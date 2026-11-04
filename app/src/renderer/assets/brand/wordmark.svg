@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 120" fill="none" stroke-linecap="round" role="img" aria-label="Rollout">
+  <!-- Zeichen links, Schriftzug als Text in Archivo (800, Breite 112 %, Laufweite -.03em). Die Schrift liegt unter assets/fonts und muss geladen sein. -->
+  <g transform="translate(0 6) scale(.1055)">
+    <path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="currentColor" stroke-width="32" transform="translate(-140 -140)"/>
+    <path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="currentColor" stroke-width="32" transform="translate(-140 -140)"/>
+    <path d="M713.1 303L759.5 254.8" stroke="#E8673C" stroke-width="40" transform="translate(-140 -140)"/>
+  </g>
+  <text x="130" y="88" fill="currentColor" font-family="Archivo, Figtree, system-ui, sans-serif" font-size="96" font-weight="800" font-stretch="112%" letter-spacing="-2.9">Rollout</text>
+</svg>
