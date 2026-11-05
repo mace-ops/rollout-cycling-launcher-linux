@@ -152,8 +152,8 @@ neu abgefragt, nicht während Installation, Entfernen und Spiel).
   (Knopf „Nochmal versuchen“); eine gescheiterte Installation führt dorthin zurück. Texte in allen 8 Sprachen (`problem.*` in `src/renderer/locales`).
 - **Starten:** `launch('zwift')` startet `rollout-run zwift` in einer eigenen Prozessgruppe. Phasen aus der Ausgabe: „Container wird vorbereitet“, ab der Zeile `Launching Zwift` von `zwift.sh` „Zwift startet“, nach
   `ROLLOUT_ZWIFT_RUNNING_MS` (Vorgabe 20000) „Läuft“. Der Container meldet das nicht selbst, das ist eine Annahme. Fehlt die Zeile, läuft die Anzeige nach 8 s trotzdem weiter. Bluetooth prüft Rollout bei Zwift nicht.
-  Exit 0 = Spiel beendet; Exit 10, 11, 12, 127 = „kann nicht starten“ mit Grund (`Launch.problem`, Phase `failed`); anderer Fehler binnen 90 s = „schloss sich direkt nach dem Start“. „Spiel beenden“ schickt TERM an die ganze Gruppe
-  (nach 15 s KILL) und wartet, bis `state/run.pid` weg ist.
+  Exit 0 = Spiel beendet; Exit 10, 11, 12, 127 = „kann nicht starten“ mit Grund (`Launch.problem`, Phase `failed`); anderer Fehler binnen 90 s = „schloss sich direkt nach dem Start“. „Spiel beenden“ schickt TERM an `rollout-run`; das stoppt den Container mit `podman stop -t 10 zwift-${ZWIFT_RIDER:-$USER}` (ein TERM an die ganze
+  Gruppe ließ ihn am Ally als Waise weiterlaufen, sein PID 1 ignoriert TERM) und wartet, bis `state/run.pid` weg ist; nach 35 s KILL an die Gruppe. Setzt der Nutzer `ZWIFT_RIDER` erst in netbrains eigener config, kennt der Starter den Namen nicht (bekannte Grenze).
 - **Entfernen:** Rückfrage mit Tag und Größe, dann `rollout-run --zwift-remove`. Scheitert es (zum Beispiel läuft noch ein Container), bleibt Zwift installiert, die Karte und die Zeile unter „Eine App entfernen“ nennen es.
   `zwift.sh` und die Container-Laufzeit bleiben.
 - **Attrappe:** `ROLLOUT_ZWIFT=fake` ersetzt Netz und Container (Zustand per `ROLLOUT_SIM_ZWIFT`: leer, `ready`, `norun`, `nonet`, `nopull`, `runcrash`, `runfail`, `norem`).

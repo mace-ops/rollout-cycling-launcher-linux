@@ -129,6 +129,9 @@ zwift_prepare() {
   export CONTAINER_TOOL=$rt IMAGE=$zw_image VERSION=$zw_tag DONT_UPDATE=1 ZWIFT_FG=1
   # zwift.sh bricht mit „USER: unbound variable“ ab, wenn USER fehlt (am Ally beim Probelauf mit leerer Umgebung aufgefallen).
   [ -n "${USER:-}" ] || { USER=$(id -un 2>/dev/null) || USER=; export USER; }
+  # Name des Containers wie in zwift.sh (--name zwift-${ZWIFT_RIDER:-$USER}); beim Beenden stoppt der Starter ihn damit (siehe forward).
+  # Setzt der Nutzer ZWIFT_RIDER erst in netbrains eigener config, kennt der Starter den Namen nicht und stoppt nichts (bekannte Grenze).
+  zw_name=zwift-${ZWIFT_RIDER:-$USER}
 }
 
 # Upstream je App: MyWhoosh liegt im Launcher-Release, Zwift ist das Startskript von netbrain/zwift unter zwift/<sha>/ (ROLLOUT_ZWIFT_SCRIPT ersetzt es).
@@ -162,10 +165,17 @@ if ! ( set -C; echo $$ > "$state/run.pid" ) 2>/dev/null; then
 fi
 trap '[ "$(sed -n "1p" "$state/run.pid" 2>/dev/null)" = "$$" ] && rm -f "$state/run.pid"' EXIT
 
-# INT und HUP gehen als TERM weiter, damit das Spiel sich beenden kann.
+# INT und HUP gehen als TERM weiter, damit das Spiel sich beenden kann. Bei Zwift reicht das nicht: Der Container hängt nicht am
+# Prozessbaum von zwift.sh, und sein PID 1 ignoriert TERM. Der Starter stoppt ihn deshalb selbst (Dienst „podman stop“, nach 10 s KILL)
+# und wartet dafür höchstens 20 s; ein Container dieses Namens, der noch nicht oder nicht mehr läuft, ist kein Fehler.
 sig=0
 pid=
-forward() { sig=1; [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null; }
+forward() {
+  sig=1
+  [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
+  [ -n "${zw_name:-}" ] && limited "$rt" stop -t 10 "$zw_name" >/dev/null 2>&1 </dev/null
+  return 0
+}
 trap forward TERM INT HUP
 
 # Bildschirm wachhalten, wo systemd-inhibit da ist und es darf (in einer SSH-Sitzung verweigert polkit es): vorher ausprobieren,
@@ -179,7 +189,12 @@ fi
 pid=$!
 while :; do
   wait "$pid"; code=$?
-  kill -0 "$pid" 2>/dev/null || break
+  if ! kill -0 "$pid" 2>/dev/null; then
+    # Ein Signal unterbrach das Warten, und das Spiel endete, während forward lief (podman stop dauert): den echten Exit-Code holen.
+    # War es schon abgeholt (127), gilt der erste Wert.
+    if [ "$sig" = 1 ] && [ "$code" -gt 128 ]; then wait "$pid" 2>/dev/null; again=$?; [ "$again" = 127 ] || code=$again; fi
+    break
+  fi
 done
 [ "$sig" = 1 ] && [ "$code" = 0 ] && code=143
 exit "$code"

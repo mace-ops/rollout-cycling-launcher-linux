@@ -135,7 +135,7 @@ export interface ZwiftStatus {
 export interface ZwiftRun {
   /** Endet, wenn der Starter endet: sein Exit-Code, bei einem Signal `null`. */
   done: Promise<number | null>;
-  /** Beendet das Spiel (TERM an die ganze Prozessgruppe, nach einer Frist KILL). */
+  /** Beendet das Spiel: TERM an `rollout-run`, das den Container mit `podman stop` anhält; nach einer Frist KILL an die ganze Prozessgruppe. */
   stop(): void;
 }
 
@@ -183,7 +183,7 @@ export interface RealZwiftOptions {
   env?: NodeJS.ProcessEnv;
   /** Zeitgrenze für `--zwift-status` in ms */
   statusTimeoutMs?: number;
-  /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 15000 */
+  /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 35000 (der Starter wartet höchstens 20 s auf `podman stop`) */
   stopGraceMs?: number;
 }
 
@@ -243,7 +243,7 @@ export class RealZwift implements ZwiftService {
 
   start(onLine: (line: string) => void): ZwiftRun {
     if (!fs.existsSync(this.runner)) return { done: Promise.resolve(127), stop: () => {} };
-    // Eigene Prozessgruppe: `zwift.sh` startet den Container als Kind. Ein TERM nur an den Starter ließe den Container weiterlaufen.
+    // Eigene Prozessgruppe, damit der KILL nach der Frist alles trifft, was am Starter hängt.
     const child = this.spawnRunner('zwift', true);
     feedLines(child.stdout, onLine);
     feedLines(child.stderr, onLine);
@@ -258,8 +258,10 @@ export class RealZwift implements ZwiftService {
     return {
       done,
       stop: () => {
-        signalGroup('SIGTERM');
-        killer ??= setTimeout(() => signalGroup('SIGKILL'), this.o.stopGraceMs ?? 15_000);
+        // Nur der Starter bekommt TERM: Er stoppt den Container selbst (podman stop, siehe rollout-run). Ein TERM an die ganze Gruppe
+        // träfe auch `podman run` und ließe den Container als Waise weiterlaufen (am Ally beobachtet).
+        try { child.kill('SIGTERM'); } catch { /* schon beendet */ }
+        killer ??= setTimeout(() => signalGroup('SIGKILL'), this.o.stopGraceMs ?? 35_000);
       }
     };
   }

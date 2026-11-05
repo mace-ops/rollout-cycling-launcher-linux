@@ -308,20 +308,26 @@ test('Z15 RealZwift.start: Exit-Codes von rollout-run tragen ihren Grund (Laufze
   assert.equal(containerLog(bare).filter((l) => / pull /.test(l)).length, 0);
 });
 
-test('Z16 RealZwift.start.stop: TERM geht an die ganze Prozessgruppe, auch an Kinder des Spiels (der Container), und das Warten endet', async () => {
+test('Z16 RealZwift.start.stop: TERM geht an den Starter, der den Container mit podman stop anhält (nicht an die Gruppe: das ließ ihn als Waise laufen); das Warten endet', async () => {
   const home = runtimeHome({ image: true });
-  const { lines, run } = collect(realZwift(home, stubUpstream(home, `sleep 30 & echo $! > "$ROLLOUT_HOME/child.pid"\necho "Launching Zwift"\nwait`)));
+  const { lines, run } = collect(realZwift(home, { ...stubUpstream(home, `sleep 30 & echo $! > "$ROLLOUT_HOME/child.pid"\necho "Launching Zwift"\nwait`), USER: 'fahrer' }));
   const end = Date.now() + 5000;
   while (!lines.some(zwift.isStartLine) && Date.now() < end) await new Promise((r) => setTimeout(r, 20));
-  const child = Number(fs.readFileSync(path.join(home, 'child.pid'), 'utf8'));
-  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-  assert.equal(alive(child), true, 'Kind läuft');
+  assert.equal(containerLog(home).filter((l) => / stop /.test(l)).length, 0, 'läuft: noch kein stop');
   run.stop();
   const code = await run.done;
   assert.notEqual(code, 0);
-  await new Promise((r) => setTimeout(r, 200));
-  assert.equal(alive(child), false, 'auch das Kind ist beendet');
+  assert.deepEqual(containerLog(home).filter((l) => / stop /.test(l)), ['podman stop -t 10 zwift-fahrer']);
   assert.equal(fs.existsSync(path.join(home, 'state/run.pid')), false, 'run.pid aufgeräumt');
+  try { process.kill(Number(fs.readFileSync(path.join(home, 'child.pid'), 'utf8'))); } catch { /* schon weg */ }
+  // ZWIFT_RIDER bestimmt den Namen, wie in zwift.sh.
+  const home2 = runtimeHome({ image: true });
+  const second = collect(realZwift(home2, { ...stubUpstream(home2, `echo "Launching Zwift"\nsleep 30 &\nwait`), ZWIFT_RIDER: 'rollouttest', USER: 'fahrer' }));
+  const end2 = Date.now() + 5000;
+  while (!second.lines.some(zwift.isStartLine) && Date.now() < end2) await new Promise((r) => setTimeout(r, 20));
+  second.run.stop();
+  await second.run.done;
+  assert.deepEqual(containerLog(home2).filter((l) => / stop /.test(l)), ['podman stop -t 10 zwift-rollouttest']);
 });
 
 test('Z17 RealZwift.removeImage: podman rmi für genau Image:Tag, Zustimmung vergessen; ohne Image ebenfalls Erfolg; Fehler tragen ihren Grund', async () => {

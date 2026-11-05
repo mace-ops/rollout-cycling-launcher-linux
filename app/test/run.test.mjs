@@ -422,6 +422,38 @@ for (const sh of shells) {
     assert.equal(pidFile(home), null);
   });
 
+  test(`R21 Beenden (${sh}): TERM stoppt den Zwift-Container beim Namen (zwift-<ZWIFT_RIDER oder USER>), MyWhoosh und ein früher Abbruch stoppen nichts`, async () => {
+    const home = makeHome();
+    zwiftScript(home);
+    const child = start(sh, home, ['zwift'], { RUN_MODE: 'wait', USER: 'fahrer' });
+    assert.ok(await until(() => fs.existsSync(path.join(home, 'started'))), 'Spiel läuft');
+    assert.equal(containers(home).filter((l) => / stop /.test(l)).length, 0);
+    child.kill('SIGTERM');
+    await exited(child);
+    assert.deepEqual(containers(home).filter((l) => / stop /.test(l)), ['podman stop -t 10 zwift-fahrer']);
+    assert.equal(pidFile(home), null);
+    const home2 = makeHome();
+    zwiftScript(home2);
+    const rider = start(sh, home2, ['zwift'], { RUN_MODE: 'wait', USER: 'fahrer', ZWIFT_RIDER: 'rollouttest' });
+    assert.ok(await until(() => fs.existsSync(path.join(home2, 'started'))));
+    rider.kill('SIGTERM');
+    await exited(rider);
+    assert.deepEqual(containers(home2).filter((l) => / stop /.test(l)), ['podman stop -t 10 zwift-rollouttest']);
+    // MyWhoosh hat keinen Container: kein stop.
+    const home3 = makeHome();
+    const vendor = path.join(home3, 'current/vendor');
+    fs.mkdirSync(vendor, { recursive: true });
+    fs.copyFileSync(path.join(home3, 'upstream.sh'), path.join(vendor, 'mywhoosh.sh'));
+    fs.chmodSync(path.join(vendor, 'mywhoosh.sh'), 0o755);
+    const bare = env(home3, { RUN_MODE: 'wait' });
+    delete bare.ROLLOUT_RUN_UPSTREAM;
+    const mw = spawn(...argv(sh, path.join(home3, 'bin/rollout-run'), 'mywhoosh'), { env: bare, stdio: 'ignore' });
+    assert.ok(await until(() => fs.existsSync(path.join(home3, 'started'))));
+    mw.kill('SIGTERM');
+    await exited(mw);
+    assert.equal(containers(home3).filter((l) => / stop /.test(l)).length, 0);
+  });
+
   test(`--container-check (${sh}) nennt die Laufzeit auf stdout`, () => {
     const home = makeHome();
     const r = run(sh, home, ['--container-check'], {});
