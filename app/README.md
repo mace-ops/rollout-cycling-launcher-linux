@@ -26,7 +26,8 @@ Die Szenarien S1 bis S4 (Oberfläche des Launcher-Updates) laufen mit `ROLLOUT_S
 
 ```text
 bin/rollout            Starter und Wächter (scripts/bin-rollout.sh), Steam-Ziel, ändert sich im Pfad nie
-bin/rollout-run        Spielstarter (scripts/bin-rollout-run.sh): Umgebung bereinigen, Bildschirm wachhalten, state/run.pid; Upstream-Anbindung folgt mit den Adaptern
+bin/rollout-run        Spielstarter (scripts/bin-rollout-run.sh): Umgebung bereinigen, Bildschirm wachhalten, state/run.pid; Zwift über die Container-Laufzeit (unten)
+zwift/<sha>/zwift.sh  Startskript von netbrain/zwift (legt der Zwift-Adapter bereit, noch nicht gebaut; ROLLOUT_ZWIFT_SCRIPT ersetzt es)
 current -> versions/<v>   previous -> versions/<v>
 versions/<v>/          package.json, dist/, bootstrap/rollout, runtime (Name des Electron-Ordners)
 electron/<v>/          Electron
@@ -115,3 +116,19 @@ Im Desktop-Modus unter Steam erreicht das Gamepad Chromium nicht (Gate G4, E1), 
 ## Marke
 
 `src/renderer/assets/brand/`: `logo.svg`, `logo-currentcolor.svg`, `wordmark.svg` (Text in Archivo, die Schrift muss geladen sein), `logo.png`.
+
+## Zwift über netbrain/zwift
+
+`rollout-run zwift` startet `zwift.sh` von netbrain/zwift (Container, Podman vor Docker) mit `CONTAINER_TOOL`, `IMAGE`, `VERSION`, `DONT_UPDATE=1` und `ZWIFT_FG=1`.
+Vorher prüft es, ob die Laufzeit nutzbar ist (Programm da, `info` geht, Rechte und Dienst), und erklärt sonst auf Deutsch, was fehlt. Es installiert nie etwas.
+
+Das Image ist fest eingestellt, nie `latest`: In `~/.config/rollout/config.toml` (oder per `ROLLOUT_ZWIFT_TAG`, `ROLLOUT_ZWIFT_DIGEST`, `ROLLOUT_ZWIFT_IMAGE`)
+
+```toml
+zwift_tag = "1.2.3"                 # Pflicht, Tag aus docker.io/netbrain/zwift
+zwift_digest = "sha256:…"           # optional: gezogen wird dann genau dieser Digest und lokal als Tag benannt
+```
+
+Gezogen wird nur mit Zustimmung für genau diese Angabe: `rollout-run --zwift-pull` (vom Launcher nach Bestätigung, oder von Hand) zieht und merkt sich die Zustimmung in `state/zwift-image-ok`.
+`rollout-run --container-check` nennt die nutzbare Laufzeit. Exit-Codes: 10 keine Laufzeit, 11 Image nicht eingestellt, 12 Image fehlt oder Ziehen gescheitert, 127 `zwift.sh` fehlt.
+Tests R9 bis R17 in `test/run.test.mjs` nutzen Attrappen für `podman` und `docker`.

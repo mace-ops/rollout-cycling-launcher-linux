@@ -158,7 +158,9 @@ export class SimBackend implements Backend {
 
   private persist(): void {
     const { language, theme, scale, autoUpdate, updateChannel } = this.state;
-    const settings: Settings = { language, theme, scale, autoUpdate, updateChannel };
+    // Zwift-Tag und -Digest pflegt der Nutzer von Hand in config.toml: Beim Speichern bleiben sie erhalten.
+    const { zwiftTag, zwiftDigest } = this.store.load();
+    const settings: Settings = { language, theme, scale, autoUpdate, updateChannel, zwiftTag, zwiftDigest };
     this.store.save(settings);
   }
 

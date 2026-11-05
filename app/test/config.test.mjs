@@ -76,6 +76,28 @@ test('U5 „Alles zurücksetzen“ setzt auch den Kanal zurück und löst eine P
   await backend.setUpdateChannel('beta');
   assert.equal(saved.updateChannel, 'beta');
   assert.equal(changes, 2);
+  saved = { ...config.DEFAULTS, zwiftTag: '1.2.3' };
+  await backend.setAutoUpdate(false);
+  assert.equal(saved.zwiftTag, '1.2.3', 'Speichern aus der Oberfläche behält den von Hand gesetzten Zwift-Tag');
 });
 
 process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
+
+test('Zwift-Image: Tag und Digest werden gelesen, gespeichert und nur gültig angenommen (nie latest)', () => {
+  const digest = `sha256:${'ab'.repeat(32)}`;
+  assert.equal(config.DEFAULTS.zwiftTag, '');
+  assert.doesNotMatch(config.serializeConfig({ ...config.DEFAULTS }), /zwift/);
+  const text = config.serializeConfig({ ...config.DEFAULTS, zwiftTag: '1.2.3', zwiftDigest: digest });
+  assert.match(text, /zwift_tag = "1\.2\.3"/);
+  assert.match(text, new RegExp(`zwift_digest = "${digest}"`));
+  const back = config.parseConfig(text);
+  assert.equal(back.zwiftTag, '1.2.3');
+  assert.equal(back.zwiftDigest, digest);
+  for (const bad of ['latest', '-x', 'a b', '', '../x']) assert.equal(config.parseConfig(`zwift_tag = "${bad}"\n`).zwiftTag, '', bad);
+  for (const bad of ['sha256:abc', `md5:${'a'.repeat(64)}`, `sha256:${'G'.repeat(64)}`, '']) assert.equal(config.parseConfig(`zwift_digest = "${bad}"\n`).zwiftDigest, '', bad);
+  // Einstellungen aus dem Launcher dürfen den Zwift-Tag nicht verlieren.
+  config.fileStore.save({ ...config.DEFAULTS, zwiftTag: '1.2.3' });
+  config.fileStore.save({ ...config.fileStore.load(), theme: 'light' });
+  assert.equal(config.fileStore.load().zwiftTag, '1.2.3');
+  config.fileStore.save({ ...config.DEFAULTS });
+});

@@ -11,9 +11,13 @@ export interface Settings {
   scale: string;
   autoUpdate: boolean;
   updateChannel: UpdateChannel;
+  /** Fester Tag des Zwift-Images (netbrain/zwift), leer = nicht eingestellt; nie „latest“. `rollout-run` liest ihn aus derselben Datei. */
+  zwiftTag: string;
+  /** Optionaler fester Digest des Zwift-Images (`sha256:` und 64 Hex-Zeichen), leer = nur der Tag zählt */
+  zwiftDigest: string;
 }
 
-export const DEFAULTS: Settings = { language: 'auto', theme: 'dark', scale: 'auto', autoUpdate: true, updateChannel: 'stable' };
+export const DEFAULTS: Settings = { language: 'auto', theme: 'dark', scale: 'auto', autoUpdate: true, updateChannel: 'stable', zwiftTag: '', zwiftDigest: '' };
 
 export interface SettingsStore {
   load(): Settings;
@@ -36,6 +40,8 @@ export function parseConfig(text: string): Settings {
     else if (key === 'scale' && str && (str === 'auto' || (/^\d{3}$/.test(str) && Number(str) >= 100 && Number(str) <= 200))) result.scale = str;
     else if (key === 'auto_update' && (value === 'true' || value === 'false')) result.autoUpdate = value === 'true';
     else if (key === 'update_channel' && (str === 'stable' || str === 'beta')) result.updateChannel = str;
+    else if (key === 'zwift_tag' && str && str !== 'latest' && /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(str)) result.zwiftTag = str;
+    else if (key === 'zwift_digest' && str && /^sha256:[0-9a-f]{64}$/.test(str)) result.zwiftDigest = str;
   }
   return result;
 }
@@ -47,6 +53,8 @@ export function serializeConfig(settings: Settings): string {
   if (settings.scale !== DEFAULTS.scale) lines.push(`scale = "${settings.scale}"`);
   if (settings.autoUpdate !== DEFAULTS.autoUpdate) lines.push(`auto_update = ${settings.autoUpdate}`);
   if (settings.updateChannel !== DEFAULTS.updateChannel) lines.push(`update_channel = "${settings.updateChannel}"`);
+  if (settings.zwiftTag !== DEFAULTS.zwiftTag) lines.push(`zwift_tag = "${settings.zwiftTag}"`);
+  if (settings.zwiftDigest !== DEFAULTS.zwiftDigest) lines.push(`zwift_digest = "${settings.zwiftDigest}"`);
   return lines.length ? `# Rollout: nur eigene Abweichungen\n${lines.join('\n')}\n` : '';
 }
 
