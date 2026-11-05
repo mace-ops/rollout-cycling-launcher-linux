@@ -1,192 +1,192 @@
-# Rollout (Oberfläche)
+# Rollout (UI)
 
-Electron-App mit TypeScript. Sie zeigt die Bildschirme aus `docs/design.md` und spricht über `src/shared/api.ts` mit dem Hauptprozess.
-Der Hauptprozess nutzt `src/main/sim.ts` als Zustandsmaschine. Zwift (`zwift.ts`) und MyWhoosh (`mywhoosh.ts`) hängen als echte Adapter daran; ohne sie (Entwicklung ohne `bin/rollout-run`) bleibt es bei der Simulation.
-Das Launcher-Update (`src/main/selfupdate.ts`) ist davon unabhängig und echt, siehe unten.
+Electron app written in TypeScript. It renders the screens of the design and talks to the main process through `src/shared/api.ts`.
+The main process uses `src/main/sim.ts` as its state machine. Zwift (`zwift.ts`) and MyWhoosh (`mywhoosh.ts`) plug into it as real adapters; without them (development without `bin/rollout-run`) it stays a simulation.
+The launcher update (`src/main/selfupdate.ts`) is independent of that and real, see below.
 
-## Befehle
+## Commands
 
 ```sh
 npm install
-npm run build        # bündelt nach dist/
-npm start            # baut und startet
-npm run test:unit    # VDF, Steam, Config, Bluetooth, Zoom, Selbst-Update (U1 bis U9), Wächter (W1 bis W12), Release-Werkzeug
-npm test             # Typprüfung, Unit-Tests, Build, Klicktest (braucht eine Bildschirmsitzung)
+npm run build        # bundles into dist/
+npm start            # builds and starts
+npm run test:unit    # VDF, Steam, config, Bluetooth, zoom, self-update (U1 to U9), watcher (W1 to W12), release tool
+npm test             # type check, unit tests, build, click test (needs a display session)
 ```
 
-Der Klicktest `test/smoke.mjs` startet die App je Szenario neu, geht alle Ansichten durch und legt mit `ROLLOUT_SHOTS=<Ordner>` Screenshots ab.
-Auf Systemen ohne `electron` im Pfad: `ELECTRON_BIN=<Pfad> ELECTRON_RUN_AS_NODE=1 <Pfad> test/smoke.mjs`.
-Rahmen, Attrappen und Wegwerf-Ordner stehen in `test/harness.mjs` und werden nicht überschreibbar erzwungen (Steam-Attrappe, Bluetooth-Attrappe, `ROLLOUT_SELFUPDATE=fake`, Wegwerf-`ROLLOUT_HOME` und `ROLLOUT_CONFIG_HOME`).
-Die Szenarien S1 bis S4 (Oberfläche des Launcher-Updates) laufen mit `ROLLOUT_SIM_SELFUPDATE`, S5 bis S8 (Durchlauf mit echtem Electron und dem Wächter, Wegwerf-Installation) mit
-`ROLLOUT_ELECTRON_DIR=<Ordner mit der Datei electron>` und gebautem `dist/`; sonst werden sie übersprungen. `ROLLOUT_ELECTRON_OLD=<Ordner mit Electron 44>` schaltet A3 (Zurück auf eine ältere Hauptversion mit demselben Profil) zu. `ROLLOUT_ONLY=<Präfix>` wählt Szenarien. `rollout-run` hat eigene Tests (`test/run.test.mjs`, laufen mit `npm run test:unit`). Am Ally dafür `DISPLAY=:0` und ein `TMPDIR` auf btrfs setzen.
+The click test `test/smoke.mjs` restarts the app for each scenario, walks through all views and, with `ROLLOUT_SHOTS=<dir>`, saves screenshots.
+On systems without `electron` on the path: `ELECTRON_BIN=<path> ELECTRON_RUN_AS_NODE=1 <path> test/smoke.mjs`.
+The frame, fakes and throwaway directories live in `test/harness.mjs` and are enforced so they cannot be overridden (Steam fake, Bluetooth fake, `ROLLOUT_SELFUPDATE=fake`, throwaway `ROLLOUT_HOME` and `ROLLOUT_CONFIG_HOME`).
+Scenarios S1 to S4 (launcher update UI) run with `ROLLOUT_SIM_SELFUPDATE`; S5 to S8 (full run with real Electron and the watcher, throwaway installation) need
+`ROLLOUT_ELECTRON_DIR=<directory containing the file electron>` and a built `dist/`, otherwise they are skipped. `ROLLOUT_ELECTRON_OLD=<directory with Electron 44>` enables A3 (back to an older major version with the same profile). `ROLLOUT_ONLY=<prefix>` selects scenarios. `rollout-run` has its own tests (`test/run.test.mjs`, run with `npm run test:unit`). On the Ally set `DISPLAY=:0` and a `TMPDIR` on btrfs.
 
-## Fester Pfad und Steam
+## Fixed path and Steam
 
-`scripts/install.sh [Electron-Ordner]` legt nach `npm run build` alles unter `~/.local/share/rollout` ab (`$ROLLOUT_HOME` überschreibt das), Aufbau nach Konzept 4.3:
+After `npm run build`, `scripts/install.sh [Electron directory]` puts everything under `~/.local/share/rollout` (`$ROLLOUT_HOME` overrides it):
 
 ```text
-bin/rollout            Starter und Wächter (scripts/bin-rollout.sh), Steam-Ziel, ändert sich im Pfad nie
-bin/rollout-run        Spielstarter (scripts/bin-rollout-run.sh): Umgebung bereinigen, Bildschirm wachhalten, state/run.pid; Zwift über die Container-Laufzeit (unten)
-zwift/<commit>/zwift.sh  Startskript von netbrain/zwift, gepinnt in upstreams.json, vom Zwift-Adapter (src/main/zwift.ts) geladen und geprüft; ROLLOUT_ZWIFT_SCRIPT ersetzt es
+bin/rollout            starter and watcher (scripts/bin-rollout.sh), Steam target, its path never changes
+bin/rollout-run        game starter (scripts/bin-rollout-run.sh): cleans the environment, keeps the screen awake, state/run.pid; Zwift through the container runtime (below)
+zwift/<commit>/zwift.sh  start script from netbrain/zwift, pinned in upstreams.json, downloaded and verified by the Zwift adapter (src/main/zwift.ts); ROLLOUT_ZWIFT_SCRIPT replaces it
 current -> versions/<v>   previous -> versions/<v>
-versions/<v>/          package.json, dist/, vendor/ (mywhoosh.sh, ble-bridge.py, Lizenz), bootstrap/rollout, runtime (Name des Electron-Ordners)
+versions/<v>/          package.json, dist/, vendor/ (mywhoosh.sh, ble-bridge.py, licence), bootstrap/rollout, runtime (name of the Electron directory)
 electron/<v>/          Electron
-staging/ state/        Laden und Entpacken, Wächter-Zustand (lock, pending, trial, healthy, bad, notice, boot.log, check.json)
+staging/ state/        download and unpack area, watcher state (lock, pending, trial, healthy, bad, notice, boot.log, check.json)
 icon.png
 ```
 
-Ein alter Aufbau (`app/dist`, `app/electron`) zieht beim nächsten Lauf um und behält sein Electron. Ohne Argument bleibt ein vorhandenes Electron, sonst kommt `node_modules/electron/dist` zum Einsatz,
-mit `REPLACE_ELECTRON=1` und Argument oder `ELECTRON_DIR` wird ein anderes genommen. Rollout vorher beenden.
+An old layout (`app/dist`, `app/electron`) is migrated on the next run and keeps its Electron. Without an argument an existing Electron stays, otherwise `node_modules/electron/dist` is used;
+with `REPLACE_ELECTRON=1` and an argument, or `ELECTRON_DIR`, another one is taken. Quit Rollout first.
 
-## Launcher-Update
+## Launcher update
 
-Konzept 6.1 bis 6.12, Oberfläche Design 10.12. Der Wächter `bin/rollout` bleibt als Elternprozess von Electron (`ROLLOUT_SUPERVISED=1`), tauscht `current` per `rename`, startet die neue Version zur Probe
-und schaltet nach zwei Fehlschlägen auf `previous` zurück. Ohne Wächter (`npm start`) gibt es keine Prüfung und keine Zeile mit Knopf in den Einstellungen.
-`src/main/selfupdate.ts` prüft ein signiertes Manifest (Ed25519, `node:crypto`), lädt App- und bei Bedarf Electron-Archiv, prüft Größe und SHA-256, legt die Version bereit und schreibt zuletzt `state/pending`.
-Das Netz steckt hinter `Feed` (`selfupdate-net.ts`, nur im Hauptprozess), die Attrappen stehen in `selfupdate-fake.ts`. Pfade im Hauptprozess nur über `__dirname`, nie über `app.getAppPath()` (zeigt auf den Symlink).
+The watcher `bin/rollout` stays as the parent process of Electron (`ROLLOUT_SUPERVISED=1`), swaps `current` by `rename`, starts the new version on trial
+and switches back to `previous` after two failures. Without the watcher (`npm start`) there is no check and no row with a button in the settings.
+`src/main/selfupdate.ts` verifies a signed manifest (Ed25519, `node:crypto`), downloads the app archive and, if needed, the Electron archive, checks size and SHA-256, stages the version and writes `state/pending` last.
+The network sits behind `Feed` (`selfupdate-net.ts`, main process only); the fakes live in `selfupdate-fake.ts`. In the main process, paths come only from `__dirname`, never from `app.getAppPath()` (it points to the symlink).
 
-**Schlüssel:** `src/main/selfupdate-keys.ts` ist leer. Solange kein öffentlicher Schlüssel eingetragen ist, prüft der Client gar nicht und lehnt alles ab. Der echte Schlüssel entsteht erst bei der Veröffentlichung (Konzept 6.4, Schritt 7).
+**Keys:** `src/main/selfupdate-keys.ts` lists the public keys. As long as no public key is registered, the client does not check at all and rejects everything. The real key is created only at publication.
 
-**Release bauen** (nur lokal, kein Upload):
+**Building a release** (local only, no upload):
 
 ```sh
 npm test
-node scripts/release.mjs pack --runtime <Electron-Ordner>        # oder --runtime-from <früheres rollout-update.json>
-node scripts/release.mjs check --electron <Electron-Ordner> [--previous <rollout-<v>-app.tar.gz>]
+node scripts/release.mjs pack --runtime <Electron directory>        # or --runtime-from <earlier rollout-update.json>
+node scripts/release.mjs check --electron <Electron directory> [--previous <rollout-<v>-app.tar.gz>]
 ```
 
-`pack` schreibt Archive und das signierte `rollout-update.json` nach `release-out/` (per `.gitignore` ausgenommen) und fragt nach der Passphrase des Schlüssels
-(`--key`, sonst `~/.config/rollout-release/rollout-update-1.pem`; `ROLLOUT_RELEASE_PASSPHRASE` ersetzt die Frage). `check` ist die Release-Probe (Konzept 6.12): vorheriges Release auf den Kandidaten,
-dann den Kandidaten auf eine künstliche Version +1, mit Testschlüssel und echtem Electron. Tag, Entwurf, Upload und Veröffentlichung folgen von Hand nach Konzept 6.3.
+`pack` writes the archives and the signed `rollout-update.json` to `release-out/` (excluded by `.gitignore`) and asks for the key's passphrase
+(`--key`, otherwise `~/.config/rollout-release/rollout-update-1.pem`; `ROLLOUT_RELEASE_PASSPHRASE` replaces the prompt). `check` is the release probe: previous release onto the candidate,
+then the candidate onto an artificial version +1, with a test key and a real Electron. Tag, draft, upload and publication follow by hand.
 
-**Einstellungen:** `update_channel = "stable"` oder `"beta"` in der `config.toml` (nur Abweichungen), bedient unter Erweitert, Reiter „Launcher“. „Updates automatisch laden“ gilt auch für den Launcher.
+**Settings:** `update_channel = "stable"` or `"beta"` in `config.toml` (deviations only), operated under Advanced, tab "Launcher". "Download updates automatically" also applies to the launcher.
 
-Rollout startet im Vollbild, wenn Steam es startet oder der Gaming Mode läuft. `--fullscreen` erzwingt das, `--windowed` verhindert es, `F11` schaltet um.
+Rollout starts fullscreen when Steam starts it or Gaming Mode is running. `--fullscreen` forces that, `--windowed` prevents it, `F11` toggles.
 
-Oben rechts beendet der runde Knopf neben „Einstellungen“ die App, nach einer Rückfrage.
+At the top right, the round button next to "Settings" quits the app after a confirmation.
 
-In den Einstellungen legt der Schalter „Rollout in Steam“ einen Nicht-Steam-Eintrag auf `bin/rollout` an oder entfernt ihn (`src/main/steam.ts`, `vdf.ts`).
-Ablauf: Läuft Steam, fragt Rollout „Steam muss kurz neu starten“, schließt Steam, schreibt `shortcuts.vdf` und startet Steam wieder.
-Geschrieben wird mit Sicherung (`shortcuts.vdf.rollout-backup-*`, die letzten drei bleiben), Prüfung und atomarem Umbenennen. Fremde Einträge bleiben byte-genau erhalten.
-Dazu erzeugt Rollout die Bilder für die Bibliothek (Hochformat, Breitformat, Hintergrund mit dem MyWhoosh-Foto, Logo) in `config/grid`, benannt nach der AppID (`src/main/artwork.ts`). Steam zeigt sie nach seinem nächsten Start.
-Nur natives Steam im Desktop-Modus. Flatpak, Snap und der Gaming Mode melden „nicht verfügbar“.
+In the settings, the "Rollout in Steam" switch creates a non-Steam entry for `bin/rollout` or removes it (`src/main/steam.ts`, `vdf.ts`).
+Flow: if Steam is running, Rollout asks "Steam needs to restart briefly", closes Steam, writes `shortcuts.vdf` and starts Steam again.
+Writing happens with a backup (`shortcuts.vdf.rollout-backup-*`, the last three are kept), verification and atomic rename. Foreign entries are preserved byte for byte.
+Rollout also generates the library images (portrait, landscape, background with the MyWhoosh photo, logo) in `config/grid`, named after the AppID (`src/main/artwork.ts`). Steam shows them after its next start.
+Native Steam in Desktop Mode only. Flatpak, Snap and Gaming Mode report "not available".
 
-## Simulierte Zustände
+## Simulated states
 
-| Variable | Wirkung |
+| Variable | Effect |
 | --- | --- |
-| `ROLLOUT_SIM_STATE=fresh` | keine App installiert |
-| `ROLLOUT_SIM_UPDATE=1` | für installierte Apps ist ein Update da |
-| `ROLLOUT_SIM_CRASH=1` | Spiel beendet sich nach dem Start |
-| `ROLLOUT_SIM_LANG=de` | Sprache fest wählen, sonst die gespeicherte oder die Systemsprache |
-| `ROLLOUT_SIM_THEME=light` | Aussehen fest wählen (`dark` oder `light`) |
-| `ROLLOUT_SIM_SCALE=125` | Größe fest wählen |
-| `ROLLOUT_CONFIG_HOME=<Ordner>` | Ort der `config.toml`, im Test ein Wegwerf-Ordner |
-| `ROLLOUT_BT=fake` | Bluetooth-Attrappe statt `bluetoothctl`; `ROLLOUT_SIM_BT=problem` lässt den Adapter ausfallen |
-| `ROLLOUT_MYWHOOSH=real\|sim` | MyWhoosh echt (`vendor/mywhoosh.sh` über `rollout-run`) oder simuliert; ohne Angabe echt, sobald `bin/rollout-run` und `vendor/mywhoosh.sh` da sind. Der Klicktest erzwingt `sim` |
-| `MYWHOOSH_ROOT=<Ordner>` | verlegt den Spielordner von `mywhoosh.sh` (sonst `~/Games/mywhoosh-linux`), im Test ein Wegwerf-Ordner |
-| `ROLLOUT_SIM_STEAM=fake` | Steam-Zugriff durch eine Attrappe ersetzen. Der Klicktest erzwingt das, damit nie echte Steam-Dateien geändert werden |
-| `ROLLOUT_SIM_STEAM_RUNNING=1` | die Attrappe tut so, als liefe Steam |
-| `ROLLOUT_SIM_SELFUPDATE=<Zustand>[,blocked][,fail][,previous=<v>][,notice=<v>][,next=<v>][,mb=<n>]` | Launcher-Update fest wählen (`current`, `checking`, `checkFailed`, `available`, `downloading`, `ready`, `invalid`, `noSpace`, `manual`, `none`), ohne Dateien und ohne Neustart |
-| `ROLLOUT_SELFUPDATE=fake` | ersetzt das Netz durch `ROLLOUT_SELFUPDATE_DIR` (`rollout-update.json`, `rollout-update-beta.json`, Archive nach Dateiname) und nimmt den öffentlichen Schlüssel (32 Byte, Base64) aus `ROLLOUT_SELFUPDATE_KEY`. Gilt nur mit gesetztem `ROLLOUT_HOME`, sonst bricht die App ab. Verkürzt die Zeiten (erste Prüfung 0,3 s, Gesund-Meldung 1 s). `ROLLOUT_SELFUPDATE_DELAY_MS` bremst das Laden |
-| `ROLLOUT_HOME=<Ordner>` | Ort der Installation (Zustand des Selbst-Updates, Steam-Ziel), im Test ein Wegwerf-Ordner |
-| `ROLLOUT_BOOT_TIMEOUT`, `ROLLOUT_BOOT_GRACE` | Zeitlimit der Probe (60 s) und Frist zwischen TERM und KILL (5 s) im Wächter, im Test verkürzt |
+| `ROLLOUT_SIM_STATE=fresh` | no app installed |
+| `ROLLOUT_SIM_UPDATE=1` | an update is available for installed apps |
+| `ROLLOUT_SIM_CRASH=1` | the game exits after the start |
+| `ROLLOUT_SIM_LANG=de` | fix the language, otherwise the saved one or the system language |
+| `ROLLOUT_SIM_THEME=light` | fix the appearance (`dark` or `light`) |
+| `ROLLOUT_SIM_SCALE=125` | fix the size |
+| `ROLLOUT_CONFIG_HOME=<dir>` | location of `config.toml`, a throwaway directory in tests |
+| `ROLLOUT_BT=fake` | Bluetooth fake instead of `bluetoothctl`; `ROLLOUT_SIM_BT=problem` makes the adapter fail |
+| `ROLLOUT_MYWHOOSH=real\|sim` | MyWhoosh real (`vendor/mywhoosh.sh` through `rollout-run`) or simulated; without it, real as soon as `bin/rollout-run` and `vendor/mywhoosh.sh` exist. The click test forces `sim` |
+| `MYWHOOSH_ROOT=<dir>` | moves `mywhoosh.sh`'s game directory (otherwise `~/Games/mywhoosh-linux`), a throwaway directory in tests |
+| `ROLLOUT_SIM_STEAM=fake` | replace Steam access with a fake. The click test forces this so real Steam files are never changed |
+| `ROLLOUT_SIM_STEAM_RUNNING=1` | the fake pretends Steam is running |
+| `ROLLOUT_SIM_SELFUPDATE=<state>[,blocked][,fail][,previous=<v>][,notice=<v>][,next=<v>][,mb=<n>]` | fix the launcher update (`current`, `checking`, `checkFailed`, `available`, `downloading`, `ready`, `invalid`, `noSpace`, `manual`, `none`), without files and without a restart |
+| `ROLLOUT_SELFUPDATE=fake` | replaces the network with `ROLLOUT_SELFUPDATE_DIR` (`rollout-update.json`, `rollout-update-beta.json`, archives by file name) and takes the public key (32 bytes, base64) from `ROLLOUT_SELFUPDATE_KEY`. Applies only with `ROLLOUT_HOME` set, otherwise the app aborts. Shortens the timings (first check 0.3 s, healthy report 1 s). `ROLLOUT_SELFUPDATE_DELAY_MS` slows down the download |
+| `ROLLOUT_HOME=<dir>` | location of the installation (self-update state, Steam target), a throwaway directory in tests |
+| `ROLLOUT_BOOT_TIMEOUT`, `ROLLOUT_BOOT_GRACE` | trial time limit (60 s) and deadline between TERM and KILL (5 s) in the watcher, shortened in tests |
 
-## Sprachen
+## Languages
 
-Englisch ist die Quellsprache (`src/renderer/locales/en.ts`). Vorhanden: Englisch, Deutsch, Spanisch, Französisch, Italienisch, Portugiesisch, Niederländisch, Polnisch. Japanisch und Chinesisch sind bewusst nicht dabei. Eine weitere Sprache ist eine Datei im selben Ordner, die den Typ `Messages` erfüllt,
-plus ein Eintrag in `src/renderer/i18n.ts`. Fehlt ein Schlüssel, meldet die Typprüfung das. Die Sprache folgt dem System und lässt sich in den Einstellungen ändern.
+English is the source language (`src/renderer/locales/en.ts`). Available: English, German, Spanish, French, Italian, Portuguese, Dutch, Polish. Japanese and Chinese are deliberately not included. Another language is a file in the same directory that satisfies the `Messages` type,
+plus an entry in `src/renderer/i18n.ts`. If a key is missing, the type check reports it. The language follows the system and can be changed in the settings.
 
-## Einstellungen
+## Settings
 
-Sprache, Aussehen (Automatisch, Dunkel, Hell), Größe der Oberfläche und „Updates automatisch laden“ werden in `~/.config/rollout/config.toml` gespeichert, und zwar nur Abweichungen von den Vorgaben (`src/main/config.ts`, `ROLLOUT_CONFIG_HOME` verlegt den Ordner).
+Language, appearance (Automatic, Dark, Light), UI size and "Download updates automatically" are saved in `~/.config/rollout/config.toml`, and only deviations from the defaults (`src/main/config.ts`, `ROLLOUT_CONFIG_HOME` moves the directory).
 
-Die Oberfläche ist für 1280 × 800 entworfen. „Automatisch“ vergrößert sie mit dem Fenster (ein Ally mit 1920 × 1080 zeigt 135 %), nie unter 100 %. Handwerte reichen bis 175 % und werden auf das begrenzt, was noch in 1024 × 640 passt (`src/main/zoom.ts`).
+The UI is designed for 1280 × 800. "Automatic" scales it with the window (an Ally at 1920 × 1080 shows 135 %), never below 100 %. Manual values go up to 175 % and are capped to what still fits in 1024 × 640 (`src/main/zoom.ts`).
 
 ## Bluetooth
 
-Die Suche nutzt `bluetoothctl` (`src/main/bluetooth.ts`) und zeigt Trainer (FTMS oder Cycling Power) und Herzfrequenz-Gurte, die gerade senden. Es wird nichts gekoppelt.
-`ROLLOUT_BT=fake` ersetzt sie durch eine Attrappe, der Klicktest erzwingt das. Von Hand mit echtem Adapter: `ROLLOUT_REAL_BT=1 ROLLOUT_ONLY=bluetooth-echt` beim Klicktest.
+The scan uses `bluetoothctl` (`src/main/bluetooth.ts`) and shows trainers (FTMS or Cycling Power) and heart-rate straps that are currently broadcasting. Nothing is paired.
+`ROLLOUT_BT=fake` replaces it with a fake; the click test forces that. By hand with a real adapter: `ROLLOUT_REAL_BT=1 ROLLOUT_ONLY=bluetooth-real` for the click test.
 
-## Bedienung
+## Operation
 
-Auswahlfelder öffnen eine eigene Liste in der App statt des nativen Menüs, weil das Controller und Touch im Gaming Mode nicht bedienen können.
+Select fields open a list of their own inside the app instead of the native menu, because controller and touch cannot operate the native one in Gaming Mode.
 
-Maus, Touch, Tastatur und Controller: Pfeile, Steuerkreuz und linker Stick wechseln den Fokus, Enter oder A löst aus, Esc oder B geht zurück, der rechte Stick scrollt.
-Im Desktop-Modus unter Steam erreicht das Gamepad Chromium nicht (Gate G4, E1), im Gaming Mode funktioniert es.
+Mouse, touch, keyboard and controller: arrows, d-pad and left stick move the focus, Enter or A activates, Esc or B goes back, the right stick scrolls.
+In Desktop Mode under Steam the gamepad does not reach Chromium (gate G4, E1); in Gaming Mode it works.
 
-## Lizenz
+## Licence
 
-Rollout steht unter der MIT-Lizenz, siehe [LICENSE](../LICENSE). Fremde Komponenten (Electron, Schriften Archivo und Figtree) behalten ihre Lizenz, siehe [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md). Zwift und MyWhoosh sind Marken und Spiele der Hersteller, Rollout ist nicht mit ihnen verbunden und nicht von ihnen genehmigt.
+Rollout is released under the MIT licence, see [LICENSE](../LICENSE). Third-party components (Electron, the Archivo and Figtree fonts) keep their licences, see [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md). Zwift and MyWhoosh are trademarks and games of their vendors; Rollout is not affiliated with or endorsed by them.
 
-## Marke
+## Brand
 
-`src/renderer/assets/brand/`: `logo.svg`, `logo-currentcolor.svg`, `wordmark.svg` (Text in Archivo, die Schrift muss geladen sein), `logo.png`.
+`src/renderer/assets/brand/`: `logo.svg`, `logo-currentcolor.svg`, `wordmark.svg` (text in Archivo, the font has to be loaded), `logo.png`.
 
 ## MyWhoosh (`src/main/mywhoosh.ts`, `vendor/`, `upstreams.json`)
 
-MyWhoosh läuft über die eigene Kopie von `mywhoosh.sh` aus [Parapeth962/mywhoosh-linux-installer](https://github.com/Parapeth962/mywhoosh-linux-installer) (MIT, Lizenz in `vendor/`), gepinnt in `upstreams.json` (`mywhoosh`: Commit der Vorlage, SHA-256 beider Dateien; `test/mywhoosh.test.mjs` M16 prüft, dass `vendor/` dazu passt).
-`ble-bridge.py` gehört mit hinein: `mywhoosh.sh install` kopiert sie in den Spielordner und bricht ohne sie ab. Shim und Helfer von Dj0ulo (keine Lizenz) lädt das Skript selbst vom Original-Release und prüft die Prüfsumme; sie liegen nicht im Repo.
-`vendor/` geht in jedes Release (`scripts/release.mjs`, `scripts/install.sh`) und liegt neben `dist/` der laufenden Version; `rollout-run mywhoosh` startet `current/vendor/mywhoosh.sh run`.
+MyWhoosh runs through our own copy of `mywhoosh.sh` from [Parapeth962/mywhoosh-linux-installer](https://github.com/Parapeth962/mywhoosh-linux-installer) (MIT, licence in `vendor/`), pinned in `upstreams.json` (`mywhoosh`: commit of the original, SHA-256 of both files; `test/mywhoosh.test.mjs` M16 checks that `vendor/` matches).
+`ble-bridge.py` belongs with it: `mywhoosh.sh install` copies it into the game directory and aborts without it. The shim and helper by Dj0ulo (no licence) are downloaded by the script itself from the original release and verified by checksum; they are not in the repo.
+`vendor/` goes into every release (`scripts/release.mjs`, `scripts/install.sh`) and sits next to `dist/` of the running version; `rollout-run mywhoosh` starts `current/vendor/mywhoosh.sh run`.
 
-- **Zustand:** von der Platte, nicht aus dem Gedächtnis: installiert, wenn `~/Games/mywhoosh-linux/game/MyWhoosh/Binaries/Win64/MyWhoosh-Win64-Shipping.exe` da ist (HD: `~/Games/mywhoosh-hd-linux`, `MYWHOOSH_ROOT` verlegt den Ordner). Die Version steht in `AppxManifest.xml` und erscheint im App-Menü unter dem Namen (`AppInfo.version`).
-- **Einrichten, Aktualisieren, Entfernen:** `rollout-run --mywhoosh install [--hd]|update|uninstall` (Bildschirm bleibt wach, kein `run.pid`, Exit 1 bei laufendem Spiel). Ausgabe und Fehler stehen in `state/mywhoosh.log`. Fehlerarten aus der Ausgabe: `net` (download failed), `verify` (checksum/digest mismatch), `disk` (zu wenig Platz, vorab geprüft: 14 GB, HD 38 GB), sonst `error`.
-  Fortschritt ist eine Schätzung: geschriebene Bytes in `cache/`, `game/` und `game.new/` gegen 9 GB (HD 31 GB), dazu Mindestwerte aus Zeilen („preparing Windows environment“ 92 %). Ein Spielordner ohne Spiel (Rest eines abgebrochenen Versuchs) wird vor dem Einrichten gelöscht; ein Spiel nie. `state/mywhoosh-setup.pid` verhindert zwei Einrichtungen zugleich, auch über einen Neustart von Rollout hinweg.
-- **Start:** Bluetooth-Prüfung (`bluetooth.ts`), bei Problem Karte „Bluetooth prüfen“ mit „Trotzdem starten“; dann `rollout-run mywhoosh`. Phasen aus der Ausgabe: „Updates“ (das Skript prüft beim Start selbst auf eine neuere Version und lädt sie, Minuten möglich), ab der Zeile `starting MyWhoosh` „Startet“, nach 20 s (`ROLLOUT_MYWHOOSH_RUNNING_MS`) „Läuft“. **Annahme, nicht belegt:** MyWhoosh meldet „läuft“ nicht; die 20 s sind geschätzt. Fehler innerhalb von 90 s zeigen die Absturz-Ansicht, Exit 127 „kann nicht starten“.
-- **Beenden:** TERM an `rollout-run`, das das Spiel in einer eigenen Sitzung (`setsid`) startet und beim Beenden der ganzen Gruppe TERM schickt (Wine, umu und Bluetooth-Helfer hängen nicht am Prozessbaum des Skripts), nach 12 s (`ROLLOUT_RUN_KILL_AFTER`) KILL. Beendet Steam Rollout, stoppt Rollout das Spiel vorher (`hasRunningGame`); eine laufende Einrichtung wird dabei abgebrochen.
-- **Controller im Spielmodus:** Die Oberfläche von MyWhoosh zeigt beim Navigieren mit dem Gamepad keinen Fokus, und ein A kann sie beenden. Deshalb sieht Wine das Steam-Gamepad nicht mehr: `rollout-run` setzt `SDL_GAMECONTROLLER_IGNORE_DEVICES=0x045e/0x028e` (nur mit `xdotool`, nie bei `ROLLOUT_MYWHOOSH_PAD=off`, eine eigene Vorgabe gilt). Stattdessen gibt Rollout es wie bei Zwift als Tastatur und Maus weiter (`gamepad-bridge.ts`, Zeigermodus: beide Sticks bewegen den Zeiger, das Steuerkreuz in 12-Pixel-Schritten, **A Linksklick**, B/Start Esc, RT/LT Klicks, LB/RB Scrollen; keine Pfeiltasten, damit im Spiel kein unsichtbarer Fokus entsteht), aber erst, wenn das MyWhoosh-Fenster (WM_CLASS enthält `mywhoosh`) das von gamescope fokussierte Fenster ist (`watchZwiftWindow` mit `tag: false`, setzt kein `STEAM_GAME`). Anzeige: die geerbte `DISPLAY` (`ROLLOUT_MYWHOOSH_DISPLAY`), Fokus von `:0`. Protokoll: `state/mywhoosh-window.log`. `ROLLOUT_MYWHOOSH_WINDOWS=off` schaltet Fenster und Controller ab. Rollouts eigene Oberfläche ignoriert das Gamepad in den Phasen „Startet“ und „Läuft“ (`nav.ts`, `padEnabled`), damit ein A nicht zugleich „Spiel beenden“ klickt.
-  **Nicht belegt:** ob Wine das Gamepad über SDL liest und die Variable es verbirgt, und welche WM_CLASS das Fenster wirklich trägt; beides ist am Ally zu prüfen (Protokoll lesen).
-- **Runder Zeiger:** Rollout legt unter `state/cursors/rollout-dot/` ein X-Cursor-Thema an (weißer Kreis mit dunklem Rand und blauer Mitte, 48 px, `xcursor.ts`) und nennt es dem Spiel über `XCURSOR_PATH`, `XCURSOR_THEME`, `XCURSOR_SIZE`. `ROLLOUT_MYWHOOSH_CURSOR=off` lässt den normalen Zeiger. **Nicht belegt:** Wine zeichnet den Zeiger oft aus dem Bild, das die Anwendung selbst liefert, und ignoriert dann das Thema; ob es am Ally greift, ist zu prüfen.
-- **Bluetooth im App-Menü:** Die Zeile zeigt den echten Zustand von `bluetoothctl show` (`Powered: yes`), frisch bei jedem Öffnen des Menüs und vor jedem Start. Die Abfrage blockiert den Hauptprozess nicht.
-- **Entfernen:** Rückfrage in der Oberfläche, dann `uninstall` (löscht Spiel, Prefix und Anmeldung, Proton bleibt). Scheitert es, bleibt MyWhoosh installiert und die Karte nennt es.
-- **Nicht umgesetzt:** Erkennen einer neueren Store-Version vor dem Start (`updateAvailable` bleibt `false`; aktualisiert wird beim Start), Vorabprüfung von Python `dbus`/`gi`, Abbrechen der Einrichtung per Knopf, Steam-Eintrag je Spiel (der Schalter setzt nur das Kennzeichen, wie bei Zwift).
-- **Tests:** M1 bis M16 in `test/mywhoosh.test.mjs` (Attrappe als `mywhoosh.sh`, echtes `rollout-run`, `HOME` und `MYWHOOSH_ROOT` im Wegwerf-Ordner), R30 bis R33 in `test/run.test.mjs`. Die Klicktests erzwingen `ROLLOUT_MYWHOOSH=sim`; `real` läuft dort nur mit Attrappe als Upstream und Spielordner unter `/tmp`.
+- **State:** from disk, not from memory: installed if `~/Games/mywhoosh-linux/game/MyWhoosh/Binaries/Win64/MyWhoosh-Win64-Shipping.exe` exists (HD: `~/Games/mywhoosh-hd-linux`, `MYWHOOSH_ROOT` moves the directory). The version is in `AppxManifest.xml` and appears in the app menu under the name (`AppInfo.version`).
+- **Install, update, remove:** `rollout-run --mywhoosh install [--hd]|update|uninstall` (screen stays awake, no `run.pid`, exit 1 if a game is running). Output and errors go to `state/mywhoosh.log`. Error kinds from the output: `net` (download failed), `verify` (checksum/digest mismatch), `disk` (not enough space, checked beforehand: 14 GB, HD 38 GB), otherwise `error`.
+  Progress is an estimate: bytes written in `cache/`, `game/` and `game.new/` against 9 GB (HD 31 GB), plus minimum values from lines ("preparing Windows environment" 92 %). A game directory without a game (leftover of an aborted attempt) is deleted before setup; a game never. `state/mywhoosh-setup.pid` prevents two setups at once, even across a Rollout restart.
+- **Start:** Bluetooth check (`bluetooth.ts`); on a problem, the "Check Bluetooth" card with "Start anyway"; then `rollout-run mywhoosh`. Phases from the output: "Updates" (the script checks for a newer version itself at start and downloads it, which can take minutes), "Starting" from the line `starting MyWhoosh`, "Running" after 20 s (`ROLLOUT_MYWHOOSH_RUNNING_MS`). **Assumption, not confirmed:** MyWhoosh does not report "running"; the 20 s are an estimate. Errors within 90 s show the crash view, exit 127 "cannot start".
+- **Quit:** TERM to `rollout-run`, which starts the game in a session of its own (`setsid`) and, on quit, sends TERM to the whole group (Wine, umu and the Bluetooth helper are not part of the script's process tree), KILL after 12 s (`ROLLOUT_RUN_KILL_AFTER`). If Steam ends Rollout, Rollout stops the game first (`hasRunningGame`); a running setup is aborted.
+- **Controller in Gaming Mode:** MyWhoosh's UI shows no focus when navigating with the gamepad, and an A can quit it. Therefore Wine no longer sees the Steam gamepad: `rollout-run` sets `SDL_GAMECONTROLLER_IGNORE_DEVICES=0x045e/0x028e` (only with `xdotool`, never with `ROLLOUT_MYWHOOSH_PAD=off`, a user-set value wins). Instead, as with Zwift, Rollout forwards it as keyboard and mouse (`gamepad-bridge.ts`, pointer mode: both sticks move the pointer, the d-pad in 12-pixel steps, **A left click**, B/Start Esc, RT/LT clicks, LB/RB scrolling; no arrow keys, so the game never ends up with an invisible focus), but only once the MyWhoosh window (WM_CLASS contains `mywhoosh`) is the window focused by gamescope (`watchZwiftWindow` with `tag: false`, sets no `STEAM_GAME`). Display: the inherited `DISPLAY` (`ROLLOUT_MYWHOOSH_DISPLAY`), focus from `:0`. Log: `state/mywhoosh-window.log`. `ROLLOUT_MYWHOOSH_WINDOWS=off` switches window and controller off. Rollout's own UI ignores the gamepad in the phases "Starting" and "Running" (`nav.ts`, `padEnabled`) so an A does not also click "Quit game".
+  **Not confirmed:** whether Wine reads the gamepad through SDL and the variable hides it, and which WM_CLASS the window really carries; both need to be checked on the Ally (read the log).
+- **Round pointer:** Rollout creates an X cursor theme under `state/cursors/rollout-dot/` (white circle with a dark rim and blue centre, 48 px, `xcursor.ts`) and passes it to the game through `XCURSOR_PATH`, `XCURSOR_THEME`, `XCURSOR_SIZE`. `ROLLOUT_MYWHOOSH_CURSOR=off` keeps the normal pointer. **Not confirmed:** Wine often draws the pointer from the image the application supplies itself and then ignores the theme; whether it takes effect on the Ally needs to be checked.
+- **Bluetooth in the app menu:** The row shows the real state of `bluetoothctl show` (`Powered: yes`), fresh every time the menu opens and before every start. The query does not block the main process.
+- **Remove:** confirmation in the UI, then `uninstall` (deletes game, prefix and login; Proton stays). If it fails, MyWhoosh stays installed and the card says so.
+- **Not implemented:** detecting a newer store version before the start (`updateAvailable` stays `false`; updating happens at start), pre-checking Python `dbus`/`gi`, cancelling the setup with a button, a Steam entry per game (the switch only sets the flag, as with Zwift).
+- **Tests:** M1 to M19 in `test/mywhoosh.test.mjs` (fake `mywhoosh.sh`, real `rollout-run`, `HOME` and `MYWHOOSH_ROOT` in a throwaway directory), R30 to R34 in `test/run.test.mjs`. The click tests force `ROLLOUT_MYWHOOSH=sim`; `real` runs there only with a fake upstream and a game directory under `/tmp`.
 
-## Zwift über netbrain/zwift
+## Zwift through netbrain/zwift
 
-`rollout-run zwift` startet `zwift.sh` von netbrain/zwift (Container, Podman vor Docker) mit `CONTAINER_TOOL`, `IMAGE`, `VERSION`, `DONT_UPDATE=1` und `ZWIFT_FG=1`.
-Vorher prüft es, ob die Laufzeit nutzbar ist (Programm da, `info` geht, Rechte und Dienst), und erklärt sonst auf Deutsch, was fehlt. Es installiert nie etwas.
+`rollout-run zwift` starts netbrain/zwift's `zwift.sh` (container, Podman before Docker) with `CONTAINER_TOOL`, `IMAGE`, `VERSION`, `DONT_UPDATE=1` and `ZWIFT_FG=1`.
+Beforehand it checks whether the runtime is usable (program present, `info` works, permissions and service) and otherwise explains what is missing. It never installs anything.
 
-Das Image ist fest eingestellt, nie `latest`: In `~/.config/rollout/config.toml` (oder per `ROLLOUT_ZWIFT_TAG`, `ROLLOUT_ZWIFT_DIGEST`, `ROLLOUT_ZWIFT_IMAGE`)
+The image is fixed, never `latest`: in `~/.config/rollout/config.toml` (or via `ROLLOUT_ZWIFT_TAG`, `ROLLOUT_ZWIFT_DIGEST`, `ROLLOUT_ZWIFT_IMAGE`)
 
 ```toml
-zwift_tag = "1.2.3"                 # Pflicht, Tag aus docker.io/netbrain/zwift
-zwift_digest = "sha256:…"           # optional: gezogen wird dann genau dieser Digest und lokal als Tag benannt
+zwift_tag = "1.2.3"                 # mandatory, tag from docker.io/netbrain/zwift
+zwift_digest = "sha256:…"           # optional: then exactly this digest is pulled and named locally as the tag
 ```
 
-Gezogen wird nur mit Zustimmung für genau diese Angabe: `rollout-run --zwift-pull` (vom Launcher nach Bestätigung, oder von Hand) zieht und merkt sich die Zustimmung in `state/zwift-image-ok`.
-`rollout-run --container-check` nennt die nutzbare Laufzeit. Exit-Codes: 10 keine Laufzeit, 11 Image nicht eingestellt, 12 Image fehlt oder Ziehen gescheitert, 13 Entfernen gescheitert, 127 `zwift.sh` fehlt.
-`rollout-run --zwift-remove` entfernt das eingestellte Image mit `rmi Image:Tag` und löscht `state/zwift-image-ok` (ohne Image ebenfalls Exit 0, bei Fehler Exit 13 und die Zustimmung bleibt). Nur nach Rückfrage des Nutzers aufrufen; die Laufzeit und `zwift.sh` bleiben.
-`rollout-run --zwift-status` gibt `runtime=`, `ref=`, `image=present|missing` und `consent=yes|no` aus (zieht und startet nichts; Exit 10 oder 11 wie oben). Fehlt `USER`, setzt `rollout-run` es für `zwift.sh`.
-Tests R9 bis R20 in `test/run.test.mjs` nutzen Attrappen für `podman` und `docker`.
+Pulling happens only with consent for exactly this reference: `rollout-run --zwift-pull` (from the launcher after confirmation, or by hand) pulls and remembers the consent in `state/zwift-image-ok`.
+`rollout-run --container-check` names the usable runtime. Exit codes: 10 no runtime, 11 image not configured, 12 image missing or pull failed, 13 removal failed, 127 `zwift.sh` missing.
+`rollout-run --zwift-remove` removes the configured image with `rmi image:tag` and deletes `state/zwift-image-ok` (exit 0 without an image too; on error exit 13 and the consent stays). Call only after asking the user; the runtime and `zwift.sh` stay.
+`rollout-run --zwift-status` prints `runtime=`, `ref=`, `image=present|missing` and `consent=yes|no` (pulls and starts nothing; exit 10 or 11 as above). If `USER` is missing, `rollout-run` sets it for `zwift.sh`.
+Tests R9 to R20 in `test/run.test.mjs` use fakes for `podman` and `docker`.
 
-### Zwift-Adapter (`src/main/zwift.ts`, `upstreams.json`)
+### Zwift adapter (`src/main/zwift.ts`, `upstreams.json`)
 
-`upstreams.json` pinnt `zwift.sh` (Repo, Commit, Pfad `src/zwift.sh`, SHA-256) und nennt das Standard-Image samt Tag; sie wird beim Bauen in den Hauptprozess eingebündelt. Der Adapter
-lädt `https://raw.githubusercontent.com/<repo>/<commit>/<pfad>` (höchstens 256 KiB), prüft die SHA-256, legt die Datei unter `zwift/.staging-*` an und setzt sie mit `rename` nach
-`zwift/<commit>/zwift.sh` (ausführbar). Danach verschwinden Skripte anderer Commits. Ein verändertes oder nicht ausführbares Skript gilt als nicht da und wird ersetzt. Pin neu setzen:
-Commit und `sha256sum` der Datei in `upstreams.json` eintragen, `ROLLOUT_ZWIFT_NET=1 node --test test/zwift.test.mjs` prüft den Pin gegen GitHub.
+`upstreams.json` pins `zwift.sh` (repo, commit, path `src/zwift.sh`, SHA-256) and names the default image with its tag; it is bundled into the main process at build time. The adapter
+downloads `https://raw.githubusercontent.com/<repo>/<commit>/<path>` (at most 256 KiB), checks the SHA-256, creates the file under `zwift/.staging-*` and moves it with `rename` to
+`zwift/<commit>/zwift.sh` (executable). Afterwards scripts of other commits disappear. A modified or non-executable script counts as missing and is replaced. To set a new pin:
+enter the commit and the file's `sha256sum` in `upstreams.json`; `ROLLOUT_ZWIFT_NET=1 node --test test/zwift.test.mjs` checks the pin against GitHub.
 
-Anbindung an `SimBackend`: Ohne `ROLLOUT_ZWIFT` gilt Zwift als echt, sobald `bin/rollout-run` da ist und der Pin in `upstreams.json` stimmt (`chooseZwiftMode`); sonst bleibt es simuliert.
-`ROLLOUT_ZWIFT=real|fake|sim` erzwingt die Wahl. Echt gilt Zwift als installiert, wenn das gepinnte Skript da ist und `--zwift-status` das Image meldet (Zustand bei jedem Snapshot, höchstens alle 5 s
-neu abgefragt, nicht während Installation, Entfernen und Spiel).
+Connection to `SimBackend`: without `ROLLOUT_ZWIFT`, Zwift counts as real as soon as `bin/rollout-run` exists and the pin in `upstreams.json` is valid (`chooseZwiftMode`); otherwise it stays simulated.
+`ROLLOUT_ZWIFT=real|fake|sim` forces the choice. In real mode Zwift counts as installed when the pinned script exists and `--zwift-status` reports the image (state on every snapshot, queried at most every 5 s,
+not during installation, removal and game).
 
-- **Installieren:** Die Oberfläche fragt zuerst („Zwift-Image herunterladen?“ mit Tag aus `Snapshot.zwiftTag` und ungefährer Größe); erst die Bestätigung startet. Dann lädt der Adapter `zwift.sh`, trägt den Tag aus
-  `upstreams.json` als `zwift_tag` ein, wenn keiner eingestellt ist (Umgebung `ROLLOUT_ZWIFT_TAG` vor `config.toml` vor Pin), und zieht das Image mit `rollout-run --zwift-pull`. Der Fortschritt zählt fertige Image-Schichten (Schätzung).
-- **Fehler:** `apps.zwift.problem` (`net`, `verify`, `disk`, `runtime`, `tag`, `pull`, `error`) erscheint als Pille „Braucht Aufmerksamkeit“ an der Karte und als Satz mit nächstem Schritt in der Installieren-Ansicht
-  (Knopf „Nochmal versuchen“); eine gescheiterte Installation führt dorthin zurück. Texte in allen 8 Sprachen (`problem.*` in `src/renderer/locales`).
-- **Starten:** `launch('zwift')` startet `rollout-run zwift` in einer eigenen Prozessgruppe. Phasen aus der Ausgabe: „Container wird vorbereitet“, ab der Zeile `Launching Zwift` von `zwift.sh` „Zwift startet“, ab der Meldung `Zwift started using wine`
-  des Containers (am Ally nach etwa 5 s) „Läuft“, spätestens nach `ROLLOUT_ZWIFT_RUNNING_MS` (Vorgabe 20000). Ob das Fenster im Spielmodus (gamescope) zu sehen ist, erkennt Rollout selbst (`src/main/zwift-window.ts`, „Weg A“): Es sucht auf dem X-Server `:0` das Fenster `zwiftapp.exe`, setzt `STEAM_GAME` auf die AppID des eigenen Steam-Eintrags (aus dem Prozessbaum; `reaper SteamLaunch AppId=…`) und meldet „sichtbar“ (`onVisible`), sobald `GAMESCOPE_FOCUSED_WINDOW` dieses Fenster ist, beim Beenden wieder „nicht sichtbar“. Außerdem nimmt es das von `zwift.sh` geöffnete `xhost +local:` nach dem Spiel zurück, wenn es vorher nicht galt. `ROLLOUT_ZWIFT_WINDOWS=off` schaltet das ab, `ROLLOUT_ZWIFT_DISPLAY=<:N>` wählt den X-Server (Vorgabe `:0`). Am Ally belegt. Ohne Start aus Steam (keine AppID im Prozessbaum) bleibt das Fenster ohne `STEAM_GAME`. Fehlt die Startzeile, läuft die Anzeige nach 8 s trotzdem weiter. Bluetooth prüft Rollout bei Zwift nicht.
-  Exit 0 = Spiel beendet; Exit 10, 11, 12, 127 = „kann nicht starten“ mit Grund (`Launch.problem`, Phase `failed`); anderer Fehler binnen 90 s = „schloss sich direkt nach dem Start“. „Spiel beenden“ schickt TERM an `rollout-run`; das stoppt den Container mit `podman stop -t 10 zwift-${ZWIFT_RIDER:-$USER}` (ein TERM an die ganze
-  Gruppe ließ ihn am Ally als Waise weiterlaufen, sein PID 1 ignoriert TERM) und wartet, bis `state/run.pid` weg ist (etwa 12 s, weil der Container TERM ignoriert und `podman stop -t 10` ihn nach 10 s killt); in der Zeit zeigt die Karte „Wird beendet …“ (`Launch.phase = 'stopping'`) und ein neuer Start ist gesperrt. Nach 60 s KILL an die Gruppe. **Anmeldung bleibt erhalten:** Netbrains `run_zwift.sh` kopiert Zwifts Einstellungen samt Anmeldung (AppData) erst ins Volume `zwift-<Fahrer>`, wenn sich `ZwiftApp.exe` beendet hat. Ein hartes `podman stop` übersprang das, die Anmeldung ging verloren. Darum beendet `rollout-run` Zwift zuerst geordnet: `taskkill /im ZwiftApp.exe` im Container, nach 8 s (`ROLLOUT_ZWIFT_QUIT_WAIT`) `taskkill /f`, bis 15 s (`ROLLOUT_ZWIFT_KILL_WAIT`) warten, danach immer `podman stop`. Test R35; am Ally noch zu bestätigen (zweiter Start ohne erneute Anmeldung). Setzt der Nutzer `ZWIFT_RIDER` erst in netbrains eigener config, kennt der Starter den Namen nicht (bekannte Grenze).
-- **Zustand:** Rollout fragt ihn bei jedem Check (höchstens alle 5 s) aus der Container-Laufzeit (`rollout-run --zwift-status`). Fehlt in `config.toml` noch ein Tag, fragt es mit dem gepinnten Tag ab, damit Laufzeit und ein schon vorhandenes Image erkannt werden. Ist das Image da und nur `zwift.sh` fehlt, lädt Rollout das Skript still nach. Der Installer zeigt netbrain/zwift (Link) und ob Podman/Docker gefunden wurde (`Snapshot.zwiftRuntime`).
-- **Netz:** `rollout-run` setzt `NETWORKING=host` (netbrains `zwift.sh`), weil die Zwift Companion App das Spiel sonst im WLAN nicht findet (am Ally belegt); der Container teilt damit das Netz des Hosts. `NETWORKING` von außen gesetzt gilt weiter. Direktes Bluetooth im Container geht nicht (`BLE_LOAD_FAIL`, Wine lädt die BLE-Bibliothek nicht, auch mit `DISABLE_BLUETOOTH=0`): Sensoren koppelt die Companion App.
-- **Controller:** Zwift kennt kein Gamepad, das Steam-Layout von Rollout ist eins. Solange das Zwift-Fenster zu sehen ist, liest Rollout das virtuelle Gamepad von Steam Input (`Microsoft X-Box 360 pad <N>` unter `/dev/input`, für den Nutzer lesbar) und gibt es per `xdotool` als Tastatur und Maus an gamescope weiter (`gamepad-bridge.ts`): Steuerkreuz und linker Stick Pfeiltasten, A Enter, B und Start Esc, X Tab, Y Umschalt+Tab, Select Rücktaste, rechter Stick Maus, RT Linksklick, LT Rechtsklick, R3 Klick, LB/RB Scrollen. Keine Vorlage und keine Einstellung in Steam nötig. Mit `ROLLOUT_ZWIFT_PAD=off` abschaltbar. Braucht `xdotool` (unter Bazzite vorhanden).
-- **App-Menü:** Das Zahnrad auf der Karte öffnet Steam-Schalter, bei MyWhoosh die Bluetooth-Einrichtung, die erweiterten Einstellungen und das Deinstallieren.
-- **Beenden von Rollout:** Beendet Steam Rollout (Spiel beenden, Fenster zu, TERM/INT/HUP), stoppt Rollout vorher das laufende Spiel (`before-quit`, Signale in `main.ts`); am Ally belegt.
-- **Entfernen:** Rückfrage mit Tag und Größe, dann `rollout-run --zwift-remove`. Scheitert es (zum Beispiel läuft noch ein Container), bleibt Zwift installiert, die Karte und die Zeile unter „Eine App entfernen“ nennen es.
-  `zwift.sh` und die Container-Laufzeit bleiben.
-- **Attrappe:** `ROLLOUT_ZWIFT=fake` ersetzt Netz und Container (Zustand per `ROLLOUT_SIM_ZWIFT`: leer, `ready`, `norun`, `nonet`, `nopull`, `runcrash`, `runfail`, `norem`).
-  Die Klicktests erzwingen `ROLLOUT_ZWIFT=sim`, wenn ein Szenario nichts anderes verlangt; `real` läuft dort nur mit Container-Attrappen im PATH und ersetztem Upstream (`ROLLOUT_RUN_UPSTREAM`), sonst bricht die Harness ab.
+- **Install:** the UI asks first ("Download the Zwift image?" with the tag from `Snapshot.zwiftTag` and the approximate size); only the confirmation starts it. Then the adapter downloads `zwift.sh`, writes the tag from
+  `upstreams.json` as `zwift_tag` if none is configured (environment `ROLLOUT_ZWIFT_TAG` before `config.toml` before pin), and pulls the image with `rollout-run --zwift-pull`. Progress counts finished image layers (estimate).
+- **Errors:** `apps.zwift.problem` (`net`, `verify`, `disk`, `runtime`, `tag`, `pull`, `error`) appears as a "Needs attention" pill on the card and as a sentence with the next step in the install view
+  ("Try again" button); a failed installation leads back there. Texts in all 8 languages (`problem.*` in `src/renderer/locales`).
+- **Start:** `launch('zwift')` starts `rollout-run zwift` in a process group of its own. Phases from the output: "Preparing the container", from the `zwift.sh` line `Launching Zwift` "Starting Zwift", from the container's message `Zwift started using wine`
+  (after about 5 s on the Ally) "Running", at the latest after `ROLLOUT_ZWIFT_RUNNING_MS` (default 20000). Whether the window is visible in Gaming Mode (gamescope) is detected by Rollout itself (`src/main/zwift-window.ts`, "path A"): it looks for the `zwiftapp.exe` window on the X server `:0`, sets `STEAM_GAME` to the AppID of its own Steam entry (from the process tree; `reaper SteamLaunch AppId=…`) and reports "visible" (`onVisible`) as soon as `GAMESCOPE_FOCUSED_WINDOW` is this window, and "not visible" again on quit. It also revokes the `xhost +local:` opened by `zwift.sh` after the game if it was not set before. `ROLLOUT_ZWIFT_WINDOWS=off` switches this off, `ROLLOUT_ZWIFT_DISPLAY=<:N>` selects the X server (default `:0`). Confirmed on the Ally. Without a start from Steam (no AppID in the process tree) the window stays without `STEAM_GAME`. If the start line is missing, the display moves on after 8 s anyway. Rollout does not check Bluetooth for Zwift.
+  Exit 0 = game ended; exit 10, 11, 12, 127 = "cannot start" with a reason (`Launch.problem`, phase `failed`); any other error within 90 s = "closed right after the start". "Quit game" sends TERM to `rollout-run`; that stops the container with `podman stop -t 10 zwift-${ZWIFT_RIDER:-$USER}` (a TERM to the whole
+  group left it running as an orphan on the Ally, its PID 1 ignores TERM) and waits until `state/run.pid` is gone (about 12 s, because the container ignores TERM and `podman stop -t 10` kills it after 10 s); during that time the card shows "Closing …" (`Launch.phase = 'stopping'`) and a new start is blocked. After 60 s KILL to the group. **The login is preserved:** netbrain's `run_zwift.sh` copies Zwift's settings including the login (AppData) into the volume `zwift-<rider>` only once `ZwiftApp.exe` has exited. A hard `podman stop` skipped that and the login was lost. Therefore `rollout-run` quits Zwift in an orderly way first: `taskkill /im ZwiftApp.exe` in the container, after 8 s (`ROLLOUT_ZWIFT_QUIT_WAIT`) `taskkill /f`, wait up to 15 s (`ROLLOUT_ZWIFT_KILL_WAIT`), then always `podman stop`. Test R35; still to be confirmed on the Ally (second start without logging in again). If the user sets `ZWIFT_RIDER` only in netbrain's own config, the starter does not know the name (known limitation).
+- **State:** Rollout queries it on every check (at most every 5 s) from the container runtime (`rollout-run --zwift-status`). If `config.toml` has no tag yet, it queries with the pinned tag so the runtime and an already existing image are recognised. If the image exists and only `zwift.sh` is missing, Rollout quietly downloads the script. The installer shows netbrain/zwift (link) and whether Podman/Docker was found (`Snapshot.zwiftRuntime`).
+- **Network:** `rollout-run` sets `NETWORKING=host` (netbrain's `zwift.sh`) because otherwise the Zwift Companion app does not find the game on the Wi-Fi (confirmed on the Ally); the container thereby shares the host's network. A `NETWORKING` set from outside still applies. Direct Bluetooth in the container does not work (`BLE_LOAD_FAIL`, Wine does not load the BLE library, even with `DISABLE_BLUETOOTH=0`): the Companion app pairs sensors.
+- **Controller:** Zwift does not know gamepads, Rollout's Steam layout is one. While the Zwift window is visible, Rollout reads Steam Input's virtual gamepad (`Microsoft X-Box 360 pad <N>` under `/dev/input`, readable for the user) and forwards it via `xdotool` as keyboard and mouse to gamescope (`gamepad-bridge.ts`): d-pad and left stick arrow keys, A Enter, B and Start Esc, X Tab, Y Shift+Tab, Select Backspace, right stick mouse, RT left click, LT right click, R3 click, LB/RB scrolling. No template and no setting in Steam needed. Can be switched off with `ROLLOUT_ZWIFT_PAD=off`. Needs `xdotool` (present on Bazzite).
+- **App menu:** The gear on the card opens the Steam switch, for MyWhoosh the Bluetooth setup, the advanced settings and uninstalling.
+- **Quitting Rollout:** If Steam ends Rollout (quit game, window closed, TERM/INT/HUP), Rollout first stops the running game (`before-quit`, signals in `main.ts`); confirmed on the Ally.
+- **Remove:** confirmation with tag and size, then `rollout-run --zwift-remove`. If it fails (for example a container is still running), Zwift stays installed, and the card and the row under "Remove an app" say so.
+  `zwift.sh` and the container runtime stay.
+- **Fake:** `ROLLOUT_ZWIFT=fake` replaces network and container (state via `ROLLOUT_SIM_ZWIFT`: empty, `ready`, `norun`, `nonet`, `nopull`, `runcrash`, `runfail`, `norem`).
+  The click tests force `ROLLOUT_ZWIFT=sim` unless a scenario requires otherwise; `real` runs there only with container fakes on PATH and a replaced upstream (`ROLLOUT_RUN_UPSTREAM`), otherwise the harness aborts.
 
-Tests Z1 bis Z22 in `test/zwift.test.mjs` (Download und Pin, `rollout-run` mit Container-Attrappen, Anbindung, Start, Beenden, Entfernen; Z13 nur mit `ROLLOUT_ZWIFT_NET=1` gegen das echte GitHub). Klicktests `zwift-*` in `test/smoke.mjs`; `zwift-echt` (Skript von GitHub, Attrappen) nur mit `ROLLOUT_ZWIFT_NET=1`.
+Tests Z1 to Z29 in `test/zwift.test.mjs` (download and pin, `rollout-run` with container fakes, integration, start, quit, removal; Z13 only with `ROLLOUT_ZWIFT_NET=1` against the real GitHub). Click tests `zwift-*` in `test/smoke.mjs`; `zwift-real` (script from GitHub, fakes) only with `ROLLOUT_ZWIFT_NET=1`.

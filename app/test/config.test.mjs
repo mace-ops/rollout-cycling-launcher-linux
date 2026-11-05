@@ -13,11 +13,11 @@ for (const name of ['config', 'sim']) {
 const config = await import(path.join(work, 'config.mjs'));
 const sim = await import(path.join(work, 'sim.mjs'));
 
-test('ohne Datei gelten die Vorgaben', () => {
+test('without a file the defaults apply', () => {
   assert.deepEqual(config.fileStore.load(), config.DEFAULTS);
 });
 
-test('gespeichert werden nur Abweichungen', () => {
+test('only deviations are saved', () => {
   config.fileStore.save({ ...config.DEFAULTS, language: 'de', theme: 'light' });
   const text = fs.readFileSync(config.configFile(), 'utf8');
   assert.match(text, /language = "de"/);
@@ -26,29 +26,29 @@ test('gespeichert werden nur Abweichungen', () => {
   assert.deepEqual(config.fileStore.load(), { ...config.DEFAULTS, language: 'de', theme: 'light' });
 });
 
-test('Vorgaben löschen die Datei', () => {
+test('defaults delete the file', () => {
   config.fileStore.save({ ...config.DEFAULTS });
   assert.equal(fs.existsSync(config.configFile()), false);
 });
 
-test('ungültige Werte werden ignoriert', () => {
+test('invalid values are ignored', () => {
   const settings = config.parseConfig('language = "../../x"\ntheme = "neon"\nauto_update = maybe\nunbekannt = 1\n');
   assert.deepEqual(settings, config.DEFAULTS);
 });
 
-test('Größe wird gelesen und nur im gültigen Bereich angenommen', () => {
+test('size is read and accepted only within the valid range', () => {
   assert.equal(config.parseConfig('scale = "125"\n').scale, '125');
   assert.equal(config.parseConfig('scale = "900"\n').scale, 'auto');
   assert.equal(config.parseConfig('scale = "abc"\n').scale, 'auto');
 });
 
-test('Kommentare und Leerzeilen stören nicht', () => {
-  const settings = config.parseConfig('# Kommentar\n\nlanguage = "fr" # Französisch\nauto_update = false\n');
+test('comments and blank lines do not interfere', () => {
+  const settings = config.parseConfig('# comment\n\nlanguage = "fr" # French\nauto_update = false\n');
   assert.equal(settings.language, 'fr');
   assert.equal(settings.autoUpdate, false);
 });
 
-test('U5 update_channel: Vorgabe wird nicht gespeichert, Beta schon, Unsinn fällt zurück', () => {
+test('U5 update_channel: the default is not saved, beta is, nonsense falls back', () => {
   assert.equal(config.DEFAULTS.updateChannel, 'stable');
   assert.doesNotMatch(config.serializeConfig({ ...config.DEFAULTS }), /update_channel/);
   assert.match(config.serializeConfig({ ...config.DEFAULTS, updateChannel: 'beta' }), /update_channel = "beta"/);
@@ -60,7 +60,7 @@ test('U5 update_channel: Vorgabe wird nicht gespeichert, Beta schon, Unsinn fäl
   assert.equal(fs.existsSync(config.configFile()), false);
 });
 
-test('U5 „Alles zurücksetzen“ setzt auch den Kanal zurück und löst eine Prüfung aus', async () => {
+test('U5 "Reset all" also resets the channel and triggers a check', async () => {
   let saved = { ...config.DEFAULTS, updateChannel: 'beta' };
   const store = { load: () => saved, save: (s) => { saved = s; } };
   let changes = 0;
@@ -78,12 +78,12 @@ test('U5 „Alles zurücksetzen“ setzt auch den Kanal zurück und löst eine P
   assert.equal(changes, 2);
   saved = { ...config.DEFAULTS, zwiftTag: '1.2.3' };
   await backend.setAutoUpdate(false);
-  assert.equal(saved.zwiftTag, '1.2.3', 'Speichern aus der Oberfläche behält den von Hand gesetzten Zwift-Tag');
+  assert.equal(saved.zwiftTag, '1.2.3', 'Saving from the UI keeps the Zwift tag set by hand');
 });
 
 process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
 
-test('Zwift-Image: Tag und Digest werden gelesen, gespeichert und nur gültig angenommen (nie latest)', () => {
+test('Zwift image: tag and digest are read, saved and accepted only if valid (never latest)', () => {
   const digest = `sha256:${'ab'.repeat(32)}`;
   assert.equal(config.DEFAULTS.zwiftTag, '');
   assert.doesNotMatch(config.serializeConfig({ ...config.DEFAULTS }), /zwift/);
@@ -95,7 +95,7 @@ test('Zwift-Image: Tag und Digest werden gelesen, gespeichert und nur gültig an
   assert.equal(back.zwiftDigest, digest);
   for (const bad of ['latest', '-x', 'a b', '', '../x']) assert.equal(config.parseConfig(`zwift_tag = "${bad}"\n`).zwiftTag, '', bad);
   for (const bad of ['sha256:abc', `md5:${'a'.repeat(64)}`, `sha256:${'G'.repeat(64)}`, '']) assert.equal(config.parseConfig(`zwift_digest = "${bad}"\n`).zwiftDigest, '', bad);
-  // Einstellungen aus dem Launcher dürfen den Zwift-Tag nicht verlieren.
+  // Settings from the launcher must not lose the Zwift tag.
   config.fileStore.save({ ...config.DEFAULTS, zwiftTag: '1.2.3' });
   config.fileStore.save({ ...config.fileStore.load(), theme: 'light' });
   assert.equal(config.fileStore.load().zwiftTag, '1.2.3');

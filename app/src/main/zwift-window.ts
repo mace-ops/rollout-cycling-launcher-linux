@@ -1,17 +1,17 @@
-// Sichtbarkeit von Zwift im Spielmodus (gamescope), „Weg A“: Das Zwift-Fenster kommt aus dem Container und trägt kein `STEAM_GAME`;
-// gamescope nimmt es deshalb nicht in `GAMESCOPE_FOCUSABLE_WINDOWS` auf, Steam fokussiert es nie. Hier erkennt Rollout das Fenster auf
-// dem Host (xwininfo), setzt `STEAM_GAME` auf die AppID des eigenen Steam-Eintrags (xprop) und meldet „sichtbar“ erst, wenn
-// `GAMESCOPE_FOCUSED_WINDOW` das Zwift-Fenster ist. Belegt am Ally mit Test T3 (docs/notizen-bazzite-container.md).
-// Kein Electron, keine feste Anbindung an X: Die Werkzeugaufrufe und der Prozessbaum kommen als Funktionen herein.
+// Visibility of Zwift in Gaming Mode (gamescope), "path A": the Zwift window comes from the container and carries no `STEAM_GAME`;
+// gamescope therefore does not add it to `GAMESCOPE_FOCUSABLE_WINDOWS`, and Steam never focuses it. Here Rollout detects the window on
+// the host (xwininfo), sets `STEAM_GAME` to the AppID of its own Steam entry (xprop) and reports "visible" only when
+// `GAMESCOPE_FOCUSED_WINDOW` is the Zwift window. Confirmed on the Ally with test T3.
+// No Electron, no hard binding to X: the tool calls and the process tree come in as functions.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Führt ein X-Werkzeug (`xprop`, `xwininfo`, `xhost`) aus und gibt stdout zurück; wirft bei Fehler oder Zeitüberschreitung. */
+/** Runs an X tool (`xprop`, `xwininfo`, `xhost`) and returns stdout; throws on error or timeout. */
 export type XExec = (file: string, args: string[]) => Promise<string>;
 
 export const WINDOW_CLASS = 'zwiftapp.exe';
-/** Kleinere Fenster (Eingabemethode, Wine-Hilfsfenster: 1x1) sind nicht das Spielfenster. */
+/** Smaller windows (input method, Wine helper windows: 1x1) are not the game window. */
 const MIN_SIDE = 200;
 const MAX_APP_ID = 4_294_967_295;
 
@@ -22,13 +22,13 @@ export function realXExec(display: string, env: NodeJS.ProcessEnv = process.env,
 }
 
 /**
- * AppID des eigenen Steam-Eintrags aus dem Prozessbaum: Steam startet jeden Eintrag unter `reaper SteamLaunch AppId=<N> -- …`
- * (die cgroup zeigt sie nicht). Gibt `null` zurück, wenn Rollout nicht aus Steam gestartet wurde.
+ * AppID of the own Steam entry from the process tree: Steam starts every entry under `reaper SteamLaunch AppId=<N> -- …`
+ * (the cgroup does not show it). Returns `null` if Rollout was not started from Steam.
  */
 export function appIdFromAncestors(startPid: number, procRoot = '/proc'): string | null {
   const parentOf = (pid: number): number => {
     const stat = fs.readFileSync(path.join(procRoot, String(pid), 'stat'), 'utf8');
-    // Der Name steht in Klammern und kann Leerzeichen und Klammern enthalten: ab der letzten Klammer lesen.
+    // The name is in parentheses and may contain spaces and parentheses: read from the last parenthesis.
     const rest = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
     return Number(rest[1]);
   };
@@ -54,7 +54,7 @@ export interface XWindow { id: number; hex: string; width: number; height: numbe
 
 const WINDOW_LINE = /^(\s+)(0x[0-9a-f]+)\s+(?:"[^"]*"|\(has no name\)):\s+\("([^"]*)" "([^"]*)"\)\s+(\d+)x(\d+)[+-]/;
 
-/** Spielfenster aus `xwininfo -root -tree`: oberste Ebene, WM_CLASS `zwiftapp.exe`, nicht winzig; bei mehreren das größte. */
+/** Game window from `xwininfo -root -tree`: top level, WM_CLASS `zwiftapp.exe`, not tiny; with several, the largest. */
 export function findZwiftWindow(tree: string, windowClass: string | RegExp = WINDOW_CLASS): XWindow | null {
   const lines = tree.split('\n').map((l) => WINDOW_LINE.exec(l)).filter((m): m is RegExpExecArray => m !== null);
   if (!lines.length) return null;
@@ -72,7 +72,7 @@ export function findZwiftWindow(tree: string, windowClass: string | RegExp = WIN
   return best;
 }
 
-/** `GAMESCOPE_FOCUSED_WINDOW(CARDINAL) = 67108869` → 67108869; `null`, wenn die Eigenschaft fehlt. */
+/** `GAMESCOPE_FOCUSED_WINDOW(CARDINAL) = 67108869` → 67108869; `null` if the property is missing. */
 export function parseFocusedWindow(out: string): number | null {
   const m = /GAMESCOPE_FOCUSED_WINDOW\(CARDINAL\)\s*=\s*(\d+)/.exec(out);
   return m ? Number(m[1]) : null;
@@ -80,32 +80,32 @@ export function parseFocusedWindow(out: string): number | null {
 
 export interface WindowWatcherOptions {
   exec: XExec;
-  /** Liest `GAMESCOPE_FOCUSED_WINDOW`: Die Eigenschaft liegt am Wurzelfenster des primären gamescope-X-Servers (`:0`), die Spielfenster dagegen am X-Server des Spiels (bei Rollout meist `:1`). Vorgabe: `exec`. */
+  /** Reads `GAMESCOPE_FOCUSED_WINDOW`: the property lives on the root window of the primary gamescope X server (`:0`), the game windows on the game's X server (usually `:1` for Rollout). Default: `exec`. */
   focusExec?: XExec;
-  /** AppID des Rollout-Eintrags; `null` = nicht aus Steam gestartet, dann wird nichts gesetzt und nichts gemeldet */
+  /** AppID of the Rollout entry; `null` = not started from Steam, then nothing is set and nothing reported */
   appId: string | null;
-  /** Wird bei jedem Wechsel zwischen sichtbar und nicht sichtbar gerufen (am Anfang: nicht sichtbar) */
+  /** Called on every change between visible and not visible (at the start: not visible) */
   onVisible: (visible: boolean) => void;
-  /** Hinweise für das Protokoll (z. B. gesetzte AppID, Werkzeugfehler) */
+  /** Notes for the log (e.g. AppID set, tool errors) */
   onNote?: (text: string) => void;
   intervalMs?: number;
-  /** WM_CLASS des Spielfensters (Vorgabe `zwiftapp.exe`); ein RegExp trifft Instanz oder Klasse */
+  /** WM_CLASS of the game window (default `zwiftapp.exe`); a RegExp matches instance or class */
   windowClass?: string | RegExp;
-  /** `STEAM_GAME` an das Fenster setzen (Vorgabe ja). MyWhoosh startet unter Steam und trägt es schon; dann ohne AppID nur beobachten. */
+  /** Set `STEAM_GAME` on the window (default yes). MyWhoosh starts under Steam and already carries it; then just observe without an AppID. */
   tag?: boolean;
 }
 
 export interface WindowWatcher {
   stop(): void;
-  /** Das Zwift-Fenster ist das fokussierte Fenster. */
+  /** The Zwift window is the focused window. */
   readonly visible: boolean;
 }
 
 /**
- * Fragt regelmäßig den X-Server (gamescope-Xwayland `:0`) ab, bis `stop()` kommt: Findet es das Zwift-Fenster, trägt es
- * `STEAM_GAME=<AppID>` ein (einmal je Fenster; die Launcher-Fenster von Zwift werden durch das Spielfenster ersetzt, dann wieder),
- * und meldet „sichtbar“ erst, wenn gamescope dieses Fenster fokussiert hat. Läufe nie überlappend, Fehler einzelner Abfragen
- * (Server noch nicht bereit, Fenster weg) lassen die Überwachung weiterlaufen.
+ * Queries the X server (gamescope Xwayland `:0`) regularly until `stop()` arrives: if it finds the Zwift window, it sets
+ * `STEAM_GAME=<AppID>` (once per window; Zwift's launcher windows are replaced by the game window, then again),
+ * and reports "visible" only when gamescope has focused that window. Runs never overlap, errors of single queries
+ * (server not ready yet, window gone) let the watching continue.
  */
 export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
   const { exec, appId } = opts;
@@ -121,11 +121,11 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
 
   const tick = async (): Promise<void> => {
     const win = findZwiftWindow(await exec('xwininfo', ['-root', '-tree']), opts.windowClass);
-    if (!win) { tagged = 0; note('kein Spielfenster gefunden'); setVisible(false); return; }
+    if (!win) { tagged = 0; note('no game window found'); setVisible(false); return; }
     if (tag && tagged !== win.id) {
       await exec('xprop', ['-id', win.hex, '-f', 'STEAM_GAME', '32c', '-set', 'STEAM_GAME', appId as string]);
       tagged = win.id;
-      note(`STEAM_GAME=${appId} an Fenster ${win.hex} gesetzt`);
+      note(`STEAM_GAME=${appId} set on window ${win.hex}`);
     }
     setVisible(parseFocusedWindow(await focusExec('xprop', ['-root', 'GAMESCOPE_FOCUSED_WINDOW'])) === win.id);
   };
@@ -136,7 +136,7 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
   };
 
   if (appId || !tag) void loop();
-  else note('Rollout läuft nicht unter Steam (keine AppID im Prozessbaum): Zwift-Fenster bleibt ohne STEAM_GAME');
+  else note('Rollout is not running under Steam (no AppID in the process tree): Zwift window stays without STEAM_GAME');
   return {
     stop: () => { stopped = true; if (timer) clearTimeout(timer); },
     get visible() { return visible; }
@@ -144,8 +144,8 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
 }
 
 /**
- * Zugriff des Containers auf X: netbrains zwift.sh ruft `xhost +local:` auf und nimmt es nie zurück. Wer vorher keinen
- * `LOCAL:`-Eintrag hatte, bekommt ihn nach dem Spiel zurückgesetzt. Beides ist Best Effort (ohne `xhost` passiert nichts).
+ * Container access to X: netbrain's zwift.sh calls `xhost +local:` and never revokes it. Whoever had no
+ * `LOCAL:` entry before gets it reset after the game. Both are best effort (without `xhost` nothing happens).
  */
 export async function xhostSnapshot(exec: XExec): Promise<boolean | null> {
   try { return /^LOCAL:/m.test(await exec('xhost', [])); } catch { return null; }

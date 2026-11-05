@@ -1,8 +1,8 @@
-// Controller für Zwift im Spielmodus. Zwift (Windows-Spiel im Container) kennt kein Gamepad, und das Steam-Layout des Rollout-Eintrags
-// ist ein Gamepad-Layout. Solange das Zwift-Fenster zu sehen ist, liest Rollout deshalb das virtuelle Gamepad von Steam Input
-// (/dev/input/eventN, für den angemeldeten Nutzer lesbar) und gibt die Eingaben als Tastatur und Maus an den X-Server von gamescope weiter
-// (`xdotool` über XTest). Es braucht keine Vorlage und keine Einstellung in Steam.
-// Der Kern (`PadMapper`) kennt weder Geräte noch Prozesse: Er bekommt evdev-Ereignisse und Zeit und liefert xdotool-Zeilen.
+// Controller for Zwift in Gaming Mode. Zwift (a Windows game in a container) does not know gamepads, and the Steam layout of the Rollout entry
+// is a gamepad layout. While the Zwift window is visible, Rollout therefore reads Steam Input's virtual gamepad
+// (/dev/input/eventN, readable for the logged-in user) and forwards the input as keyboard and mouse to gamescope's X server
+// (`xdotool` via XTest). It needs no template and no setting in Steam.
+// The core (`PadMapper`) knows neither devices nor processes: it receives evdev events and time and produces xdotool lines.
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 
@@ -16,18 +16,18 @@ const STICK_ON = 0.5;
 const DEADZONE = 0.15;
 const TRIGGER_MAX = 255;
 const TRIGGER_ON = 0.4;
-/** Zeigergeschwindigkeit bei vollem Ausschlag in Pixel je Sekunde */
+/** Pointer speed at full deflection in pixels per second */
 const MOUSE_SPEED = 1400;
 const REPEAT_FIRST_MS = 400;
 const REPEAT_MS = 110;
-/** Zwift fragt Tasten und Maus je Bild ab: ein Druck, der sofort wieder losgelassen wird, geht verloren (am Ally belegt). */
+/** Zwift polls keys and mouse once per frame: a press released immediately is lost (confirmed on the Ally). */
 const HOLD_MS = 70;
-/** Zeigermodus: Schritt des Steuerkreuzes in Pixel (gedrückt halten wiederholt ihn) */
+/** Pointer mode: d-pad step in pixels (holding it down repeats it) */
 const DPAD_STEP = 12;
 
 type Dir = 'Up' | 'Down' | 'Left' | 'Right';
 
-/** Bildet Gamepad-Ereignisse auf xdotool-Zeilen ab (A Enter, B Esc, X Tab, Y Umschalt+Tab, Select Rücktaste, Start Esc, Steuerkreuz und linker Stick Pfeile, rechter Stick Maus, RT Linksklick, LT Rechtsklick, LB/RB Scrollen, R3 Klick). */
+/** Maps gamepad events to xdotool lines (A Enter, B Esc, X Tab, Y Shift+Tab, Select Backspace, Start Esc, d-pad and left stick arrows, right stick mouse, RT left click, LT right click, LB/RB scroll, R3 click). */
 export class PadMapper {
   private readonly dirs = new Map<Dir, { since: number; last: number }>();
   private readonly stickDirs = new Set<Dir>();
@@ -45,12 +45,12 @@ export class PadMapper {
   private readonly releases: { at: number; line: string }[] = [];
 
   /**
-   * `pointer`: Oberflächen mit Mauszeiger wie MyWhoosh (Zwift nutzt Tastaturfokus). A ist Linksklick statt Enter, und es gibt keine Pfeiltasten:
-   * Der linke Stick bewegt den Zeiger wie der rechte, das Steuerkreuz in kleinen Schritten. So entsteht im Spiel kein Fokus, den man nicht sieht.
+   * `pointer`: UIs with a mouse pointer like MyWhoosh (Zwift uses keyboard focus). A is left click instead of Enter, and there are no arrow keys:
+   * the left stick moves the pointer like the right one, the d-pad in small steps. That way the game never ends up with a focus you cannot see.
    */
   constructor(private readonly send: (line: string) => void, private readonly opts: { pointer?: boolean } = {}) {}
 
-  /** Pfeil drücken, im Zeigermodus stattdessen den Zeiger einen Schritt bewegen. */
+  /** Press an arrow; in pointer mode move the pointer one step instead. */
   private press(dir: Dir): void {
     if (!this.opts.pointer) { this.key(dir); return; }
     const dx = dir === 'Left' ? -DPAD_STEP : dir === 'Right' ? DPAD_STEP : 0;
@@ -58,7 +58,7 @@ export class PadMapper {
     this.send(`mousemove_relative -- ${dx} ${dy}`);
   }
 
-  /** Taste drücken und nach `HOLD_MS` loslassen. */
+  /** Press a key and release it after `HOLD_MS`. */
   private key(name: string): void {
     this.send(`keydown ${name}`);
     this.releases.push({ at: this.clock + HOLD_MS, line: `keyup ${name}` });
@@ -95,7 +95,7 @@ export class PadMapper {
     this.send(`${down ? 'mousedown' : 'mouseup'} ${which === 'left' ? 1 : 3}`);
   }
 
-  /** `value` wie im Ereignis: Tasten 0/1/2, Achsen im Wertebereich des Geräts. */
+  /** `value` as in the event: keys 0/1/2, axes in the device's value range. */
   feed(type: number, code: number, value: number): void {
     if (type === EV_KEY) {
       if (value === 2) return;
@@ -138,7 +138,7 @@ export class PadMapper {
     }
   }
 
-  /** Zeit voranschreiben (Millisekunden seit dem letzten Aufruf): Tastenwiederholung und Zeigerbewegung. */
+  /** Advance time (milliseconds since the last call): key repeat and pointer movement. */
   tick(dtMs: number): void {
     this.clock += dtMs;
     while (this.releases.length && this.releases[0].at <= this.clock) this.send((this.releases.shift() as { line: string }).line);
@@ -154,7 +154,7 @@ export class PadMapper {
       const f = Math.min(1, (m - DEADZONE) / (1 - DEADZONE));
       return Math.sign(v) * f * f;
     };
-    // Zeigermodus: beide Sticks bewegen den Zeiger (die Summe ist auf volle Geschwindigkeit begrenzt).
+    // Pointer mode: both sticks move the pointer (the sum is capped at full speed).
     const mx = this.opts.pointer ? Math.max(-1, Math.min(1, axis(this.rx) + axis(this.lx))) : axis(this.rx);
     const my = this.opts.pointer ? Math.max(-1, Math.min(1, axis(this.ry) + axis(this.ly))) : axis(this.ry);
     this.carryX += mx * MOUSE_SPEED * dtMs / 1000;
@@ -168,7 +168,7 @@ export class PadMapper {
     }
   }
 
-  /** Alles loslassen (Fenster nicht mehr sichtbar). */
+  /** Release everything (window no longer visible). */
   release(): void {
     for (const r of this.releases.splice(0)) this.send(r.line);
     this.setButton('left', false);
@@ -180,7 +180,7 @@ export class PadMapper {
 
 const EVENT_SIZE = 24;
 
-/** Zerlegt einen Strom von `struct input_event` (64 Bit: 16 Byte Zeit, Typ, Code, Wert); gibt die Ereignisse und den Rest zurück. */
+/** Splits a stream of `struct input_event` (64 bit: 16 bytes time, type, code, value); returns the events and the remainder. */
 export function parseEvents(chunk: Buffer): { events: { type: number; code: number; value: number }[]; rest: Buffer } {
   const events: { type: number; code: number; value: number }[] = [];
   let at = 0;
@@ -190,7 +190,7 @@ export function parseEvents(chunk: Buffer): { events: { type: number; code: numb
   return { events, rest: chunk.subarray(at) };
 }
 
-/** Das von Steam Input erzeugte Gamepad: `Microsoft X-Box 360 pad <Nummer>` (die echten Geräte heißen ohne Nummer). */
+/** The gamepad created by Steam Input: `Microsoft X-Box 360 pad <number>` (real devices have no number). */
 export function findPadEvents(devices: string): string[] {
   const found: string[] = [];
   for (const block of devices.split(/\n\s*\n/)) {
@@ -207,25 +207,25 @@ export interface PadBridgeOptions {
   display: string;
   env?: NodeJS.ProcessEnv;
   onNote?: (text: string) => void;
-  /** Zeigermodus (MyWhoosh): A Linksklick, Sticks und Steuerkreuz bewegen den Zeiger, keine Pfeiltasten */
+  /** Pointer mode (MyWhoosh): A left click, sticks and d-pad move the pointer, no arrow keys */
   pointer?: boolean;
-  /** Ersetzen für Tests */
+  /** Replaceable for tests */
   devicesFile?: string;
   spawnFn?: typeof spawn;
 }
 
-/** Startet die Weitergabe; ohne lesbares Gamepad oder ohne `xdotool` passiert nichts (Hinweis über `onNote`). */
+/** Starts the forwarding; without a readable gamepad or without `xdotool` nothing happens (note via `onNote`). */
 export function startPadBridge(opts: PadBridgeOptions): PadBridge {
   const note = (t: string): void => opts.onNote?.(t);
   const run = opts.spawnFn ?? spawn;
   let pads: string[] = [];
   try { pads = findPadEvents(fs.readFileSync(opts.devicesFile ?? '/proc/bus/input/devices', 'utf8')).filter((p) => { try { fs.accessSync(p, fs.constants.R_OK); return true; } catch { return false; } }); } catch { /* unten */ }
-  if (!pads.length) { note('Controller-Weitergabe: kein lesbares Steam-Gamepad gefunden'); return { stop: () => {} }; }
+  if (!pads.length) { note('Gamepad bridge: no readable Steam gamepad found'); return { stop: () => {} }; }
   const children: ChildProcess[] = [];
   let seen = 0;
   const xdo = run('xdotool', ['-'], { env: { ...(opts.env ?? process.env), DISPLAY: opts.display }, stdio: ['pipe', 'ignore', 'ignore'] });
   let alive = true;
-  xdo.on('error', () => { alive = false; note('Controller-Weitergabe: xdotool fehlt oder startet nicht'); });
+  xdo.on('error', () => { alive = false; note('Gamepad bridge: xdotool missing or fails to start'); });
   xdo.on('close', (code) => { alive = false; note(`xdotool beendet (Code ${code ?? '?'})`); });
   xdo.stdin?.on('error', () => { alive = false; });
   let sent = 0;
@@ -238,7 +238,7 @@ export function startPadBridge(opts: PadBridgeOptions): PadBridge {
       const parsed = parseEvents(Buffer.concat([rest, data]));
       rest = parsed.rest;
       for (const e of parsed.events) {
-        if (seen++ < 5 && e.type !== 0) note(`Ereignis ${device}: Typ ${e.type} Code ${e.code} Wert ${e.value}`);
+        if (seen++ < 5 && e.type !== 0) note(`Event ${device}: type ${e.type} code ${e.code} value ${e.value}`);
         mapper.feed(e.type, e.code, e.value);
       }
     });
@@ -246,15 +246,15 @@ export function startPadBridge(opts: PadBridgeOptions): PadBridge {
   }
   let last = Date.now();
   const timer = setInterval(() => { const now = Date.now(); mapper.tick(now - last); last = now; }, 16);
-  note(`Controller-Weitergabe aktiv (${pads.join(', ')})`);
+  note(`Gamepad bridge active (${pads.join(', ')})`);
   return {
     stop: () => {
       clearInterval(timer);
       mapper.release();
-      for (const c of children) { try { c.kill('SIGTERM'); } catch { /* schon beendet */ } }
-      try { xdo.stdin?.end(); } catch { /* schon zu */ }
+      for (const c of children) { try { c.kill('SIGTERM'); } catch { /* already exited */ } }
+      try { xdo.stdin?.end(); } catch { /* already closed */ }
       setTimeout(() => { try { xdo.kill('SIGTERM'); } catch { /* weg */ } }, 500).unref();
-      note('Controller-Weitergabe beendet');
+      note('Gamepad bridge stopped');
     }
   };
 }

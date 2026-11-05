@@ -1,5 +1,5 @@
-// Prüft scripts/release.mjs pack mit einem Testschlüssel pro Lauf: Archive, Manifest und Signatur gegen die Logik des Clients.
-// Es wird nichts hochgeladen und kein echter Schlüssel benutzt.
+// Checks scripts/release.mjs pack with one test key per run: archives, manifest and signature against the client's logic.
+// Nothing is uploaded and no real key is used.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
@@ -23,9 +23,9 @@ fs.mkdirSync(electronDir);
 fs.writeFileSync(path.join(electronDir, 'electron'), '#!/bin/sh\necho 45.0.0\n', { mode: 0o755 });
 fs.writeFileSync(path.join(electronDir, 'version'), '45.0.0\n');
 fs.writeFileSync(path.join(electronDir, 'LICENSE'), 'MIT');
-const skip = !fs.existsSync('dist/main/main.js') && 'dist/ fehlt, erst npm run build';
+const skip = !fs.existsSync('dist/main/main.js') && 'dist/ is missing, run npm run build first';
 
-test('pack: Archive, Manifest und Signatur stimmen mit dem Client überein', { skip }, async () => {
+test('pack: archives, manifest and signature match the client', { skip }, async () => {
   const out = path.join(work, 'out');
   const { manifest } = await release.pack({ key: keyFile, 'key-id': 'rollout-update-test', runtime: electronDir, out });
   const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -48,11 +48,11 @@ test('pack: Archive, Manifest und Signatur stimmen mit dem Client überein', { s
   assert.deepEqual(fs.readFileSync(path.join(stage, 'bootstrap/rollout')), fs.readFileSync('scripts/bin-rollout.sh'));
   assert.deepEqual(fs.readFileSync(path.join(stage, 'bootstrap/rollout-run')), fs.readFileSync('scripts/bin-rollout-run.sh'));
   assert.deepEqual(fs.readFileSync(path.join(stage, 'vendor/mywhoosh.sh')), fs.readFileSync('vendor/mywhoosh.sh'));
-  assert.ok(fs.statSync(path.join(stage, 'vendor/mywhoosh.sh')).mode & 0o100, 'mywhoosh.sh bleibt ausführbar');
+  assert.ok(fs.statSync(path.join(stage, 'vendor/mywhoosh.sh')).mode & 0o100, 'mywhoosh.sh stays executable');
   assert.equal(execFileSync('tar', ['-tzf', path.join(out, 'rollout-runtime-electron-45.0.0-linux-x64.tar.gz')], { encoding: 'utf8' }).includes('./LICENSE'), true, 'Lizenz im Electron-Archiv');
   assert.equal(manifest.runtime.electron, '45.0.0');
 
-  // Spätere Releases übernehmen den Runtime-Block aus einem früheren Manifest.
+  // Later releases take over the runtime block from an earlier manifest.
   const again = await release.pack({ key: keyFile, 'key-id': 'rollout-update-test', 'runtime-from': path.join(out, 'rollout-update.json'), out: path.join(work, 'out2') });
   assert.deepEqual(again.manifest.runtime, manifest.runtime);
   assert.deepEqual(fs.readdirSync(path.join(work, 'out2')).sort(), [`rollout-${pkg.version}-app.tar.gz`, 'rollout-update.json']);
@@ -60,10 +60,10 @@ test('pack: Archive, Manifest und Signatur stimmen mit dem Client überein', { s
 
 test('pack lehnt fehlende Angaben ab', { skip }, async () => {
   await assert.rejects(release.pack({ key: keyFile, out: path.join(work, 'out3') }), /--runtime/);
-  await assert.rejects(release.pack({ key: path.join(work, 'gibt-es-nicht.pem'), runtime: electronDir, out: path.join(work, 'out4') }));
+  await assert.rejects(release.pack({ key: path.join(work, 'does-not-exist.pem'), runtime: electronDir, out: path.join(work, 'out4') }));
 });
 
-test('bumpVersion: künstliche Version +1', () => {
+test('bumpVersion: artificial version +1', () => {
   assert.equal(release.bumpVersion('0.9.0-beta.1'), '0.9.0-beta.2');
   assert.equal(release.bumpVersion('1.2.3'), '1.2.4');
   assert.equal(release.bumpVersion('1.0.0-rc'), '1.0.0-rc.1');

@@ -11,14 +11,14 @@ const esc = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 const sceneImg = (id: AppId): string => `<img class="scene" data-app="${id}" src="assets/img/${id}.jpg" alt="">`;
-// Breiten setzt die Oberfläche nach dem Zeichnen per Skript, weil die CSP keine style-Attribute erlaubt.
+// The UI sets widths by script after rendering because the CSP does not allow style attributes.
 const width = (pct: number): string => `data-w="${pct}"`;
 
 const versionNote = (version: string): string | null =>
   version === 'GE-Proton11-12' || version === 'GE-Proton11-11' ? t('adv.note.notRecommended')
     : version === 'GE-Proton11-8' ? t('adv.note.older') : null;
 
-/** Satz zum Problem einer App: was passiert ist und was der Nutzer tun kann. */
+/** Sentence about an app's problem: what happened and what the user can do. */
 export const problemText = (problem: Exclude<AppProblem, ''>): string => t(`problem.${problem}` as MessageKey);
 
 const backBtn = (to: Screen): string =>
@@ -35,7 +35,7 @@ export function cardStatus(id: AppId, snap: Snapshot): string {
   return info.installed ? t('status.ready') : t('status.notInstalled', { gb: download(id, false) });
 }
 
-/** Kopfzeilen-Knopf „Rollout aktualisieren“: nur wenn nichts belegt ist und das Update bereit ist oder von Hand geladen werden muss. */
+/** Header button "Update Rollout": only when nothing is busy and the update is ready or has to be downloaded by hand. */
 const updateHint = (snap: Snapshot): 'restart' | 'settings' | null => {
   const su = snap.selfUpdate;
   if (su.blocked) return null;
@@ -84,7 +84,7 @@ function library(snap: Snapshot): string {
   </div>`;
 }
 
-/** Dezenter Hinweis im Zwift-Installer: Herkunft mit Link und Stand der Container-Laufzeit (✓ gefunden, ✗ fehlt, nichts bei „unbekannt“). */
+/** Subtle note in the Zwift installer: origin with link and state of the container runtime (✓ found, ✗ missing, nothing for "unknown"). */
 function zwiftNote(runtime: string | null): string {
   const link = `<button class="linkbtn inline" data-act="project">netbrain/zwift</button>`;
   const state = runtime === null ? '' : runtime
@@ -176,7 +176,7 @@ const done = (ui: Ui): string => `<div class="center">
   </div>`;
 
 export const launchText = (phase: LaunchPhase | undefined, app?: AppId): string => {
-  // Zwift prüft keinen Bluetooth-Adapter und keine Updates: es bereitet den Container vor und startet ihn.
+  // Zwift checks no Bluetooth adapter and no updates: it prepares the container and starts it.
   if (app === 'zwift') return phase === 'starting' ? t('launch.zwiftStart') : t('launch.zwiftPrepare');
   return phase === 'bluetooth' ? t('launch.bluetooth') : phase === 'starting' ? t('launch.starting') : t('launch.updates');
 };
@@ -254,7 +254,7 @@ function bluetooth(ui: Ui, snap: Snapshot): string {
   </div>`;
 }
 
-/** Menü einer App (Zahnrad auf der Karte): Steam, Bluetooth (nur MyWhoosh), erweiterte Einstellungen, Deinstallieren. */
+/** Menu of an app (gear on the card): Steam, Bluetooth (MyWhoosh only), advanced settings, uninstall. */
 function appMenu(ui: Ui, snap: Snapshot): string {
   const id = ui.menuApp;
   const info = snap.apps[id];
@@ -290,7 +290,7 @@ function rolloutSteamRow(snap: Snapshot): string {
     </div>`;
 }
 
-/** Zeile „Rollout <Version>“ in den Einstellungen. Die Knopf-Kennung bleibt gleich, damit der Fokus beim Zustandswechsel auf der Zeile bleibt. */
+/** Row "Rollout <version>" in the settings. The button identifier stays the same so the focus stays on the row when the state changes. */
 export function selfUpdateNote(snap: Snapshot): string {
   const su = snap.selfUpdate;
   switch (su.status) {
@@ -511,7 +511,7 @@ export function modal(ui: Ui, snap: Snapshot): string {
   return '';
 }
 
-/** Hinweis nach einem Rollback: einmalig auf der Startseite, bis er bestätigt wurde. */
+/** Notice after a rollback: shown once on the home page until acknowledged. */
 export const noticeVisible = (ui: Ui, snap: Snapshot): boolean =>
   ui.screen === 'library' && !!snap.selfUpdate.notice && !ui.steamModal && ui.steamRollout === null && !ui.picker && !ui.confirmRemove && !ui.confirmQuit
   && !ui.confirmRestart && !ui.confirmPrevious && !ui.confirmImage;

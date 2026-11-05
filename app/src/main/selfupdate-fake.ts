@@ -1,5 +1,5 @@
-// Attrappen für das Selbst-Update, nach dem Muster von FakeSteam. Nur mit ROLLOUT_SELFUPDATE=fake beziehungsweise
-// ROLLOUT_SIM_SELFUPDATE im Einsatz, nie ohne diese Variablen.
+// Fakes for the self-update, modelled on FakeSteam. Used only with ROLLOUT_SELFUPDATE=fake or
+// ROLLOUT_SIM_SELFUPDATE, never without these variables.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { SelfUpdate, SelfUpdateStatus, UpdateChannel } from '../shared/api';
@@ -7,7 +7,7 @@ import { FeedError, type DownloadOptions, type Feed, type SelfUpdateService } fr
 
 const CHUNK = 64 * 1024;
 
-/** Ersetzt das Netz durch einen Ordner: rollout-update.json (stabil), rollout-update-beta.json und die Archive nach ihrem Dateinamen. */
+/** Replaces the network with a directory: rollout-update.json (stable), rollout-update-beta.json and the archives by file name. */
 export class FakeFeed implements Feed {
   constructor(private readonly dir: string, private readonly delayMs = 0) {}
 
@@ -32,7 +32,7 @@ export class FakeFeed implements Feed {
         const { bytesRead } = await handle.read(buffer, 0, CHUNK, null);
         if (!bytesRead) break;
         total += bytesRead;
-        if (total > maxBytes) throw new FeedError('size', 'mehr Bytes als angegeben');
+        if (total > maxBytes) throw new FeedError('size', 'more bytes than declared');
         await out.write(buffer, 0, bytesRead);
         onBytes(bytesRead);
         if (this.delayMs) await new Promise((resolve) => setTimeout(resolve, this.delayMs));
@@ -49,8 +49,8 @@ const STATUSES: readonly SelfUpdateStatus[] = [
 ];
 
 /**
- * Hält einen festen Zustand für den Klicktest (ROLLOUT_SIM_SELFUPDATE=<Zustand>[,blocked][,fail][,previous=<v>][,notice=<v>][,next=<v>][,mb=<n>]).
- * Prüfen, Laden, Neustart und „Vorherige Version“ laufen simuliert, ohne Dateien und ohne Neustart.
+ * Holds a fixed state for the click test (ROLLOUT_SIM_SELFUPDATE=<state>[,blocked][,fail][,previous=<v>][,notice=<v>][,next=<v>][,mb=<n>]).
+ * Checking, downloading, restart and "Previous version" are simulated, without files and without a restart.
  */
 export class FakeSelfUpdate implements SelfUpdateService {
   private info: SelfUpdate;
@@ -75,8 +75,8 @@ export class FakeSelfUpdate implements SelfUpdateService {
   private later(ms: number, fn: () => void): void { this.timer = setTimeout(() => { this.timer = null; fn(); }, ms); }
 
   snapshot(): SelfUpdate { return { ...this.info }; }
-  start(): void { /* kein Takt */ }
-  uiReady(): void { /* keine Gesund-Meldung */ }
+  start(): void { /* no ticker */ }
+  uiReady(): void { /* no healthy report */ }
   onChange(listener: () => void): void { this.listeners.push(listener); }
   settingsChanged(): void { this.emit(); }
   busyChanged(): void { this.emit(); }

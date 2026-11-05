@@ -1,5 +1,5 @@
-// Prüft die Logik und den Dienst des Selbst-Updates (U1 bis U4, U6 bis U9) in Wegwerf-Ordnern, ohne Netz.
-// Testschlüssel entstehen pro Lauf. Der Schlüssel in selfupdate-keys.ts wird nie benutzt.
+// Checks the logic and the service of the self-update (U1 to U4, U6 to U9) in throwaway directories, without network.
+// Test keys are generated per run. The key in selfupdate-keys.ts is never used.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
@@ -14,7 +14,7 @@ process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
 for (const name of ['selfupdate', 'selfupdate-fake']) {
   await build({ entryPoints: [`src/main/${name}.ts`], bundle: true, platform: 'node', format: 'esm', outfile: path.join(work, `${name}.mjs`), logLevel: 'error', external: ['electron'] });
 }
-// Beide Bündel enthalten selfupdate.ts: FeedError und Dienst kommen für den Dienst aus demselben Bündel.
+// Both bundles contain selfupdate.ts: FeedError and service come from the same bundle for the service.
 const su = await import(path.join(work, 'selfupdate.mjs'));
 const fake = await import(path.join(work, 'selfupdate-fake.mjs'));
 
@@ -59,20 +59,20 @@ test('U1 SemVer-Reihenfolge', () => {
 
 test('U2 Signatur', () => {
   const m = manifestOf();
-  assert.equal(verdict(envelope(m)).ok, true, 'gültig');
-  assert.equal(verdict(envelope(m, { tamper: (s) => s.replace('1.3.0', '1.3.1') })).ok, false, 'ein Byte geändert');
-  assert.equal(verdict(envelope(m, { tamper: (s) => `${s} ` })).ok, false, 'angehängtes Leerzeichen');
+  assert.equal(verdict(envelope(m)).ok, true, 'valid');
+  assert.equal(verdict(envelope(m, { tamper: (s) => s.replace('1.3.0', '1.3.1') })).ok, false, 'one byte changed');
+  assert.equal(verdict(envelope(m, { tamper: (s) => `${s} ` })).ok, false, 'appended space');
   assert.equal(verdict(envelope(m, { keyId: 'rollout-update-9' })).ok, false, 'unbekannte keyId');
-  assert.equal(verdict(envelope(m, { keyId: '__proto__' })).ok, false, 'keyId aus dem Prototyp');
-  assert.equal(verdict(envelope(m, { keyId: 'rollout-update-2' })).ok, false, 'Signatur eines anderen Schlüssels');
-  assert.equal(verdict(envelope(m, { keyId: 'rollout-update-2', key: reserve.priv })).ok, true, 'Reserveschlüssel gültig');
+  assert.equal(verdict(envelope(m, { keyId: '__proto__' })).ok, false, 'keyId from the prototype');
+  assert.equal(verdict(envelope(m, { keyId: 'rollout-update-2' })).ok, false, 'signature of a different key');
+  assert.equal(verdict(envelope(m, { keyId: 'rollout-update-2', key: reserve.priv })).ok, true, 'reserve key valid');
   const parsed = JSON.parse(envelope(m));
   for (const signature of [parsed.signature.slice(0, -8), `${parsed.signature}AAAA`, '', '!!!']) {
-    assert.equal(verdict(JSON.stringify({ ...parsed, signature })).ok, false, `Signatur-Länge ${signature.length}`);
+    assert.equal(verdict(JSON.stringify({ ...parsed, signature })).ok, false, `signature length ${signature.length}`);
   }
-  assert.equal(su.verifySignature('x', parsed.signature, Buffer.alloc(31).toString('base64')), false, 'Schlüssel zu kurz');
-  assert.equal(su.verifySignature('x', parsed.signature, Buffer.alloc(33).toString('base64')), false, 'Schlüssel zu lang');
-  assert.equal(verdict(envelope(m), { keys: {} }).ok, false, 'ohne eingetragenen Schlüssel wird alles abgelehnt');
+  assert.equal(su.verifySignature('x', parsed.signature, Buffer.alloc(31).toString('base64')), false, 'key too short');
+  assert.equal(su.verifySignature('x', parsed.signature, Buffer.alloc(33).toString('base64')), false, 'key too long');
+  assert.equal(verdict(envelope(m), { keys: {} }).ok, false, 'without a configured key everything is rejected');
 });
 
 test('U3 Manifest', () => {
@@ -82,34 +82,34 @@ test('U3 Manifest', () => {
   assert.equal(reason(envelope(manifestOf({ product: 'anderes' }))), 'invalid', 'falsches Produkt');
   assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { url: 'https://example.com/x.tar.gz' }) }))), 'invalid', 'fremde URL');
   assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { url: `${BASE.replace('https', 'http')}/v1.3.0/x.tar.gz` }) }))), 'invalid', 'http');
-  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { url: `${BASE}/../../../evil/x.tar.gz` }) }))), 'invalid', 'Pfad nach oben');
-  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { url: 'https://github.com@evil.example/mace-ops/rollout-cycling-launcher-linux/releases/download/x' }) }))), 'invalid', 'Nutzer in der URL');
-  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { size: su.LIMITS.app + 1 }) }))), 'invalid', 'App-Archiv zu groß');
-  assert.equal(reason(envelope(manifestOf({ runtime: { ...manifestOf().runtime, size: su.LIMITS.runtime + 1 } }))), 'invalid', 'Electron-Archiv zu groß');
-  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { sha256: 'xyz' }) }))), 'invalid', 'Prüfsumme kaputt');
-  assert.equal(reason(envelope(manifestOf({ runtime: { ...manifestOf().runtime, min: '46.0.0' } }))), 'invalid', 'min über electron');
-  assert.equal(reason(envelope(manifestOf({ padding: 'x'.repeat(su.LIMITS.manifest) }))), 'invalid', 'Manifest über 64 KiB');
+  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { url: `${BASE}/../../../evil/x.tar.gz` }) }))), 'invalid', 'path traversal upwards');
+  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { url: 'https://github.com@evil.example/mace-ops/rollout-cycling-launcher-linux/releases/download/x' }) }))), 'invalid', 'user in the URL');
+  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { size: su.LIMITS.app + 1 }) }))), 'invalid', 'app archive too large');
+  assert.equal(reason(envelope(manifestOf({ runtime: { ...manifestOf().runtime, size: su.LIMITS.runtime + 1 } }))), 'invalid', 'Electron archive too large');
+  assert.equal(reason(envelope(manifestOf({ app: archive('x.tar.gz', { sha256: 'xyz' }) }))), 'invalid', 'checksum broken');
+  assert.equal(reason(envelope(manifestOf({ runtime: { ...manifestOf().runtime, min: '46.0.0' } }))), 'invalid', 'min above electron');
+  assert.equal(reason(envelope(manifestOf({ padding: 'x'.repeat(su.LIMITS.manifest) }))), 'invalid', 'manifest over 64 KiB');
   assert.equal(reason('{kaputt'), 'invalid', 'kaputtes JSON');
   assert.equal(reason(envelope('{kaputt')), 'invalid', 'kaputtes JSON im signierten Teil');
-  assert.equal(reason(JSON.stringify([1])), 'invalid', 'Umschlag ist kein Objekt');
+  assert.equal(reason(JSON.stringify([1])), 'invalid', 'envelope is not an object');
   assert.equal(reason(envelope(manifestOf({ version: '1.2.0' }))), 'old', 'gleiche Version');
-  assert.equal(reason(envelope(manifestOf({ version: '1.1.9' }))), 'old', 'ältere Version');
-  assert.equal(reason(envelope(manifestOf({ version: '1.2.0-beta.1' }))), 'old', 'Vorabversion der laufenden');
+  assert.equal(reason(envelope(manifestOf({ version: '1.1.9' }))), 'old', 'older version');
+  assert.equal(reason(envelope(manifestOf({ version: '1.2.0-beta.1' }))), 'old', 'prerelease of the running one');
   assert.equal(reason(envelope(manifestOf()), { bad: ['1.3.0'] }), 'bad', 'Version in bad');
-  assert.equal(reason(envelope(manifestOf({ format: 2, neu: true }))), 'format', 'zu hohes format');
+  assert.equal(reason(envelope(manifestOf({ format: 2, added: true }))), 'format', 'format too high');
   assert.equal(reason(envelope(manifestOf({ format: 0 }))), 'invalid', 'format 0');
-  assert.equal(reason(envelope(manifestOf({ format: 2 }), { key: reserve.priv })), 'invalid', 'zu hohes format ohne gültige Signatur zählt nicht');
+  assert.equal(reason(envelope(manifestOf({ format: 2 }), { key: reserve.priv })), 'invalid', 'format too high without a valid signature does not count');
 });
 
 test('U4 Electron-Regel', () => {
   const rt = (electron, min) => ({ electron, min });
   assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('45.0.0', '45.0.0')), { use: '45.0.0', download: false }, 'gleich');
-  assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('45.2.2', '45.0.0')), { use: '45.0.0', download: false }, 'gleiche Hauptversion ab min lädt nichts');
-  assert.deepEqual(su.electronPlan(['45.2.2'], '45.2.2', rt('45.0.0', '45.0.0')), { use: '45.2.2', download: false }, 'installiertes ist neuer');
-  assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('45.2.2', '45.1.0')), { use: '45.2.2', download: true }, 'unter min lädt mit');
-  assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('46.0.0', '46.0.0')), { use: '46.0.0', download: true }, 'neue Hauptversion lädt mit');
-  assert.deepEqual(su.electronPlan(['45.0.0', '46.0.0'], '45.0.0', rt('46.0.0', '46.0.0')), { use: '46.0.0', download: false }, 'vorhandener Ordner wird wiederverwendet');
-  assert.deepEqual(su.electronPlan(['45.0.0', '45.2.2'], '45.0.0', rt('45.2.2', '45.1.0')), { use: '45.2.2', download: false }, 'vorhandener Ordner unter min');
+  assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('45.2.2', '45.0.0')), { use: '45.0.0', download: false }, 'same major version from min downloads nothing');
+  assert.deepEqual(su.electronPlan(['45.2.2'], '45.2.2', rt('45.0.0', '45.0.0')), { use: '45.2.2', download: false }, 'installed one is newer');
+  assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('45.2.2', '45.1.0')), { use: '45.2.2', download: true }, 'below min downloads along');
+  assert.deepEqual(su.electronPlan(['45.0.0'], '45.0.0', rt('46.0.0', '46.0.0')), { use: '46.0.0', download: true }, 'new major version downloads along');
+  assert.deepEqual(su.electronPlan(['45.0.0', '46.0.0'], '45.0.0', rt('46.0.0', '46.0.0')), { use: '46.0.0', download: false }, 'existing directory is reused');
+  assert.deepEqual(su.electronPlan(['45.0.0', '45.2.2'], '45.0.0', rt('45.2.2', '45.1.0')), { use: '45.2.2', download: false }, 'existing directory below min');
   const m = su.evaluateManifest(envelope(manifestOf()), ctx()).manifest;
   assert.equal(su.neededBytes(m, { use: '45.0.0', download: false }), 5_300_000 + 5_400_000 + 50 * 1024 ** 2);
   assert.ok(su.neededBytes(m, { use: '45.0.0', download: true }) > 400_000_000);
@@ -121,7 +121,7 @@ test('U4 Electron-Regel', () => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sha = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
-/** Ordner im Aufbau von Konzept 4.3 mit laufender Version 1.2.0 (Electron 45.0.0, ein Shell-Skript). */
+/** Directory laid out as in concept 4.3 with running version 1.2.0 (Electron 45.0.0, a shell script). */
 function makeHome(name) {
   const home = path.join(work, name);
   for (const d of ['bin', 'versions/1.2.0/dist/renderer/assets/brand', 'versions/1.2.0/bootstrap', 'electron/45.0.0', 'state', 'feed']) fs.mkdirSync(path.join(home, d), { recursive: true });
@@ -136,7 +136,7 @@ function makeHome(name) {
 
 const APP_FILES = { 'dist/main/main.js': '//', 'dist/preload/preload.js': '//', 'dist/renderer/index.html': '<html>', 'bootstrap/rollout': '#!/bin/sh\n# rollout-bootstrap: 1\n' };
 
-/** Baut ein App-Archiv (und optional ein Electron-Archiv) samt signiertem Manifest in den Ordner `feed` des Testordners. */
+/** Builds an app archive (and optionally an Electron archive) with a signed manifest into the `feed` directory of the test directory. */
 function publish(home, { version = '1.3.0', channel = 'stable', files = APP_FILES, pkgVersion = version, electron = null, patch = {}, manifestFile } = {}) {
   const feed = path.join(home, 'feed');
   const stage = fs.mkdtempSync(path.join(work, 'stage-'));
@@ -178,9 +178,9 @@ function makeService(home, overrides = {}) {
 }
 
 const exists = (home, rel) => fs.existsSync(path.join(home, rel));
-const noTraces = (home) => { assert.equal(exists(home, 'state/pending'), false, 'kein pending'); assert.ok(!exists(home, 'staging') || fs.readdirSync(path.join(home, 'staging')).length === 0, 'staging leer'); };
+const noTraces = (home) => { assert.equal(exists(home, 'state/pending'), false, 'no pending'); assert.ok(!exists(home, 'staging') || fs.readdirSync(path.join(home, 'staging')).length === 0, 'staging empty'); };
 
-test('ohne Wächter oder auf anderer Architektur bleibt alles still', async () => {
+test('without watcher or on a different architecture everything stays quiet', async () => {
   for (const patch of [{ supervised: false }, { arch: 'arm64' }]) {
     const home = makeHome(`still-${Object.keys(patch)[0]}`);
     publish(home);
@@ -192,10 +192,10 @@ test('ohne Wächter oder auf anderer Architektur bleibt alles still', async () =
   }
 });
 
-test('der Dienst liest die Einstellungen erst bei start(), nicht im Konstruktor', async () => {
+test('the service reads the settings only at start(), not in the constructor', async () => {
   const home = makeHome('einstellungen-spaet');
   const timing = { firstCheckMs: 1e9, healthyMs: 1e9, intervalMs: 1e9 };
-  const { service } = makeService(home, { settings: () => { throw new Error('Backend noch nicht da'); }, timing });
+  const { service } = makeService(home, { settings: () => { throw new Error('Backend not there yet'); }, timing });
   assert.equal(service.snapshot().status, 'current');
   const ok = makeService(home, { timing });
   ok.service.start();
@@ -203,11 +203,11 @@ test('der Dienst liest die Einstellungen erst bei start(), nicht im Konstruktor'
   publish(home, { version: '1.4.0-beta.1', channel: 'beta' });
   ok.service.settingsChanged();
   await sleep(200);
-  assert.equal(ok.service.snapshot().next, '1.4.0-beta.1', 'Kanalwechsel löst sofort eine Prüfung aus');
+  assert.equal(ok.service.snapshot().next, '1.4.0-beta.1', 'channel switch triggers a check immediately');
 });
 
-test('ohne eingetragenen Schlüssel wird nichts abgefragt und nichts geladen', async () => {
-  const home = makeHome('ohne-schluessel');
+test('without a configured key nothing is queried and nothing downloaded', async () => {
+  const home = makeHome('without-key');
   publish(home);
   const { service } = makeService(home, { keys: {}, feed: { manifest: () => { throw new Error('Netz benutzt'); }, download: () => { throw new Error('Netz benutzt'); } } });
   await service.check(false);
@@ -217,7 +217,7 @@ test('ohne eingetragenen Schlüssel wird nichts abgefragt und nichts geladen', a
   noTraces(home);
 });
 
-test('Prüfen findet das Update und zeigt Version und Größe', async () => {
+test('Checking finds the update and shows version and size', async () => {
   const home = makeHome('pruefen');
   publish(home);
   const { service, state } = makeService(home);
@@ -232,10 +232,10 @@ test('Prüfen findet das Update und zeigt Version und Größe', async () => {
   state.settings.channel = 'beta';
   publish(home, { version: '1.4.0-beta.1', channel: 'beta' });
   await service.check(true);
-  assert.equal(service.snapshot().next, '1.4.0-beta.1', 'Beta nimmt die höhere Version aus beiden Kanälen');
+  assert.equal(service.snapshot().next, '1.4.0-beta.1', 'Beta takes the higher version from both channels');
 });
 
-test('automatische Prüfung: höchstens einmal in 6 Stunden, Zwischenspeicher zeigt das Update weiter', async () => {
+test('automatic check: at most once in 6 hours, cache keeps showing the update', async () => {
   const home = makeHome('takt');
   publish(home);
   let calls = 0;
@@ -248,14 +248,14 @@ test('automatische Prüfung: höchstens einmal in 6 Stunden, Zwischenspeicher ze
   clock += 3600_000;
   const second = makeService(home, { feed, now: () => clock }).service;
   await second.check(false);
-  assert.equal(calls, 1, 'zweiter Start innerhalb von 6 Stunden fragt nicht erneut');
-  assert.equal(second.snapshot().status, 'available', 'Zwischenspeicher liefert das Update');
+  assert.equal(calls, 1, 'second start within 6 hours does not ask again');
+  assert.equal(second.snapshot().status, 'available', 'cache delivers the update');
   clock += 7 * 3600_000;
   await second.check(false);
   assert.equal(calls, 2);
 });
 
-test('Netzfehler und HTTP-Fehler: automatisch still, von Hand „Prüfen ging nicht“, Netzfehler zählen nicht als Prüfung', async () => {
+test('Network and HTTP errors: silent when automatic, a failed check message when by hand, network errors do not count as a check', async () => {
   const home = makeHome('netzfehler');
   const down = { manifest: async () => { throw new Error('offline'); }, download: async () => { throw new Error('offline'); } };
   const { service } = makeService(home, { feed: down });
@@ -270,13 +270,13 @@ test('Netzfehler und HTTP-Fehler: automatisch still, von Hand „Prüfen ging ni
     const { service: s } = makeService(h, { feed: { manifest: async () => ({ status }), download: down.download } });
     await s.check(false);
     assert.equal(s.snapshot().status, 'current', `${status} automatisch still`);
-    assert.ok(exists(h, 'state/check.json'), `${status} bremst auf einmal in 6 Stunden`);
+    assert.ok(exists(h, 'state/check.json'), `${status} throttles to once in 6 hours`);
     await s.check(true);
-    assert.equal(s.snapshot().status, 'checkFailed', `${status} von Hand`);
+    assert.equal(s.snapshot().status, 'checkFailed', `${status} by hand`);
   }
 });
 
-test('manipuliertes Manifest: kein pending, automatisch still, von Hand „Prüfung nicht bestanden“', async () => {
+test('tampered manifest: no pending, silent when automatic, "check not passed" when by hand', async () => {
   const home = makeHome('manipuliert');
   publish(home);
   const file = path.join(home, 'feed/rollout-update.json');
@@ -291,7 +291,7 @@ test('manipuliertes Manifest: kein pending, automatisch still, von Hand „Prüf
   noTraces(home);
 });
 
-test('zu neues Manifest-Format führt zu „Neuinstallation nötig“', async () => {
+test('manifest format too new leads to "fresh install needed"', async () => {
   const home = makeHome('format');
   publish(home, { patch: { format: 2 } });
   const { service } = makeService(home);
@@ -308,7 +308,7 @@ async function downloaded(home, setup = {}) {
   return made;
 }
 
-test('Laden und Bereitlegen: Version, runtime und pending stimmen, staging ist leer', async () => {
+test('Download and staging: version, runtime and pending are right, staging is empty', async () => {
   const home = makeHome('laden');
   const { service } = await downloaded(home);
   const snap = service.snapshot();
@@ -318,14 +318,14 @@ test('Laden und Bereitlegen: Version, runtime und pending stimmen, staging ist l
   assert.ok(exists(home, 'versions/1.3.0/dist/main/main.js'));
   assert.ok(exists(home, 'versions/1.3.0/bootstrap/rollout'));
   assert.equal(exists(home, 'staging'), false);
-  assert.equal(path.basename(fs.readlinkSync(path.join(home, 'current'))), '1.2.0', 'current bleibt unberührt');
+  assert.equal(path.basename(fs.readlinkSync(path.join(home, 'current'))), '1.2.0', 'current stays untouched');
 });
 
-test('U6 Download: falsche Prüfsumme, falsche Größe, zu viele Bytes, Platz', async () => {
+test('U6 Download: wrong checksum, wrong size, too many bytes, space', async () => {
   const cases = {
-    'Prüfsumme': (m) => ({ app: { ...m.app, sha256: 'b'.repeat(64) } }),
-    'Größe zu klein angegeben (zu viele Bytes)': (m) => ({ app: { ...m.app, size: m.app.size - 10 } }),
-    'Größe zu groß angegeben': (m) => ({ app: { ...m.app, size: m.app.size + 10 } })
+    'Checksum': (m) => ({ app: { ...m.app, sha256: 'b'.repeat(64) } }),
+    'size declared too small (too many bytes)': (m) => ({ app: { ...m.app, size: m.app.size - 10 } }),
+    'size declared too large': (m) => ({ app: { ...m.app, size: m.app.size + 10 } })
   };
   for (const [name, patch] of Object.entries(cases)) {
     const home = makeHome(`u6-${name.length}`);
@@ -347,7 +347,7 @@ test('U6 Download: falsche Prüfsumme, falsche Größe, zu viele Bytes, Platz', 
   noTraces(noSpace);
 });
 
-test('U6 Download: Abbruch und Netzabbruch lassen nichts zurück', async () => {
+test('U6 Download: abort and network abort leave nothing behind', async () => {
   const home = makeHome('u6-abbruch');
   publish(home);
   const inner = new fake.FakeFeed(path.join(home, 'feed'));
@@ -378,9 +378,9 @@ test('U7 Archiv: falsche Version, fehlende Datei, Electron-Probelauf scheitert',
   const cases = {
     'falsche Version in package.json': { pkgVersion: '1.3.1' },
     'fehlende main.js': { files: Object.fromEntries(Object.entries(APP_FILES).filter(([n]) => n !== 'dist/main/main.js')) },
-    'fehlender Wächter': { files: Object.fromEntries(Object.entries(APP_FILES).filter(([n]) => n !== 'bootstrap/rollout')) },
+    'missing watcher': { files: Object.fromEntries(Object.entries(APP_FILES).filter(([n]) => n !== 'bootstrap/rollout')) },
     'Electron meldet andere Version': { electron: { version: '45.2.2', min: '45.1.0', reported: '45.0.0' } },
-    'Electron ohne Programmdatei': { electron: { version: '45.2.2', min: '45.1.0' }, breakElectron: true }
+    'Electron without executable': { electron: { version: '45.2.2', min: '45.1.0' }, breakElectron: true }
   };
   let n = 0;
   for (const [name, setup] of Object.entries(cases)) {
@@ -402,12 +402,12 @@ test('U7 Archiv: falsche Version, fehlende Datei, Electron-Probelauf scheitert',
     await service.download();
     assert.equal(service.snapshot().status, 'invalid', name);
     noTraces(home);
-    assert.equal(exists(home, 'versions/1.3.0'), false, `${name}: keine halbe Version`);
-    assert.equal(exists(home, 'electron/45.2.2'), false, `${name}: kein halbes Electron`);
+    assert.equal(exists(home, 'versions/1.3.0'), false, `${name}: no half version`);
+    assert.equal(exists(home, 'electron/45.2.2'), false, `${name}: no half Electron`);
   }
 });
 
-test('U7 Neues Electron wird geladen, geprüft und neben dem alten abgelegt', async () => {
+test('U7 New Electron is downloaded, verified and placed next to the old one', async () => {
   const home = makeHome('u7-electron');
   const { service } = await downloaded(home, { publish: { electron: { version: '45.2.2', min: '45.1.0' } } });
   assert.equal(service.snapshot().status, 'ready');
@@ -417,13 +417,13 @@ test('U7 Neues Electron wird geladen, geprüft und neben dem alten abgelegt', as
   assert.ok(exists(home, 'electron/45.0.0/electron'), 'altes Electron bleibt liegen');
 });
 
-test('U8 Reihenfolge: pending entsteht zuletzt, nach dem rename', async () => {
+test('U8 Order: pending is created last, after the rename', async () => {
   const home = makeHome('u8');
   const { service, state } = await downloaded(home, { publish: { electron: { version: '45.2.2', min: '45.1.0' } } });
   assert.deepEqual(state.steps.map((s) => s.name), ['electron', 'app', 'pending']);
   const pending = state.steps.find((s) => s.name === 'pending');
-  assert.equal(pending.pending, false, 'vor dem Schreiben gibt es kein pending');
-  assert.equal(pending.versionDir, true, 'die Version liegt schon da');
+  assert.equal(pending.pending, false, 'before writing there is no pending');
+  assert.equal(pending.versionDir, true, 'the version is already there');
   assert.ok(exists(home, 'state/pending'));
   assert.equal(service.snapshot().status, 'ready');
 
@@ -434,18 +434,18 @@ test('U8 Reihenfolge: pending entsteht zuletzt, nach dem rename', async () => {
   await made.service.download();
   assert.equal(made.service.snapshot().status, 'invalid');
   noTraces(crash);
-  assert.equal(exists(crash, 'versions/1.3.0'), false, 'Abbruch vor pending räumt die Version wieder weg');
+  assert.equal(exists(crash, 'versions/1.3.0'), false, 'abort before pending removes the version again');
 });
 
-test('U9 Belegt: kein Laden, kein Neustart, Abbruch beim Start, Aufräumen behält current, previous, pending', async () => {
-  // Belegt vor dem Laden: von Hand prüfen geht, Laden nicht, automatisch wird nicht einmal geprüft.
+test('U9 Busy: no download, no restart, abort on start, cleanup keeps current, previous, pending', async () => {
+  // Busy before downloading: checking by hand works, downloading does not, automatically not even checking.
   const home = makeHome('u9');
   publish(home);
   const { service, state } = makeService(home);
   state.settings.autoUpdate = true;
   state.busy = true;
   await service.check(false);
-  assert.equal(exists(home, 'state/check.json'), false, 'automatisch keine Prüfung');
+  assert.equal(exists(home, 'state/check.json'), false, 'no automatic check');
   await service.check(true);
   assert.equal(service.snapshot().status, 'available');
   assert.equal(service.snapshot().blocked, true);
@@ -453,17 +453,17 @@ test('U9 Belegt: kein Laden, kein Neustart, Abbruch beim Start, Aufräumen behä
   assert.equal(service.snapshot().status, 'available', 'Laden gesperrt');
   noTraces(home);
 
-  // Belegt durch rollout-run: state/run.pid mit lebendem Prozess.
+  // Busy through rollout-run: state/run.pid with a live process.
   state.busy = false;
   fs.writeFileSync(path.join(home, 'state/run.pid'), `${process.pid}\n`);
   assert.equal(service.snapshot().blocked, true);
   await service.download();
   assert.equal(service.snapshot().status, 'available');
   fs.writeFileSync(path.join(home, 'state/run.pid'), '999999999\n');
-  assert.equal(service.snapshot().blocked, false, 'toter Prozess zählt nicht');
+  assert.equal(service.snapshot().blocked, false, 'dead process does not count');
   fs.rmSync(path.join(home, 'state/run.pid'));
 
-  // Laufender Download bricht ab, wenn etwas beginnt.
+  // A running download aborts when something starts.
   const inner = new fake.FakeFeed(path.join(home, 'feed'));
   let started;
   const begun = new Promise((r) => { started = r; });
@@ -481,7 +481,7 @@ test('U9 Belegt: kein Laden, kein Neustart, Abbruch beim Start, Aufräumen behä
   assert.equal(second.service.snapshot().status, 'available');
   noTraces(home);
 
-  // Bereit und belegt: Neustart gesperrt, pending bleibt.
+  // Ready and busy: restart blocked, pending stays.
   const ready = makeHome('u9-bereit');
   const r = await downloaded(ready);
   r.state.busy = true;
@@ -494,7 +494,7 @@ test('U9 Belegt: kein Laden, kein Neustart, Abbruch beim Start, Aufräumen behä
   assert.deepEqual(r.state.exits, [75]);
 });
 
-test('U9 Aufräumen: behält current, previous, pending und deren Electron, nichts bei Belegt oder laufender Probe', async () => {
+test('U9 Cleanup: keeps current, previous, pending and their Electron, nothing when busy or during a running trial', async () => {
   const home = makeHome('aufraeumen');
   const add = (v, rt) => {
     fs.mkdirSync(path.join(home, 'versions', v), { recursive: true });
@@ -520,7 +520,7 @@ test('U9 Aufräumen: behält current, previous, pending und deren Electron, nich
   state.busy = false;
   fs.writeFileSync(path.join(home, 'state/trial'), '1.2.0\n0\n');
   await service.housekeeping();
-  assert.ok(exists(home, 'versions/1.1.0'), 'Probe läuft: nichts entfernt');
+  assert.ok(exists(home, 'versions/1.1.0'), 'trial running: nothing removed');
   fs.rmSync(path.join(home, 'state/trial'));
 
   await service.housekeeping();
@@ -531,7 +531,7 @@ test('U9 Aufräumen: behält current, previous, pending und deren Electron, nich
   assert.equal(fs.readFileSync(path.join(home, 'state/pending'), 'utf8'), '1.3.0\n');
 });
 
-test('Aufräumen erneuert Starter und Symbol erst nach Prüfung, nur bei höherer Nummer', async () => {
+test('Cleanup renews starter and icon only after verification, only for a higher number', async () => {
   const home = makeHome('starter');
   const old = '#!/bin/sh\n# rollout-bootstrap: 1\necho alt\n';
   fs.writeFileSync(path.join(home, 'bin/rollout'), old, { mode: 0o755 });
@@ -539,43 +539,43 @@ test('Aufräumen erneuert Starter und Symbol erst nach Prüfung, nur bei höhere
   const { service } = makeService(home);
   fresh(1, 'echo gleich');
   await service.housekeeping();
-  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), old, 'gleiche Nummer: nicht erneuert');
+  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), old, 'same number: not renewed');
   fresh(2, 'if [ then');
   await service.housekeeping();
-  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), old, 'Syntaxfehler: nicht erneuert');
+  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), old, 'syntax error: not renewed');
   fresh(2, 'echo "rollout-bootstrap 3 flock=ja"; exit 0');
   fs.writeFileSync(path.join(home, 'versions/1.2.0/bootstrap/rollout'), '#!/bin/sh\n# rollout-bootstrap: 2\nif [ "$1" = --bootstrap-selftest ]; then echo "rollout-bootstrap 9"; exit 0; fi\n');
   await service.housekeeping();
-  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), old, 'Selbsttest meldet andere Nummer: nicht erneuert');
+  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), old, 'self-test reports a different number: not renewed');
   fs.writeFileSync(path.join(home, 'versions/1.2.0/bootstrap/rollout'), '#!/bin/sh\n# rollout-bootstrap: 2\nif [ "$1" = --bootstrap-selftest ]; then echo "rollout-bootstrap 2 flock=ja"; exit 0; fi\n');
   fs.writeFileSync(path.join(home, 'versions/1.2.0/dist/renderer/assets/brand/logo.png'), 'neues logo');
   await service.housekeeping();
   assert.match(fs.readFileSync(path.join(home, 'bin/rollout'), 'utf8'), /# rollout-bootstrap: 2/);
-  assert.equal(fs.statSync(path.join(home, 'bin/rollout')).mode & 0o111, 0o111, 'ausführbar');
+  assert.equal(fs.statSync(path.join(home, 'bin/rollout')).mode & 0o111, 0o111, 'executable');
   assert.equal(fs.readFileSync(path.join(home, 'icon.png'), 'utf8'), 'neues logo');
 });
 
-test('Aufräumen legt rollout-run an und erneuert es nur bei höherer Nummer', async () => {
+test('Cleanup creates rollout-run and renews it only for a higher number', async () => {
   const home = makeHome('run-starter');
   const file = path.join(home, 'versions/1.2.0/bootstrap/rollout-run');
   const write = (n, selftest) => fs.writeFileSync(file, `#!/bin/sh\n# rollout-bootstrap: ${n}\nif [ "$1" = --bootstrap-selftest ]; then echo "rollout-bootstrap ${selftest} run"; exit 0; fi\n`);
   const { service } = makeService(home);
   await service.housekeeping();
-  assert.equal(exists(home, 'bin/rollout-run'), false, 'ältere Version ohne rollout-run: nichts angelegt');
+  assert.equal(exists(home, 'bin/rollout-run'), false, 'older version without rollout-run: nothing created');
   write(1, 2);
   await service.housekeeping();
-  assert.equal(exists(home, 'bin/rollout-run'), false, 'Selbsttest nennt eine andere Nummer: nicht angelegt');
+  assert.equal(exists(home, 'bin/rollout-run'), false, 'self-test names a different number: not created');
   write(1, 1);
   await service.housekeeping();
   assert.match(fs.readFileSync(path.join(home, 'bin/rollout-run'), 'utf8'), /# rollout-bootstrap: 1/);
-  assert.equal(fs.statSync(path.join(home, 'bin/rollout-run')).mode & 0o111, 0o111, 'ausführbar');
+  assert.equal(fs.statSync(path.join(home, 'bin/rollout-run')).mode & 0o111, 0o111, 'executable');
   const before = fs.readFileSync(path.join(home, 'bin/rollout-run'), 'utf8');
-  fs.appendFileSync(file, '# geändert\n');
+  fs.appendFileSync(file, '# changed\n');
   await service.housekeeping();
-  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout-run'), 'utf8'), before, 'gleiche Nummer: nicht erneuert');
+  assert.equal(fs.readFileSync(path.join(home, 'bin/rollout-run'), 'utf8'), before, 'same number: not renewed');
 });
 
-test('„Vorherige Version“ sperrt die laufende und legt die vorherige als pending ab', async () => {
+test('"Previous version" blocks the running one and stages the previous one as pending', async () => {
   const home = makeHome('vorherige');
   fs.mkdirSync(path.join(home, 'versions/1.1.0'));
   fs.writeFileSync(path.join(home, 'versions/1.1.0/package.json'), '{}');
@@ -595,10 +595,10 @@ test('„Vorherige Version“ sperrt die laufende und legt die vorherige als pen
   fs.mkdirSync(path.join(bad, 'versions/1.1.0'));
   fs.symlinkSync('versions/1.1.0', path.join(bad, 'previous'));
   fs.writeFileSync(path.join(bad, 'state/bad'), '1.1.0\n');
-  assert.equal(makeService(bad).service.snapshot().previous, '', 'gesperrte Version wird nicht angeboten');
+  assert.equal(makeService(bad).service.snapshot().previous, '', 'blocked version is not offered');
 });
 
-test('Hinweis nach Rollback: erscheint, bis er bestätigt wird', () => {
+test('Notice after rollback: appears until it is acknowledged', () => {
   const home = makeHome('hinweis');
   fs.writeFileSync(path.join(home, 'state/notice'), '1.3.0\n');
   const { service } = makeService(home);
@@ -608,13 +608,13 @@ test('Hinweis nach Rollback: erscheint, bis er bestätigt wird', () => {
   assert.equal(exists(home, 'state/notice'), false);
 });
 
-test('Gesund-Meldung: nur mit Probe, nur für die eigene Version', async () => {
+test('Healthy report: only with a trial, only for its own version', async () => {
   const timing = { firstCheckMs: 1e9, healthyMs: 20, intervalMs: 1e9 };
   const home = makeHome('gesund');
   const { service } = makeService(home, { timing });
   service.uiReady();
   await sleep(100);
-  assert.equal(exists(home, 'state/healthy'), false, 'ohne Probe wird nichts gemeldet');
+  assert.equal(exists(home, 'state/healthy'), false, 'without a trial nothing is reported');
 
   const trial = makeHome('gesund-probe');
   fs.writeFileSync(path.join(trial, 'state/trial'), '1.2.0\n0\n');
@@ -631,7 +631,7 @@ test('Gesund-Meldung: nur mit Probe, nur für die eigene Version', async () => {
   assert.equal(exists(other, 'state/healthy'), false);
 });
 
-test('bereitgelegtes Update überlebt den Neustart der App, ein neueres ersetzt es', async () => {
+test('staged update survives the app restart, a newer one replaces it', async () => {
   const home = makeHome('pending-neustart');
   await downloaded(home);
   const again = makeService(home).service;
@@ -645,7 +645,7 @@ test('bereitgelegtes Update überlebt den Neustart der App, ein neueres ersetzt 
   assert.equal(fs.readFileSync(path.join(home, 'state/pending'), 'utf8'), '1.3.5\n');
 });
 
-test('gesperrte Version wird nicht erneut angeboten', async () => {
+test('blocked version is not offered again', async () => {
   const home = makeHome('gesperrt');
   publish(home);
   fs.writeFileSync(path.join(home, 'state/bad'), '1.3.0\n');
@@ -654,7 +654,7 @@ test('gesperrte Version wird nicht erneut angeboten', async () => {
   assert.equal(service.snapshot().status, 'current');
 });
 
-test('automatisches Laden bei auto_update, einmal je Version und Start', async () => {
+test('automatic download with auto_update, once per version and start', async () => {
   const home = makeHome('auto');
   publish(home);
   const { service, state } = makeService(home);
@@ -672,12 +672,12 @@ test('automatisches Laden bei auto_update, einmal je Version und Start', async (
   assert.equal(downloads, 1);
   assert.equal(second.service.snapshot().status, 'available');
   await second.service.check(true);
-  assert.equal(downloads, 1, 'kein zweiter automatischer Versuch');
+  assert.equal(downloads, 1, 'no second automatic attempt');
   await second.service.download();
-  assert.equal(downloads, 2, 'von Hand geht es erneut');
+  assert.equal(downloads, 2, 'by hand it works again');
 });
 
-test('FakeSelfUpdate: Zustände, Prüfen, Laden und Neustart ohne Dateien', async () => {
+test('FakeSelfUpdate: states, checking, downloading and restart without files', async () => {
   const f = new fake.FakeSelfUpdate('available,previous=1.1.0,notice=1.3.0,mb=129', '1.2.0');
   assert.deepEqual(f.snapshot(), { status: 'available', version: '1.2.0', next: '1.3.0', mb: 129, progress: 0, blocked: false, previous: '1.1.0', notice: '1.3.0' });
   await f.download();

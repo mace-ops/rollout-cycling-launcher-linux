@@ -31,7 +31,7 @@ const isAppTab = (tab: AdvTab): tab is AppId => tab === 'mywhoosh' || tab === 'z
 const screenForPhase = (phase: LaunchPhase): Screen =>
   phase === 'running' ? 'running' : phase === 'bterror' ? 'bterror' : phase === 'crash' ? 'crash' : phase === 'failed' ? 'failed' : 'launching';
 
-/** Alles, was die Ansicht neu zeichnen muss. Fortschritt, Suchergebnisse und Starttext nicht. */
+/** Everything that requires the view to be redrawn. Not progress, search results and start text. */
 function structKey(): string {
   const { progress: _progress, ...selfUpdate } = snap.selfUpdate;
   return JSON.stringify([
@@ -40,7 +40,7 @@ function structKey(): string {
   ]);
 }
 
-// Die Bühne liegt außerhalb von #view und läuft bei jedem Neuaufbau ungestört weiter.
+// The stage lives outside #view and keeps running undisturbed on every rebuild.
 function updateStage(): void {
   const app = ui.screen === 'setup' || ui.screen === 'progress' || ui.screen === 'done' ? ui.setupApp
     : ui.screen === 'appmenu' ? ui.menuApp
@@ -110,7 +110,7 @@ function setHtml(id: string, html: string): void {
   el.innerHTML = html;
 }
 
-/** Der Takt aktualisiert nur einzelne Elemente, damit Klicks nicht verloren gehen und Animationen nicht neu starten. */
+/** The ticker updates only single elements so clicks are not lost and animations do not restart. */
 function patch(): void {
   const job = snap.job;
   if (job) {
@@ -154,7 +154,7 @@ function onSnapshot(next: Snapshot): void {
   }
   if (ui.screen === 'appmenu' && !snap.apps[ui.menuApp].installed) ui.screen = 'library';
   if (!snap.job && ui.screen === 'progress') {
-    // Eine gescheiterte Installation zeigt ihren Grund dort, wo man es noch einmal versuchen kann.
+    // A failed installation shows its reason where you can try again.
     const info = snap.apps[ui.setupApp];
     ui.screen = info.problem && !info.installed ? 'setup' : 'library';
   }
@@ -183,13 +183,13 @@ const ACTIONS: Record<string, Action> = {
     else if (info.installed) startLaunch(id);
     else Object.assign(ui, { screen: 'setup', setupApp: id, hd: false, setupSteam: true });
   },
-  // Das Menü zeigt den Bluetooth-Zustand: beim Öffnen frisch vom System holen (der Zustand ändert sich außerhalb von Rollout).
+  // The menu shows the Bluetooth state: fetch it fresh from the system when opening (the state changes outside of Rollout).
   appMenu(arg) { ui.menuApp = arg as AppId; ui.screen = 'appmenu'; void api.getSnapshot().then(onSnapshot); },
   appAdvanced(arg) { ui.advTab = arg as AppId; ACTIONS.advanced(''); },
   hd() { ui.hd = !ui.hd; },
   project() { void api.openZwiftProject(); },
   install() {
-    // Echtes Zwift lädt ein mehrere GB großes Image: erst fragen, mit Tag und Größe.
+    // Real Zwift downloads an image of several GB: ask first, with tag and size.
     if (ui.setupApp === 'zwift' && snap.zwiftTag) { ui.confirmImage = true; return; }
     ACTIONS.imageConfirm('');
   },
@@ -264,7 +264,7 @@ viewEl.addEventListener('click', (event) => {
   ACTIONS[el.dataset.act as string](el.dataset.arg ?? '');
   render();
 });
-/** Native Auswahlmenüs sind mit Controller und Touch im Gaming Mode nicht bedienbar: Rollout zeigt stattdessen eine eigene Liste. */
+/** Native select menus cannot be operated with controller and touch in Gaming Mode: Rollout shows its own list instead. */
 function openPicker(select: HTMLSelectElement): void {
   const label = document.querySelector(`label[for="${select.id}"]`);
   const title = select.getAttribute('aria-label') ?? label?.querySelector('span')?.textContent ?? label?.textContent ?? '';
@@ -297,7 +297,7 @@ viewEl.addEventListener('change', (event) => {
   render();
 });
 
-// Touch kommt im Gaming Mode als Maus an (gamescope/Steam Input): Ziehen scrollt die Seite oder die offene Liste.
+// Touch arrives as a mouse in Gaming Mode (gamescope/Steam Input): dragging scrolls the page or the open list.
 const DRAG_FROM = 8;
 let drag: { y: number; el: HTMLElement; start: number; moved: boolean } | null = null;
 window.addEventListener('pointerdown', (event) => {
@@ -317,10 +317,10 @@ window.addEventListener('pointermove', (event) => {
 const endDrag = (): void => { if (drag?.moved) setTimeout(() => { drag = null; }, 0); else drag = null; };
 window.addEventListener('pointerup', endDrag);
 window.addEventListener('pointercancel', endDrag);
-// Nach einem Zieh-Scroll kein Klick auf den Knopf unter dem Finger.
+// After a drag scroll, no click on the button under the finger.
 window.addEventListener('click', (event) => { if (drag?.moved) { event.stopPropagation(); event.preventDefault(); } }, true);
 
-/** Esc und die B-Taste: erst den Dialog schließen, sonst eine Ebene zurück. */
+/** Esc and the B button: close the dialog first, otherwise go back one level. */
 function back(): void {
   if (ui.steamModal || ui.steamRollout !== null || ui.confirmRemove || ui.picker || ui.confirmQuit || ui.confirmRestart || ui.confirmPrevious || ui.confirmImage) {
     ACTIONS.closeModal('');
@@ -336,7 +336,7 @@ function back(): void {
   render();
 }
 
-// Hell und Dunkel folgen der Systemeinstellung.
+// Light and dark follow the system setting.
 const scheme = window.matchMedia('(prefers-color-scheme: light)');
 let theme: Snapshot['theme'] = 'dark';
 const applyScheme = (): void => {
@@ -351,8 +351,8 @@ initNav({
   scope: () => viewEl.querySelector('.modalbg') ?? viewEl,
   modalOpen: () => !!viewEl.querySelector('.modalbg'),
   back,
-  // MyWhoosh hat kein Fenster-Signal wie Zwift: Ab „Startet“ liegt das Spiel vorn und gehört dem Controller; beendet wird es über Steam.
-  // `snap` ist beim ersten Takt noch leer (der erste Snapshot kommt asynchron).
+  // MyWhoosh has no window signal like Zwift: from "Starting" the game is in front and belongs to the controller; it is quit through Steam.
+  // `snap` is still empty on the first tick (the first snapshot arrives asynchronously).
   padEnabled: () => { const launch = (snap as Snapshot | undefined)?.launch; return !(launch?.app === 'mywhoosh' && (launch.phase === 'starting' || launch.phase === 'running')); }
 });
 
@@ -364,6 +364,6 @@ void api.getSnapshot().then((first) => {
   seenFinished = first.finished?.seq ?? 0;
   api.onSnapshot(onSnapshot);
   render();
-  // Gesund-Meldung an den Wächter, sobald die Oberfläche das erste Mal gezeichnet ist.
+  // Healthy report to the watcher as soon as the UI has been painted for the first time.
   requestAnimationFrame(() => requestAnimationFrame(() => api.uiReady()));
 });

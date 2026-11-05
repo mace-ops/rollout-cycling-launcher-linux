@@ -1,15 +1,16 @@
-# Drittlizenzen
+# Third-party licences
 
-Rollout selbst steht unter der MIT-Lizenz (siehe [LICENSE](LICENSE)). Diese Komponenten stammen von anderen und behalten ihre Lizenz.
+Rollout itself is released under the MIT licence (see [LICENSE](LICENSE)). These components come from others and keep their licence.
 
-| Komponente | Verwendung in Rollout | Lizenz |
+| Component | Use in Rollout | Licence |
 | --- | --- | --- |
-| Electron | Laufzeit der Oberfläche (`app/package.json`) | MIT, © OpenJS Foundation und Electron-Contributors |
-| Archivo (Schrift) | `app/src/renderer/assets/fonts/archivo.woff2` | SIL Open Font License 1.1, Text in [archivo-OFL.txt](app/src/renderer/assets/fonts/archivo-OFL.txt) |
-| Figtree (Schrift) | `app/src/renderer/assets/fonts/figtree.woff2` | SIL Open Font License 1.1, Text in [figtree-OFL.txt](app/src/renderer/assets/fonts/figtree-OFL.txt) |
+| Electron | UI runtime (`app/package.json`) | MIT, © OpenJS Foundation and Electron contributors |
+| Archivo (font) | `app/src/renderer/assets/fonts/archivo.woff2` | SIL Open Font License 1.1, text in [archivo-OFL.txt](app/src/renderer/assets/fonts/archivo-OFL.txt) |
+| Figtree (font) | `app/src/renderer/assets/fonts/figtree.woff2` | SIL Open Font License 1.1, text in [figtree-OFL.txt](app/src/renderer/assets/fonts/figtree-OFL.txt) |
+| mywhoosh-linux-installer (`mywhoosh.sh`, `ble-bridge.py`) | `app/vendor/`, pinned in `app/upstreams.json` | MIT, text in [LICENSE-mywhoosh-linux-installer](app/vendor/LICENSE-mywhoosh-linux-installer) |
 
-Nicht in diesem Repo enthalten und nur über den Adapter bezogen:
+Not contained in this repo and obtained only through the adapter:
 
-- Zwift und MyWhoosh (Spiele, eigene Lizenzbedingungen der Hersteller)
-- netbrain/zwift (Basis für den Zwift-Pfad, Lizenz des Projekts gilt)
-- Dj0ulo-Skripte (keine Lizenz, werden nicht mitgeliefert)
+- Zwift and MyWhoosh (games, the vendors' own licence terms)
+- netbrain/zwift (basis for the Zwift path, the project's licence applies)
+- Dj0ulo scripts (no licence, not shipped)

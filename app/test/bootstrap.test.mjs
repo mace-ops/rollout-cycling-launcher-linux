@@ -1,6 +1,6 @@
-// Prüft den Wächter scripts/bin-rollout.sh (W1 bis W12) und den Umzug durch scripts/install.sh (M1) in Wegwerf-Ordnern.
-// Electron ist ein Shell-Skript, das sein Verhalten aus der Datei `mode` der gestarteten Version liest (eine Zeile je Start,
-// die letzte gilt weiter) und seine Aufrufe in calls.log protokolliert. Läuft mit bash und, falls vorhanden, dash.
+// Checks the watcher scripts/bin-rollout.sh (W1 to W12) and the migration by scripts/install.sh (M1) in throwaway directories.
+// Electron is a shell script that reads its behaviour from the `mode` file of the started version (one line per start,
+// the last one keeps applying) and logs its calls to calls.log. Runs with bash and, if present, dash.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -15,12 +15,12 @@ const install = path.join(root, 'scripts/install.sh');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-boot-test-'));
 process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
 
-// `bash --posix` steht für /bin/sh am Ally (dort ist sh ein bash). dash ist nicht überall vorhanden.
+// `bash --posix` stands for /bin/sh on the Ally (where sh is bash). dash is not available everywhere.
 const shells = ['bash', 'bash --posix', 'dash'].filter((sh) => spawnSync(sh.split(' ')[0], ['-c', 'exit 0']).status === 0);
-if (!shells.includes('dash')) console.log('# dash fehlt, W1 bis W12 laufen nur mit bash und bash --posix');
+if (!shells.includes('dash')) console.log('# dash missing, W1 to W12 run only with bash and bash --posix');
 const argv = (sh, ...rest) => [sh.split(' ')[0], [...sh.split(' ').slice(1), ...rest]];
 
-// Nie echtes Steam: die Attrappen stehen in jedem Lauf fest in der Umgebung, der Wächter reicht sie an Electron weiter.
+// Never real Steam: the fakes are fixed in the environment of every run; the watcher passes them on to Electron.
 const FORCED = { ROLLOUT_SIM_STEAM: 'fake', ROLLOUT_BT: 'fake', ROLLOUT_SELFUPDATE: 'fake' };
 
 const FAKE_ELECTRON = `#!/bin/sh
@@ -75,7 +75,7 @@ const stateFile = (home, name) => { try { return fs.readFileSync(path.join(home,
 const calls = (home) => { try { return fs.readFileSync(path.join(home, 'calls.log'), 'utf8').split('\n').filter(Boolean); } catch { return []; } };
 const starts = (home) => calls(home).filter((l) => l.startsWith('start ')).map((l) => l.split(' ')[1]);
 
-/** Frischer Ordner mit alter Version 1.2.0 als `current` und, wenn angegeben, 1.3.0 als pending. */
+/** Fresh directory with old version 1.2.0 as `current` and, if given, 1.3.0 as pending. */
 function scenario({ old = 'exit 0', next = 'exit 0', pending = true } = {}) {
   const home = makeHome();
   addVersion(home, '1.2.0', { mode: old });
@@ -86,7 +86,7 @@ function scenario({ old = 'exit 0', next = 'exit 0', pending = true } = {}) {
 }
 
 function run(sh, home, { args = [], env = {}, timeout = 60000 } = {}) {
-  assert.ok(home.startsWith(os.tmpdir()), 'Test läuft nur in einem Wegwerf-Ordner');
+  assert.ok(home.startsWith(os.tmpdir()), 'Test runs only in a throwaway directory');
   const out = fs.openSync(path.join(home, 'wrapper.out'), 'a');
   const childEnv = {
     PATH: process.env.PATH, HOME: home, LD_PRELOAD: '', LD_LIBRARY_PATH: '/nonexistent',
@@ -123,7 +123,7 @@ for (const sh of shells) {
     assert.equal(stateFile(home, 'trial'), null);
   });
 
-  test(`W2 pending wird eingespielt (${sh})`, async () => {
+  test(`W2 pending is applied (${sh})`, async () => {
     const home = scenario();
     const result = await run(sh, home);
     assert.equal(result.code, 0);
@@ -134,10 +134,10 @@ for (const sh of shells) {
     assert.deepEqual(starts(home), ['1.3.0']);
   });
 
-  test(`W3 Abbruch nach jedem Einzelschritt des Tauschs (${sh})`, async () => {
+  test(`W3 abort after each single step of the swap (${sh})`, async () => {
     for (let step = 0; step <= 3; step += 1) {
       const home = scenario();
-      // Zustand, den ein Abbruch nach Schritt n hinterlässt: trial, previous, current.
+      // State left behind by an abort after step n: trial, previous, current.
       if (step >= 1) fs.writeFileSync(path.join(home, 'state/trial'), '1.3.0\n0\n');
       if (step >= 2) link(home, 'previous', '1.2.0');
       if (step >= 3) link(home, 'current', '1.3.0');
@@ -151,7 +151,7 @@ for (const sh of shells) {
     }
   });
 
-  test(`W4 healthy beendet die Probe (${sh})`, async () => {
+  test(`W4 healthy ends the trial (${sh})`, async () => {
     const home = scenario({ next: 'healthy' });
     const result = await run(sh, home);
     assert.equal(result.code, 0);
@@ -170,11 +170,11 @@ for (const sh of shells) {
     assert.equal(stateFile(home, 'notice'), '1.3.0\n');
     assert.equal(stateFile(home, 'trial'), null);
     assert.equal(stateFile(home, 'pending'), null);
-    assert.equal(target(home, 'previous'), null, 'previous zeigt nach dem Rollback nicht auf current');
+    assert.equal(target(home, 'previous'), null, 'previous does not point to current after the rollback');
   });
 
   for (const mode of ['hang', 'hangkill']) {
-    test(`W6 zweimal Hänger, ${mode === 'hang' ? 'TERM genügt' : 'TERM wird ignoriert, dann KILL'} (${sh})`, async () => {
+    test(`W6 hangs twice, ${mode === 'hang' ? 'TERM suffices' : 'TERM is ignored, then KILL'} (${sh})`, async () => {
       const home = scenario({ next: mode });
       const result = await run(sh, home);
       assert.equal(result.code, 0);
@@ -186,7 +186,7 @@ for (const sh of shells) {
     });
   }
 
-  test(`W7 Exit 0 vor healthy ist kein Fehlschlag (${sh})`, async () => {
+  test(`W7 exit 0 before healthy is not a failure (${sh})`, async () => {
     const home = scenario({ next: 'exit 0' });
     const result = await run(sh, home);
     assert.equal(result.code, 0);
@@ -199,20 +199,20 @@ for (const sh of shells) {
   test(`W8 Exit 75 (${sh})`, async () => {
     const withTrial = scenario({ next: 'exit 75\nhealthy' });
     assert.equal((await run(sh, withTrial)).code, 0);
-    assert.deepEqual(starts(withTrial), ['1.3.0', '1.3.0'], 'Neustart mit laufender Probe');
+    assert.deepEqual(starts(withTrial), ['1.3.0', '1.3.0'], 'restart with a running trial');
     assert.equal(stateFile(withTrial, 'trial'), null);
 
     const swapped = scenario({ old: 'exit 75', next: 'exit 0' });
     assert.equal((await run(sh, swapped)).code, 0);
-    assert.deepEqual(starts(swapped), ['1.3.0'], 'pending wird sofort eingespielt');
+    assert.deepEqual(starts(swapped), ['1.3.0'], 'pending is applied immediately');
 
     const restart = scenario({ old: 'exit 75', next: 'exit 0', pending: false });
     fs.writeFileSync(path.join(restart, 'versions/1.2.0/mode'), 'exit 75\n');
-    assert.equal((await run(sh, restart)).code, 75, 'ohne pending und ohne Probe endet der Wächter');
+    assert.equal((await run(sh, restart)).code, 75, 'without pending and without a trial the watcher ends');
     assert.deepEqual(starts(restart), ['1.2.0']);
   });
 
-  test(`W9 zweite Instanz bei belegter Sperre (${sh})`, async () => {
+  test(`W9 second instance when the lock is held (${sh})`, async () => {
     const home = scenario();
     const holder = spawn('flock', [path.join(home, 'state/lock'), 'sleep', '8'], { stdio: 'ignore' });
     try {
@@ -228,7 +228,7 @@ for (const sh of shells) {
     } finally { holder.kill(); }
   });
 
-  test(`W10 ungültiges pending wird verworfen, die alte Version startet (${sh})`, async () => {
+  test(`W10 invalid pending is discarded, the old version starts (${sh})`, async () => {
     const missing = scenario({ next: null });
     const noElectron = scenario();
     fs.rmSync(path.join(noElectron, 'electron/45.0.0'), { recursive: true });
@@ -250,7 +250,7 @@ for (const sh of shells) {
     }
   });
 
-  test(`W11 bewährte Version schlägt fehl: kein Rollback. Ohne previous auch nicht (${sh})`, async () => {
+  test(`W11 proven version fails: no rollback. Without previous neither (${sh})`, async () => {
     const proven = scenario({ old: 'exit 1', pending: false });
     link(proven, 'previous', '1.3.0');
     assert.equal((await run(sh, proven)).code, 1);
@@ -269,18 +269,18 @@ for (const sh of shells) {
     const previousBad = scenario({ next: 'exit 1' });
     fs.writeFileSync(path.join(previousBad, 'state/bad'), '1.2.0\n');
     assert.equal((await run(sh, previousBad)).code, 1);
-    assert.equal(target(previousBad, 'current'), '1.3.0', 'previous steht selbst in bad');
+    assert.equal(target(previousBad, 'current'), '1.3.0', 'previous is itself listed in bad');
   });
 
-  test(`W12 TERM erreicht das Kind, Exit-Code bleibt, Selbsttest startet nichts (${sh})`, async () => {
+  test(`W12 TERM reaches the child, exit code is kept, self-test starts nothing (${sh})`, async () => {
     const home = scenario({ next: 'term42' });
     const running = run(sh, home);
-    assert.ok(await waitFor(() => fs.existsSync(path.join(home, 'started'))), 'Electron läuft');
+    assert.ok(await waitFor(() => fs.existsSync(path.join(home, 'started'))), 'Electron is running');
     running.child.kill('SIGTERM');
     const result = await running;
     assert.equal(result.code, 42);
     assert.ok(calls(home).includes('term'));
-    assert.equal(stateFile(home, 'bad'), null, 'Beenden zählt nicht als Fehlschlag');
+    assert.equal(stateFile(home, 'bad'), null, 'quitting does not count as a failure');
     assert.equal(stateFile(home, 'trial'), '1.3.0\n0\n');
 
     const selftest = scenario();
@@ -292,13 +292,13 @@ for (const sh of shells) {
     assert.equal(stateFile(selftest, 'pending'), '1.3.0\n');
   });
 
-  test(`Syntaxprüfung (${sh} -n)`, () => {
+  test(`Syntax check (${sh} -n)`, () => {
     const [cmd, cmdArgs] = argv(sh, '-n', script);
     assert.equal(spawnSync(cmd, cmdArgs).status, 0);
   });
 }
 
-test('M1 install.sh zieht einen alten Aufbau um und behält Electron und bin/rollout', { skip: !fs.existsSync(path.join(root, 'dist')) && 'dist/ fehlt, erst npm run build' }, async () => {
+test('M1 install.sh migrates an old layout and keeps Electron and bin/rollout', { skip: !fs.existsSync(path.join(root, 'dist')) && 'dist/ is missing, run npm run build first' }, async () => {
   const home = path.join(work, 'alt');
   fs.mkdirSync(path.join(home, 'app/electron'), { recursive: true });
   fs.mkdirSync(path.join(home, 'app/dist'), { recursive: true });
@@ -326,7 +326,7 @@ test('M1 install.sh zieht einen alten Aufbau um und behält Electron und bin/rol
     assert.deepEqual(fs.readFileSync(path.join(home, 'bin/rollout')), fs.readFileSync(script));
     assert.deepEqual(fs.readFileSync(path.join(home, `versions/${version}/bootstrap/rollout`)), fs.readFileSync(script));
     assert.deepEqual(fs.readFileSync(path.join(home, 'bin/rollout-run')), fs.readFileSync(path.join(root, 'scripts/bin-rollout-run.sh')));
-    assert.equal(fs.statSync(path.join(home, 'bin/rollout-run')).mode & 0o111, 0o111, 'rollout-run ausführbar');
+    assert.equal(fs.statSync(path.join(home, 'bin/rollout-run')).mode & 0o111, 0o111, 'rollout-run is executable');
     assert.ok(fs.existsSync(path.join(home, `versions/${version}/bootstrap/rollout-run`)));
     assert.equal(fs.readFileSync(path.join(home, 'state/gast'), 'utf8'), 'bleibt');
     assert.notEqual(fs.readFileSync(path.join(home, 'icon.png'), 'utf8'), 'alt');

@@ -1,6 +1,6 @@
-// Eigener Mauszeiger für MyWhoosh: ein runder, gut sichtbarer Punkt (weißer Kreis mit dunklem Rand und blauer Mitte) als X-Cursor-Thema.
-// Der Controller steuert im Spiel einen Zeiger (gamepad-bridge.ts), und der normale Pfeil ist auf dem Bildschirm des Ally schwer zu finden.
-// Kein Electron: Das Thema entsteht als Dateien (Xcursor-Format, ein Bild je Datei) und wird dem Spiel über XCURSOR_PATH/THEME/SIZE genannt.
+// Custom mouse pointer for MyWhoosh: a round, clearly visible dot (white circle with a dark rim and blue centre) as an X cursor theme.
+// The controller drives a pointer in the game (gamepad-bridge.ts), and the normal arrow is hard to find on the Ally's screen.
+// No Electron: the theme is created as files (Xcursor format, one image per file) and passed to the game via XCURSOR_PATH/THEME/SIZE.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -8,20 +8,20 @@ export const THEME = 'rollout-dot';
 export const SIZE = 48;
 const XCUR_MAGIC = 0x72756358; // "Xcur"
 const IMAGE_TYPE = 0xfffd0002;
-/** Namen, unter denen Anwendungen ihren Zeiger suchen: alle bekommen dasselbe runde Bild. */
+/** Names under which applications look up their pointer: all get the same round image. */
 export const CURSOR_NAMES = [
   'left_ptr', 'default', 'arrow', 'top_left_arrow', 'right_ptr', 'pointer', 'hand', 'hand1', 'hand2', 'text', 'xterm', 'crosshair', 'cross',
   'watch', 'wait', 'progress', 'move', 'fleur', 'grab', 'grabbing', 'not-allowed', 'help', 'question_arrow'
 ];
 
-/** Bildpunkte als ARGB (vormultipliziert, 32 Bit je Punkt): Kreise mit weichem Rand von einem Pixel. */
+/** Pixels as ARGB (premultiplied, 32 bits per pixel): circles with a one-pixel soft edge. */
 export function dotPixels(size: number = SIZE): Uint32Array {
   const px = new Uint32Array(size * size);
   const c = (size - 1) / 2;
   const rOuter = size / 2 - 1;
   const rWhite = rOuter - size * 0.08;
   const rDot = size * 0.16;
-  // Anteil eines Punktes innerhalb des Radius r (weicher Rand über 1 Pixel)
+  // Share of a pixel within radius r (soft edge over 1 pixel)
   const inside = (d: number, r: number): number => Math.max(0, Math.min(1, r - d + 0.5));
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -29,21 +29,21 @@ export function dotPixels(size: number = SIZE): Uint32Array {
       const outer = inside(d, rOuter);
       const white = inside(d, rWhite);
       const dot = inside(d, rDot);
-      // Ebenen von unten nach oben: dunkler Rand (Alpha .92), weiß, blaue Mitte.
+      // Layers from bottom to top: dark rim (alpha .92), white, blue centre.
       const layers: [number, [number, number, number], number][] = [[outer, [10, 12, 24], 0.92], [white, [255, 255, 255], 1], [dot, [61, 107, 255], 1]];
       let r = 0, g = 0, b = 0, a = 0;
       for (const [cover, [lr, lg, lb], alpha] of layers) {
         const la = cover * alpha;
         r = lr * la + r * (1 - la); g = lg * la + g * (1 - la); b = lb * la + b * (1 - la); a = la + a * (1 - la);
       }
-      // r, g, b sind schon mit dem Alpha gewichtet (vormultipliziert)
+      // r, g, b are already weighted by alpha (premultiplied)
       px[y * size + x] = ((Math.round(a * 255) << 24) | (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b)) >>> 0;
     }
   }
   return px;
 }
 
-/** Eine Xcursor-Datei mit einem Bild (Hotspot in der Mitte). */
+/** An Xcursor file with one image (hotspot in the centre). */
 export function cursorFile(size: number = SIZE): Buffer {
   const px = dotPixels(size);
   const header = 16;
@@ -59,7 +59,7 @@ export function cursorFile(size: number = SIZE): Buffer {
   return buf;
 }
 
-/** Legt das Thema unter `<dir>/rollout-dot/` an (vorhandene Dateien werden ersetzt) und gibt die Umgebung für das Spiel zurück. */
+/** Creates the theme under `<dir>/rollout-dot/` (existing files are replaced) and returns the environment for the game. */
 export function writeCursorTheme(dir: string): NodeJS.ProcessEnv {
   const themeDir = path.join(dir, THEME);
   fs.mkdirSync(path.join(themeDir, 'cursors'), { recursive: true });

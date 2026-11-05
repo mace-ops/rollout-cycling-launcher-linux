@@ -1,5 +1,5 @@
-// Prüfskript für site/dist (npm test baut vorher): Seiten, SEO-Pflichten, hreflang, JSON-LD, Links, Bilder, Inhalt.
-// Jede Verletzung steht in der Ausgabe, Exit-Code 1 bei mindestens einer.
+// Check script for site/dist (npm test builds first): pages, SEO requirements, hreflang, JSON-LD, links, images, content.
+// Every violation is listed in the output, exit code 1 if there is at least one.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +31,7 @@ for (const l of LANGS) {
 for (const f of ['sitemap.xml', 'robots.txt', '404.html', '.nojekyll']) ok(fs.existsSync(file(f)), `${f} fehlt`);
 for (const l of LANGS) ok(fs.existsSync(file('assets', 'og', `${l}.jpg`)), `OG-Bild fehlt: ${l}`);
 
-// OG-Bildgröße
+// OG image size
 for (const l of LANGS) {
   const f = file('assets', 'og', `${l}.jpg`);
   if (!fs.existsSync(f)) continue;
@@ -52,64 +52,64 @@ for (const [l, html] of Object.entries(pages)) {
   const sections = [...html.matchAll(/<section\b[^>]*>/g)].map((m) => m[0]);
   for (const s of sections) {
     const id = attr(s, 'aria-labelledby');
-    ok(id && html.includes(`id="${id}"`), `${P} section ohne gültiges aria-labelledby: ${s}`);
+    ok(id && html.includes(`id="${id}"`), `${P} section without a valid aria-labelledby: ${s}`);
   }
   // canonical, hreflang
-  ok(html.includes(`<link rel="canonical" href="${url(l)}">`), `${P} canonical zeigt nicht auf sich selbst`);
+  ok(html.includes(`<link rel="canonical" href="${url(l)}">`), `${P} canonical does not point to itself`);
   for (const x of LANGS) ok(html.includes(`<link rel="alternate" hreflang="${x}" href="${url(x)}">`), `${P} hreflang ${x} fehlt`);
   ok(html.includes(`hreflang="x-default" href="${BASE}"`), `${P} x-default fehlt`);
   // Open Graph, Twitter
   ok(metaContent(html, 'property', 'og:locale') === LOCALE[l], `${P} og:locale falsch`);
-  ok((html.match(/property="og:locale:alternate"/g) ?? []).length === LANGS.length - 1, `${P} og:locale:alternate unvollständig`);
+  ok((html.match(/property="og:locale:alternate"/g) ?? []).length === LANGS.length - 1, `${P} og:locale:alternate incomplete`);
   for (const k of ['og:title', 'og:description', 'og:image', 'og:url', 'og:type']) ok(metaContent(html, 'property', k), `${P} ${k} fehlt`);
-  ok(metaContent(html, 'property', 'og:image') === `${BASE}assets/og/${l}.jpg`, `${P} og:image zeigt auf das falsche Bild`);
+  ok(metaContent(html, 'property', 'og:image') === `${BASE}assets/og/${l}.jpg`, `${P} og:image points to the wrong image`);
   ok(metaContent(html, 'name', 'twitter:card') === 'summary_large_image', `${P} twitter:card fehlt`);
   // JSON-LD
   const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-  ok(blocks.length === 2, `${P} zwei JSON-LD-Blöcke erwartet, ${blocks.length} gefunden`);
+  ok(blocks.length === 2, `${P} two JSON-LD blocks expected, ${blocks.length} found`);
   const ld = [];
-  for (const b of blocks) { try { ld.push(JSON.parse(b)); } catch (e) { bad(`${P} JSON-LD nicht parsebar: ${e.message}`); } }
+  for (const b of blocks) { try { ld.push(JSON.parse(b)); } catch (e) { bad(`${P} JSON-LD not parsable: ${e.message}`); } }
   const app = ld.find((o) => o['@type'] === 'SoftwareApplication'), faq = ld.find((o) => o['@type'] === 'FAQPage');
   if (app) {
     const v = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'app', 'package.json'), 'utf8')).version;
     ok(app.softwareVersion === v, `${P} softwareVersion ${app.softwareVersion} ≠ package.json ${v}`);
-    ok(app.offers?.price === '0' && app.operatingSystem && (LIVE ? app.downloadUrl?.endsWith('/releases/latest/download/Rollout.desktop') : app.downloadUrl === undefined) && app.screenshot && app.featureList?.length === 7, `${P} SoftwareApplication unvollständig`);
+    ok(app.offers?.price === '0' && app.operatingSystem && (LIVE ? app.downloadUrl?.endsWith('/releases/latest/download/Rollout.desktop') : app.downloadUrl === undefined) && app.screenshot && app.featureList?.length === 7, `${P} SoftwareApplication incomplete`);
   } else bad(`${P} SoftwareApplication fehlt`);
   if (faq) {
     const visible = [...html.matchAll(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map((m) => [unescape(m[1]), unescape(m[2])]);
-    ok(visible.length === faq.mainEntity.length && visible.length >= 6, `${P} FAQ: ${visible.length} sichtbar, ${faq.mainEntity.length} im JSON-LD`);
+    ok(visible.length === faq.mainEntity.length && visible.length >= 6, `${P} FAQ: ${visible.length} visible, ${faq.mainEntity.length} in JSON-LD`);
     faq.mainEntity.forEach((q, i) => ok(visible[i] && visible[i][0] === q.name && visible[i][1] === q.acceptedAnswer.text, `${P} FAQ ${i + 1}: sichtbarer Text ≠ JSON-LD`));
   } else bad(`${P} FAQPage fehlt`);
   // Bilder
   for (const m of html.matchAll(/<img\b[^>]*>/g)) {
     const t = m[0], src = attr(t, 'src');
-    ok(attr(t, 'width') && attr(t, 'height'), `${P} Bild ohne width/height: ${src}`);
-    ok(t.includes(' alt="'), `${P} Bild ohne alt: ${src}`);
+    ok(attr(t, 'width') && attr(t, 'height'), `${P} Image without width/height: ${src}`);
+    ok(t.includes(' alt="'), `${P} Image without alt: ${src}`);
     ok(!/^https?:/.test(src ?? ''), `${P} externes Bild: ${src}`);
   }
   const eager = [...html.matchAll(/<img\b[^>]*>/g)].filter((m) => !m[0].includes('loading="lazy"'));
   ok(eager.length === 1 && eager[0][0].includes('fetchpriority="high"'), `${P} genau ein eager-Bild (LCP, fetchpriority=high) erwartet, ${eager.length} gefunden`);
   const emptyAlt = [...html.matchAll(/<img\b[^>]*alt=""[^>]*>/g)].length;
-  ok(emptyAlt >= 7, `${P} Funktionsbühne sollte dekorative Bilder (alt="") enthalten`);
-  // keine fremden Skripte, Schriften, Tracking
+  ok(emptyAlt >= 7, `${P} feature stage should contain decorative images (alt="")`);
+  // no foreign scripts, fonts, tracking
   for (const m of html.matchAll(/<(script|link)\b[^>]*>/g)) {
     const u = attr(m[0], 'src') ?? attr(m[0], 'href');
     if (u && /^https?:/.test(u) && !/rel="(canonical|alternate)"/.test(m[0])) bad(`${P} externe Ressource: ${u}`);
   }
-  ok(!/googletagmanager|google-analytics|fonts\.googleapis|fonts\.gstatic|plausible|matomo/i.test(html), `${P} Tracking oder Google Fonts gefunden`);
-  // Inhalt: kein Claude/KI, kein CLI-Befehl, kein „Open Source“-Versprechen ohne MIT (MIT steht in final.sub)
+  ok(!/googletagmanager|google-analytics|fonts\.googleapis|fonts\.gstatic|plausible|matomo/i.test(html), `${P} tracking or Google Fonts found`);
+  // Content: no Claude/AI, no CLI command, no "open source" promise without MIT (MIT is in final.sub)
   const plain = text(html);
-  ok(!/claude|anthropic|artificial|künstliche|inteligencia artificial|intelligence artificielle/i.test(plain) && !/\b(KI|AI)\b/.test(plain), `${P} Erwähnung von Claude/KI`);
-  ok(!/\b(curl|wget|sudo \w|bash -c|sh -c|chmod \+x|\| ?sh)\b/.test(plain.replace(/no sudo|kein sudo|sin sudo|sans sudo|senza sudo|sem sudo|geen sudo|bez sudo|Kein sudo|No sudo|Sin sudo|Sans sudo|Senza sudo|Sem sudo|Geen sudo|Bez sudo/gi, '')), `${P} CLI-Befehl im sichtbaren Text`);
-  ok(/Zwift, Inc\./.test(plain) && /MyWhoosh/.test(plain) && /Valve/.test(plain), `${P} Marken-Hinweis fehlt`);
+  ok(!/claude|anthropic|artificial|künstliche|inteligencia artificial|intelligence artificielle/i.test(plain) && !/\b(KI|AI)\b/.test(plain), `${P} mention of Claude/AI`);
+  ok(!/\b(curl|wget|sudo \w|bash -c|sh -c|chmod \+x|\| ?sh)\b/.test(plain.replace(/no sudo|kein sudo|sin sudo|sans sudo|senza sudo|sem sudo|geen sudo|bez sudo|Kein sudo|No sudo|Sin sudo|Sans sudo|Senza sudo|Sem sudo|Geen sudo|Bez sudo/gi, '')), `${P} CLI command in visible text`);
+  ok(/Zwift, Inc\./.test(plain) && /MyWhoosh/.test(plain) && /Valve/.test(plain), `${P} trademark notice missing`);
   const dl = [...html.matchAll(/href="([^"]*Rollout\.desktop)"/g)].map((m) => m[1]);
-  if (LIVE) ok(dl.length === 2 && dl.every((d) => d === 'https://github.com/mace-ops/rollout-cycling-launcher-linux/releases/latest/download/Rollout.desktop'), `${P} zwei Download-Knöpfe mit Rollout.desktop erwartet`);
-  else ok(dl.length === 0 && (html.match(/aria-disabled="true"/g) ?? []).length === 2 && html.includes('class="soon"'), `${P} Download-Knöpfe sollen ausgegraut sein (downloadLive=false)`);
-  // interne Links und Anker
+  if (LIVE) ok(dl.length === 2 && dl.every((d) => d === 'https://github.com/mace-ops/rollout-cycling-launcher-linux/releases/latest/download/Rollout.desktop'), `${P} two download buttons with Rollout.desktop expected`);
+  else ok(dl.length === 0 && (html.match(/aria-disabled="true"/g) ?? []).length === 2 && html.includes('class="soon"'), `${P} download buttons should be greyed out (downloadLive=false)`);
+  // internal links and anchors
   for (const m of html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>/g)) {
     const href = m[1];
     if (/^(https?:|mailto:)/.test(href)) continue;
-    if (href.startsWith('#')) { if (href.length > 1) ok(html.includes(`id="${href.slice(1)}"`), `${P} Anker ${href} ohne Ziel`); continue; }
+    if (href.startsWith('#')) { if (href.length > 1) ok(html.includes(`id="${href.slice(1)}"`), `${P} anchor ${href} without target`); continue; }
     allLinks.set(`${l}|${href}`, { l, href });
   }
   for (const m of html.matchAll(/(?:src|href|srcset)="([^"]+)"/g)) {
@@ -120,16 +120,16 @@ for (const [l, html] of Object.entries(pages)) {
     }
   }
 }
-// Linkziele auflösen
+// Resolve link targets
 for (const { l, href } of allLinks.values()) {
   const dir = l === 'en' ? DIST : file(l);
   const clean = href.split('#')[0].split('?')[0];
   let target = path.resolve(dir, clean);
-  if (!target.startsWith(DIST)) { bad(`[${l}] Link verlässt dist: ${href}`); continue; }
+  if (!target.startsWith(DIST)) { bad(`[${l}] Link leaves dist: ${href}`); continue; }
   if (fs.existsSync(target) && fs.statSync(target).isDirectory()) target = path.join(target, 'index.html');
   ok(fs.existsSync(target), `[${l}] toter Link: ${href}`);
 }
-// Screenshots: Größe und Format
+// Screenshots: size and format
 for (const l of ['en']) {
   const dir = file('assets', 'screens', l);
   if (!ok(fs.existsSync(dir), `Screenshots fehlen: ${l}`)) continue;
@@ -137,24 +137,24 @@ for (const l of ['en']) {
     const m = await sharp(path.join(dir, f)).metadata();
     const w = f.endsWith('-640.webp') ? 640 : 1280;
     ok(m.width === w && m.height === w * 10 / 16, `Screenshot ${l}/${f}: ${m.width}×${m.height}, erwartet ${w}×${w * 10 / 16}`);
-    ok(fs.statSync(path.join(dir, f)).size < 400 * 1024, `Screenshot ${l}/${f} über 400 KB`);
+    ok(fs.statSync(path.join(dir, f)).size < 400 * 1024, `Screenshot ${l}/${f} over 400 KB`);
   }
 }
 // sitemap
 const sm = fs.existsSync(file('sitemap.xml')) ? fs.readFileSync(file('sitemap.xml'), 'utf8') : '';
 for (const l of LANGS) {
   ok(sm.includes(`<loc>${url(l)}</loc>`), `sitemap: ${l} fehlt`);
-  for (const x of LANGS) ok(sm.split(`<loc>${url(l)}</loc>`)[1]?.split('</url>')[0].includes(`hreflang="${x}" href="${url(x)}"`), `sitemap: ${l} ohne Alternate ${x}`);
+  for (const x of LANGS) ok(sm.split(`<loc>${url(l)}</loc>`)[1]?.split('</url>')[0].includes(`hreflang="${x}" href="${url(x)}"`), `sitemap: ${l} without alternate ${x}`);
 }
-ok(/Sitemap: https:\/\/mace-ops\.github\.io\/rollout-cycling-launcher-linux\/sitemap\.xml/.test(fs.existsSync(file('robots.txt')) ? fs.readFileSync(file('robots.txt'), 'utf8') : ''), 'robots.txt ohne Sitemap-Verweis');
-// Gesamtgröße der Auslieferung
+ok(/Sitemap: https:\/\/mace-ops\.github\.io\/rollout-cycling-launcher-linux\/sitemap\.xml/.test(fs.existsSync(file('robots.txt')) ? fs.readFileSync(file('robots.txt'), 'utf8') : ''), 'robots.txt without sitemap reference');
+// Total size of the delivery
 const size = (d) => fs.readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? size(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size), 0);
 const mb = size(DIST) / 1024 / 1024;
-ok(mb < 60, `dist ist ${mb.toFixed(1)} MB (Limit 60)`);
+ok(mb < 60, `dist is ${mb.toFixed(1)} MB (limit 60)`);
 
 if (problems.length) {
   console.log(`✗ ${problems.length} Problem(e):`);
   for (const p of problems) console.log('  -', p);
   process.exit(1);
 }
-console.log(`✓ alle Prüfungen bestanden (${LANGS.length} Seiten, dist ${mb.toFixed(1)} MB)`);
+console.log(`✓ all checks passed (${LANGS.length} pages, dist ${mb.toFixed(1)} MB)`);

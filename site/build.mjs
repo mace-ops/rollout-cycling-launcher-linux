@@ -1,5 +1,5 @@
-// Statische Website bauen: eine Vorlage (src/page.html) + Texte je Sprache (i18n/<lang>.json) → dist/.
-// Aufruf: node build.mjs. Bricht ab, wenn ein Schlüssel fehlt oder übrig ist. Einzige Abhängigkeit: sharp (Bilder).
+// Build the static website: one template (src/page.html) + texts per language (i18n/<lang>.json) → dist/.
+// Usage: node build.mjs. Aborts if a key is missing or left over. Only dependency: sharp (images).
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,11 +15,11 @@ const DESKTOP_URL = 'https://github.com/mace-ops/rollout-cycling-launcher-linux/
 const LANGS = ['en', 'de', 'es', 'fr', 'it', 'pt', 'nl', 'pl'];
 const NATIVE = { en: 'English', de: 'Deutsch', es: 'Español', fr: 'Français', it: 'Italiano', pt: 'Português', nl: 'Nederlands', pl: 'Polski' };
 const LOCALE = { en: 'en_US', de: 'de_DE', es: 'es_ES', fr: 'fr_FR', it: 'it_IT', pt: 'pt_BR', nl: 'nl_NL', pl: 'pl_PL' };
-// Karussell (Reihenfolge = Ablauf) und Ton (Akzent der App); `steam` kommt nur im Funktionsteil vor.
+// Carousel (order = flow) and tone (the app's accent); `steam` appears only in the features section.
 const SLIDES = [['home', 'zwift'], ['pick', 'zwift'], ['before-install', 'mywhoosh'], ['installing', 'zwift'], ['done', 'zwift'], ['bluetooth', 'mywhoosh'],
   ['starting', 'mywhoosh'], ['error', 'mywhoosh'], ['settings', 'zwift'], ['advanced', 'mywhoosh'], ['light', 'zwift']];
 const SHOTS = [...SLIDES.map(([n]) => n), 'steam'];
-// Funktionen: Schlüssel, Bild, Chips ({key} übersetzt, {lit} wörtlich, {kc} Tastenkappe vor dem übersetzten Text)
+// Features: key, image, chips ({key} translated, {lit} literal, {kc} key cap before the translated text)
 const FEATURES = [
   { id: 'f0', shot: 'home', chips: [{ kc: ['✚', 'L'], key: 'f0.c1' }, { kc: ['A'], key: 'f0.c2' }, { kc: ['B'], key: 'f0.c3' }, { kc: ['R'], key: 'f0.c4' }] },
   { id: 'f1', shot: 'installing', chips: [{ key: 'f1.c1' }, { key: 'f1.c2' }] },
@@ -30,7 +30,7 @@ const FEATURES = [
   { id: 'f6', shot: 'advanced', chips: [{ lit: 'GE-Proton' }, { key: 'f6.c1' }, { key: 'f6.c2' }] }
 ];
 const FAQ_COUNT = 8;
-// Solange Rollout.desktop kein Release-Asset ist: config.json { "downloadLive": false } graut die Download-Knöpfe aus und lässt downloadUrl weg.
+// As long as Rollout.desktop is not a release asset: config.json { "downloadLive": false } greys out the download buttons and omits downloadUrl.
 const DOWNLOAD_LIVE = JSON.parse(fs.readFileSync(new URL('./config.json', import.meta.url), 'utf8')).downloadLive === true;
 
 const log = (...a) => console.log('[build]', ...a);
@@ -39,16 +39,16 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, 
 const read = (...p) => fs.readFileSync(path.join(HERE, ...p), 'utf8');
 const mkdir = (p) => fs.mkdirSync(p, { recursive: true });
 
-// --- Texte laden und prüfen ------------------------------------------------------------------------------------------------
+// --- Load and check texts ------------------------------------------------------------------------------------------------
 const messages = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read('i18n', `${l}.json`))]));
 const placeholders = (s) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
 for (const l of LANGS) {
   const missing = Object.keys(messages.en).filter((k) => !(k in messages[l]));
   const extra = Object.keys(messages[l]).filter((k) => !(k in messages.en));
-  if (missing.length || extra.length) die(`i18n/${l}.json: fehlt ${JSON.stringify(missing)}, übrig ${JSON.stringify(extra)}`);
+  if (missing.length || extra.length) die(`i18n/${l}.json: missing ${JSON.stringify(missing)}, extra ${JSON.stringify(extra)}`);
   for (const [k, v] of Object.entries(messages[l])) {
-    if (typeof v !== 'string' || !v.trim()) die(`i18n/${l}.json: ${k} ist leer`);
-    if (placeholders(v) !== placeholders(messages.en[k])) die(`i18n/${l}.json: Platzhalter von ${k} weichen von en ab`);
+    if (typeof v !== 'string' || !v.trim()) die(`i18n/${l}.json: ${k} is empty`);
+    if (placeholders(v) !== placeholders(messages.en[k])) die(`i18n/${l}.json: placeholders of ${k} differ from en`);
   }
 }
 const used = new Set();
@@ -59,36 +59,36 @@ const VERSION = pkg.version;
 function render(template, lang, vars, loops = {}) {
   const m = messages[lang];
   const tr = (key, raw) => {
-    if (!(key in m)) die(`Schlüssel fehlt: ${key} (${lang})`);
+    if (!(key in m)) die(`Key missing: ${key} (${lang})`);
     used.add(key);
     return raw ? m[key] : esc(m[key]);
   };
   let out = template.replace(/<!--each:(\w+)-->([\s\S]*?)<!--\/each-->/g, (_all, name, body) => {
-    const items = loops[name] ?? die(`Schleife fehlt: ${name}`);
+    const items = loops[name] ?? die(`Loop missing: ${name}`);
     return items.map((item, i) => body
       .replace(/\{\{([thv]):([^}]+)\}\}/g, (_x, kind, key) => {
         const k = key.replace(/\$/g, item.id);
         if (kind === 'v') {
           const val = key === '#' ? String(i + 1) : key === '##' ? String(i + 1).padStart(2, '0') : key === 'total' ? String(items.length) : key === 'i' ? String(i) : item.vars?.[key];
-          return val ?? die(`Schleifenvariable fehlt: ${key} in ${name}`);
+          return val ?? die(`Loop variable missing: ${key} in ${name}`);
         }
         return tr(k, kind === 'h');
       })).join('');
   });
   out = out.replace(/\{\{([thv]):([^}]+)\}\}/g, (_x, kind, key) => {
-    if (kind === 'v') return vars[key] ?? die(`Variable fehlt: ${key}`);
+    if (kind === 'v') return vars[key] ?? die(`Variable missing: ${key}`);
     return tr(key, kind === 'h');
   });
   return out;
 }
-const T = (lang, key) => { used.add(key); return messages[lang][key] ?? die(`Schlüssel fehlt: ${key} (${lang})`); };
+const T = (lang, key) => { used.add(key); return messages[lang][key] ?? die(`Key missing: ${key} (${lang})`); };
 
 // --- Bilder ----------------------------------------------------------------------------------------------------------------
-// Bilder gibt es nur englisch; die Sprachseiten setzen übersetzte Bildtexte darauf.
+// Images exist in English only; the language pages put translated captions on them.
 const SHOT_LANG = 'en';
 const screenPath = (_lang, name, ext) => path.join(HERE, 'static', 'screens', SHOT_LANG, `${name}${ext}`);
 function picture(root, lang, name, alt, { eager = false, sizes, cls = '' } = {}) {
-  for (const ext of ['.jpg', '.webp', '-640.webp']) if (!fs.existsSync(screenPath(lang, name, ext))) die(`Screenshot fehlt: static/screens/${SHOT_LANG}/${name}${ext} (npm run shots)`);
+  for (const ext of ['.jpg', '.webp', '-640.webp']) if (!fs.existsSync(screenPath(lang, name, ext))) die(`Screenshot missing: static/screens/${SHOT_LANG}/${name}${ext} (npm run shots)`);
   const dir = `${root}assets/screens/${SHOT_LANG}/${name}`;
   return `<picture${cls ? ` class="${cls}"` : ''}><source type="image/webp" srcset="${dir}-640.webp 640w, ${dir}.webp 1280w" sizes="${sizes}"><img src="${dir}.jpg" alt="${esc(alt)}" width="1280" height="800" ${eager ? 'fetchpriority="high" decoding="async"' : 'loading="lazy" decoding="async"'}></picture>`;
 }
@@ -122,7 +122,7 @@ function photo(root, name, alt) {
   return `<picture><source type="image/avif" srcset="${set('avif')}" sizes="${sizes}"><source type="image/webp" srcset="${set('webp')}" sizes="${sizes}"><img src="${d}-800.jpg" srcset="${set('jpg')}" sizes="${sizes}" alt="${esc(alt)}" width="1600" height="1000" loading="lazy" decoding="async"></picture>`;
 }
 
-// Open-Graph-Bild 1200 × 630: Claim links, Startbildschirm im Geräterahmen rechts. Schriften: static/og-fonts (Instanzen der Variablenschriften).
+// Open Graph image 1200 × 630: claim on the left, home screen in a device frame on the right. Fonts: static/og-fonts (instances of the variable fonts).
 async function ogImage(lang) {
   const W = 1200, H = 630;
   const fonts = path.join(HERE, 'static', 'og-fonts');
@@ -132,7 +132,7 @@ async function ogImage(lang) {
   const brand = await text('<span foreground="#F4F4F6">Rollout</span>', 'Archivo OG 34', 'archivo-display.ttf', 300);
   const logo = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="130 130 764 764" width="44" height="44" fill="none" stroke-linecap="round"><path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="#F4F4F6" stroke-width="32"/><path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="#F4F4F6" stroke-width="32"/><path d="M713.1 303L759.5 254.8" stroke="#FF7A2F" stroke-width="40"/></svg>`), { density: 144 }).resize(44, 44).png().toBuffer();
   const bar = await sharp({ create: { width: 48, height: 4, channels: 3, background: '#FF7A2F' } }).png().toBuffer();
-  const sw = 560, sh = 350, fx = 592, fy = 140; // Bild im Rahmen
+  const sw = 560, sh = 350, fx = 592, fy = 140; // image inside the frame
   const mask = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${sw}" height="${sh}"><rect width="${sw}" height="${sh}" rx="18" fill="#fff"/></svg>`);
   const shot = await sharp(screenPath(lang, 'home', '.jpg')).resize(sw, sh).composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
   const frame = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#0B0C10"/><rect x="${fx - 10}" y="${fy - 10}" width="${sw + 20}" height="${sh + 20}" rx="26" fill="#14161C" stroke="#2A2D36" stroke-width="2"/></svg>`);
@@ -205,7 +205,7 @@ function buildPage(template, lang, buildId) {
     stageImgs,
     photoMywhoosh: photo(root, 'mywhoosh', T(lang, 'final.photo.mywhoosh')), photoZwift: photo(root, 'zwift', T(lang, 'final.photo.zwift'))
   };
-  // Bildbeschreibungen, die nur im Funktionsteil oder in Datenfeldern vorkommen, zählen als benutzt
+  // Image descriptions that appear only in the features section or in data fields count as used
   used.add('shot.steam.alt');
   return render(template, lang, vars, { slides, features, faq });
 }
@@ -215,7 +215,7 @@ async function main() {
   const t0 = Date.now();
   fs.rmSync(DIST, { recursive: true, force: true });
   mkdir(path.join(DIST, 'assets'));
-  // Assets mit Inhaltsstempel
+  // Assets with a content stamp
   const css = read('src', 'site.css'), bg = read('src', 'bg.js'), js = read('src', 'site.js');
   const buildId = createHash('sha1').update(css + bg + js).digest('hex').slice(0, 8);
   fs.writeFileSync(path.join(DIST, 'assets', 'site.css'), css);
@@ -240,10 +240,10 @@ async function main() {
     fs.writeFileSync(path.join(dir, 'index.html'), html);
   }
 
-  // 404 (eine Datei, alle Sprachen versteckt eingebettet; Skript wählt nach Pfad)
+  // 404 (one file, all languages embedded hidden; the script chooses by path)
   const blocks = LANGS.map((l) => `<div data-nf="${l}" lang="${l}"${l === 'en' ? '' : ' hidden'} style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">${esc(T(l, 'nf.title'))}</h1><p class="lead">${esc(T(l, 'nf.text'))}</p><a class="btn primary" href="${BASE_PATH}${l === 'en' ? '' : `${l}/`}">${esc(T(l, 'nf.home'))}</a></div>`).join('\n');
   const nf = read('src', '404.html').replace(/\{\{([thv]):([^}]+)\}\}/g, (_x, kind, key) => {
-    if (kind === 'v') return { base: BASE_PATH, basePath: BASE_PATH, buildId, blocks }[key] ?? die(`404: Variable fehlt: ${key}`);
+    if (kind === 'v') return { base: BASE_PATH, basePath: BASE_PATH, buildId, blocks }[key] ?? die(`404: Variable missing: ${key}`);
     return esc(T('en', key));
   });
   fs.writeFileSync(path.join(DIST, '404.html'), nf);
@@ -254,10 +254,10 @@ async function main() {
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap);
   fs.writeFileSync(path.join(DIST, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${BASE}sitemap.xml\n`);
 
-  // Schlüssel, die keine Vorlage und kein Builder benutzt
+  // Keys that no template and no builder uses
   const unused = Object.keys(messages.en).filter((k) => !used.has(k));
-  if (unused.length) die(`Ungenutzte Schlüssel in en.json: ${unused.join(', ')}`);
-  log(`fertig in ${((Date.now() - t0) / 1000).toFixed(1)} s, ${LANGS.length} Sprachen, Version ${VERSION}`);
+  if (unused.length) die(`Unused keys in en.json: ${unused.join(', ')}`);
+  log(`done in ${((Date.now() - t0) / 1000).toFixed(1)} s, ${LANGS.length} languages, version ${VERSION}`);
 }
 
 main().catch((e) => { console.error(`[build] FEHLER: ${e.message}`); process.exit(1); });

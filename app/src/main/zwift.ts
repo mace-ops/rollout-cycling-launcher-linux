@@ -1,6 +1,6 @@
-// Zwift-Adapter (Konzept 5.1, E7): lädt das Startskript `zwift.sh` von netbrain/zwift auf einen festen Commit, prüft die
-// SHA-256 und legt es atomar nach $ROLLOUT_HOME/zwift/<commit>/zwift.sh. Das Image zieht `rollout-run --zwift-pull`, hier nur
-// nach Zustimmung des Nutzers (der Aufrufer fragt). Dieses Modul kennt kein Electron: Das Netz kommt als Funktion herein.
+// Zwift adapter (concept 5.1, E7): downloads the start script `zwift.sh` from netbrain/zwift at a fixed commit, verifies its
+// SHA-256 and places it atomically at $ROLLOUT_HOME/zwift/<commit>/zwift.sh. The image is pulled by `rollout-run --zwift-pull`, here only
+// after the user's consent (the caller asks). This module knows nothing about Electron: the network comes in as a function.
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -10,14 +10,14 @@ import type { DownloadOptions } from './selfupdate';
 import { startPadBridge, type PadBridge } from './gamepad-bridge';
 import { appIdFromAncestors, realXExec, watchZwiftWindow, xhostRestore, xhostSnapshot, type XExec } from './zwift-window';
 
-/** Pin aus `upstreams.json`: genau dieses Skript auf genau diesem Commit, nichts Neueres wird je automatisch ausgeführt. */
+/** Pin from `upstreams.json`: exactly this script at exactly this commit; nothing newer is ever run automatically. */
 export interface ZwiftPin {
   repo: string;
   commit: string;
   path: string;
   sha256: string;
   image: string;
-  /** Voreinstellung für `zwift_tag`, solange der Nutzer keinen eigenen einträgt */
+  /** Default for `zwift_tag` as long as the user has not entered one */
   tag: string;
 }
 
@@ -27,9 +27,9 @@ export class ZwiftError extends Error {
   constructor(public readonly problem: Exclude<AppProblem, ''> | 'abort', message: string) { super(message); }
 }
 
-/** Prüft den Pin streng, weil er in eine URL und einen Pfad eingeht. */
+/** Checks the pin strictly because it goes into a URL and a path. */
 export function checkPin(value: unknown): ZwiftPin {
-  const bad = (what: string): never => { throw new ZwiftError('verify', `Pin ungültig: ${what}`); };
+  const bad = (what: string): never => { throw new ZwiftError('verify', `Invalid pin: ${what}`); };
   const pin = (value ?? {}) as Record<string, unknown>;
   const text = (key: string, re: RegExp): string => (typeof pin[key] === 'string' && re.test(pin[key] as string) ? (pin[key] as string) : bad(key));
   return {
@@ -48,7 +48,7 @@ export const scriptFile = (home: string, pin: ZwiftPin): string => path.join(scr
 
 const sha256Of = (file: string): string => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
-/** Liegt das gepinnte Skript da, unverändert und ausführbar? */
+/** Is the pinned script there, unchanged and executable? */
 export function scriptReady(home: string, pin: ZwiftPin): boolean {
   const file = scriptFile(home, pin);
   try {
@@ -63,9 +63,9 @@ export function scriptReady(home: string, pin: ZwiftPin): boolean {
 export type Download = (url: string, dest: string, options: DownloadOptions) => Promise<void>;
 
 /**
- * Lädt das gepinnte Skript. Es entsteht unter `zwift/.staging-*` (gleiche Partition), wird gegen Größe und SHA-256 geprüft und
- * per rename an seinen Platz gesetzt: Ein halbes oder verändertes Skript liegt nie unter `zwift/<commit>/`. Danach verschwinden
- * Skripte anderer Commits. Gibt `false` zurück, wenn schon alles da war.
+ * Downloads the pinned script. It is created under `zwift/.staging-*` (same partition), checked against size and SHA-256 and
+ * moved into place by rename: a half or modified script is never under `zwift/<commit>/`. Afterwards
+ * scripts of other commits disappear. Returns `false` if everything was already there.
  */
 export async function installScript(opts: { home: string; pin: ZwiftPin; download: Download; signal?: AbortSignal }): Promise<boolean> {
   const { home, download } = opts;
@@ -83,15 +83,15 @@ export async function installScript(opts: { home: string; pin: ZwiftPin; downloa
       await download(scriptUrl(pin), file, { maxBytes: MAX_SCRIPT_BYTES, signal: opts.signal ?? new AbortController().signal, onBytes: () => {} });
     } catch (e) {
       const kind = (e as { kind?: string }).kind;
-      throw new ZwiftError(kind === 'abort' ? 'abort' : 'net', `Download von zwift.sh gescheitert: ${(e as Error).message}`);
+      throw new ZwiftError(kind === 'abort' ? 'abort' : 'net', `Download of zwift.sh failed: ${(e as Error).message}`);
     }
     let size: number;
-    try { size = fs.statSync(file).size; } catch { throw new ZwiftError('net', 'zwift.sh wurde nicht geschrieben'); }
-    if (size === 0 || size > MAX_SCRIPT_BYTES) throw new ZwiftError('verify', `zwift.sh hat eine unzulässige Größe (${size} Bytes)`);
-    if (sha256Of(file) !== pin.sha256) throw new ZwiftError('verify', 'Die Prüfsumme von zwift.sh weicht vom Pin ab');
+    try { size = fs.statSync(file).size; } catch { throw new ZwiftError('net', 'zwift.sh was not written'); }
+    if (size === 0 || size > MAX_SCRIPT_BYTES) throw new ZwiftError('verify', `zwift.sh has an invalid size (${size} bytes)`);
+    if (sha256Of(file) !== pin.sha256) throw new ZwiftError('verify', 'The checksum of zwift.sh differs from the pin');
     fs.chmodSync(file, 0o755);
     const target = scriptDir(home, pin);
-    // Ein vorhandenes, aber verändertes Ziel wird erst beiseite gelegt, dann ersetzt der rename in einem Schritt.
+    // An existing but modified target is moved aside first, then the rename replaces it in one step.
     const old = path.join(root, `.staging-old-${randomBytes(4).toString('hex')}`);
     const hadOld = fs.existsSync(target);
     if (hadOld) fs.renameSync(target, old);
@@ -99,7 +99,7 @@ export async function installScript(opts: { home: string; pin: ZwiftPin; downloa
       fs.renameSync(stage, target);
     } catch (e) {
       if (hadOld) fs.renameSync(old, target);
-      throw new ZwiftError('disk', `zwift.sh konnte nicht abgelegt werden: ${(e as Error).message}`);
+      throw new ZwiftError('disk', `zwift.sh could not be stored: ${(e as Error).message}`);
     }
     fs.rmSync(old, { recursive: true, force: true });
     prune(root, pin);
@@ -109,52 +109,52 @@ export async function installScript(opts: { home: string; pin: ZwiftPin; downloa
   }
 }
 
-/** Entfernt Skripte früherer Pins. Ein laufender Start behält seine geöffnete Datei, rename und unlink stören ihn nicht. */
+/** Removes scripts of earlier pins. A running start keeps its open file; rename and unlink do not disturb it. */
 function prune(root: string, pin: ZwiftPin): void {
   for (const name of fs.readdirSync(root)) {
     if (/^[0-9a-f]{40}$/.test(name) && name !== pin.commit) fs.rmSync(path.join(root, name), { recursive: true, force: true });
   }
 }
 
-// ---------- Dienst für Oberfläche und Zustand ----------
+// ---------- Service for the UI and state ----------
 
 export interface ZwiftStatus {
-  /** gepinntes `zwift.sh` liegt unverändert da */
+  /** pinned `zwift.sh` is there unchanged */
   script: boolean;
-  /** `podman`, `docker` oder leer, wenn keine nutzbare Laufzeit da ist */
+  /** `podman`, `docker` or empty if there is no usable runtime */
   runtime: string;
-  /** das eingestellte Image liegt lokal */
+  /** the configured image exists locally */
   image: boolean;
-  /** der Nutzer hat das Ziehen genau dieses Images bestätigt */
+  /** the user confirmed pulling exactly this image */
   consent: boolean;
-  /** Image:Tag der Einstellung, leer wenn keines eingestellt ist */
+  /** image:tag of the setting, empty if none is set */
   ref: string;
-  /** warum `image` nicht beurteilt werden konnte: keine Laufzeit, kein Tag, anderer Fehler */
+  /** why `image` could not be judged: no runtime, no tag, other error */
   problem: AppProblem;
 }
 
-/** Ein laufender Start über `rollout-run zwift`. */
+/** A running start via `rollout-run zwift`. */
 export interface ZwiftRun {
-  /** Endet, wenn der Starter endet: sein Exit-Code, bei einem Signal `null`. */
+  /** Resolves when the starter ends: its exit code, `null` on a signal. */
   done: Promise<number | null>;
-  /** Beendet das Spiel: TERM an `rollout-run`, das den Container mit `podman stop` anhält; nach einer Frist KILL an die ganze Prozessgruppe. */
+  /** Quits the game: TERM to `rollout-run`, which halts the container with `podman stop`; after a deadline KILL to the whole process group. */
   stop(): void;
 }
 
-/** Exit-Codes von `rollout-run zwift`, die einen Grund tragen (Konzept 5.2). Alles andere ist ein Absturz des Spiels oder von `zwift.sh`. */
+/** Exit codes of `rollout-run zwift` that carry a reason (concept 5.2). Everything else is a crash of the game or of `zwift.sh`. */
 export const RUN_PROBLEM: Record<number, Exclude<AppProblem, ''>> = { 10: 'runtime', 11: 'tag', 12: 'pull', 127: 'error' };
 
-/** Erkennt in der Ausgabe von `zwift.sh` die Zeile, ab der der Container startet (Phase „Spiel startet“). Farbcodes sind schon entfernt. */
+/** Recognises in the output of `zwift.sh` the line from which the container starts (phase "Game starting"). Colour codes are already stripped. */
 export const isStartLine = (line: string): boolean => /\bLaunching Zwift\b/.test(line);
 
 /**
- * Meldung des Containers (netbrains Eintrittsskript), wenn ZwiftApp.exe gestartet ist: „[podman|✓] Zwift started using wine“. Am Ally kam sie
- * etwa 5 s nach dem Start des Containers. Sie ersetzt die Wartezeit bis „Läuft“; fehlt sie, gilt weiter die Zeit (ROLLOUT_ZWIFT_RUNNING_MS).
+ * Message of the container (netbrain's entry script) once ZwiftApp.exe has started: "[podman|✓] Zwift started using wine". On the Ally it arrived
+ * about 5 s after the container started. It replaces the wait until "Running"; if it is missing, the timer still applies (ROLLOUT_ZWIFT_RUNNING_MS).
  */
 export const isRunningLine = (line: string): boolean => /Zwift started using wine/.test(line);
 
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
-/** Teilt einen Ausgabestrom in Zeilen (auch bei `\r`), entfernt Farbcodes und kürzt auf 300 Zeichen. */
+/** Splits an output stream into lines (also at `\r`), strips colour codes and truncates to 300 characters. */
 export function feedLines(stream: NodeJS.ReadableStream, onLine: (line: string) => void): void {
   let rest = '';
   const emit = (raw: string): void => { const line = raw.replace(ANSI, '').trim(); if (line) onLine(line.slice(0, 300)); };
@@ -168,18 +168,18 @@ export function feedLines(stream: NodeJS.ReadableStream, onLine: (line: string) 
 
 export interface ZwiftService {
   status(): Promise<ZwiftStatus>;
-  /** Lädt und prüft `zwift.sh`. */
+  /** Downloads and verifies `zwift.sh`. */
   installScript(signal: AbortSignal): Promise<void>;
-  /** Zieht das eingestellte Image (`rollout-run --zwift-pull`). Nur nach Bestätigung durch den Nutzer aufrufen. `onLine` bekommt die Ausgabe zeilenweise. */
+  /** Pulls the configured image (`rollout-run --zwift-pull`). Call only after confirmation by the user. `onLine` receives the output line by line. */
   pullImage(onLine: (line: string) => void, signal: AbortSignal): Promise<void>;
   /**
-   * Startet das Spiel (`rollout-run zwift`). `onLine` bekommt die Ausgabe zeilenweise, ohne Farbcodes. `onVisible` meldet, ob das
-   * Zwift-Fenster im Spielmodus (gamescope) im Fokus ist, also wirklich zu sehen (Weg A, siehe zwift-window.ts).
+   * Starts the game (`rollout-run zwift`). `onLine` receives the output line by line, without colour codes. `onVisible` reports whether the
+   * Zwift window is in focus in Gaming Mode (gamescope), i.e. really visible (path A, see zwift-window.ts).
    */
   start(onLine: (line: string) => void, onVisible?: (visible: boolean) => void): ZwiftRun;
-  /** Entfernt das Image (`rollout-run --zwift-remove`, also `podman rmi`) und die gemerkte Zustimmung. Nur nach Rückfrage aufrufen. */
+  /** Removes the image (`rollout-run --zwift-remove`, i.e. `podman rmi`) and the remembered consent. Call only after asking the user. */
   removeImage(signal: AbortSignal): Promise<void>;
-  /** Voreinstellung für den Image-Tag */
+  /** Default for the image tag */
   readonly defaultTag: string;
 }
 
@@ -192,13 +192,13 @@ export interface RealZwiftOptions {
   /** Spielstarter, Vorgabe `<home>/bin/rollout-run` */
   runner?: string;
   env?: NodeJS.ProcessEnv;
-  /** Zeitgrenze für `--zwift-status` in ms */
+  /** Time limit for `--zwift-status` in ms */
   statusTimeoutMs?: number;
-  /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 60000 (der Starter beendet Zwift erst höflich und hart, je bis 8 und 15 s, dann `podman stop` bis 20 s) */
+  /** Deadline between TERM and KILL when quitting the game in ms, default 60000 (the starter first quits Zwift politely and then hard, up to 8 and 15 s respectively, then `podman stop` up to 20 s) */
   stopGraceMs?: number;
   /**
-   * Fenstersichtbarkeit im Spielmodus (zwift-window.ts). Ohne diese Angabe berührt `start` den X-Server nie (Tests). `display` Vorgabe
-   * `:0` (die gamescope-Xwayland), `exec` ersetzt xwininfo/xprop/xhost, `appId` ersetzt die Suche im Prozessbaum.
+   * Window visibility in Gaming Mode (zwift-window.ts). Without this option `start` never touches the X server (tests). `display` default
+   * `:0` (the gamescope Xwayland), `exec` replaces xwininfo/xprop/xhost, `appId` replaces the search in the process tree.
    */
   windows?: { display?: string; focusDisplay?: string; exec?: XExec; focusExec?: XExec; appId?: string | null; intervalMs?: number; onNote?: (text: string) => void; pad?: (display: string) => PadBridge | null };
 }
@@ -236,8 +236,8 @@ export class RealZwift implements ZwiftService {
       return { code: result, out: text };
     };
     let { code, out } = await ask({});
-    // Noch kein Tag in config.toml (vor der ersten Installation): den Zustand für das gepinnte Image abfragen, damit die Laufzeit
-    // und ein schon vorhandenes Image erkannt werden. Gezogen wird dabei nichts.
+    // No tag in config.toml yet (before the first installation): query the state for the pinned image so the runtime
+    // and an already existing image are recognised. Nothing is pulled in the process.
     if (code === 11 && (this.o.env ?? process.env).ROLLOUT_ZWIFT_TAG === undefined) {
       ({ code, out } = await ask({ ROLLOUT_ZWIFT_TAG: this.pin.tag }));
     }
@@ -263,29 +263,29 @@ export class RealZwift implements ZwiftService {
     });
     signal.removeEventListener('abort', onAbort);
     if (signal.aborted) throw new ZwiftError('abort', 'abgebrochen');
-    if (code !== 0) throw new ZwiftError(code !== null && EXIT_PROBLEM[code] ? EXIT_PROBLEM[code] : 'pull', `rollout-run --zwift-pull endete mit ${code ?? 'Fehler'}`);
+    if (code !== 0) throw new ZwiftError(code !== null && EXIT_PROBLEM[code] ? EXIT_PROBLEM[code] : 'pull', `rollout-run --zwift-pull ended with ${code ?? 'error'}`);
   }
 
   start(onLine: (line: string) => void, onVisible?: (visible: boolean) => void): ZwiftRun {
     if (!fs.existsSync(this.runner)) return { done: Promise.resolve(127), stop: () => {} };
     const w = this.o.windows;
     const exec = w ? (w.exec ?? realXExec(w.display ?? ':0', this.o.env ?? process.env)) : null;
-    // Vor dem Start merken, ob `xhost` schon `LOCAL:` kennt: zwift.sh öffnet es und schließt es nie.
+    // Remember before the start whether `xhost` already knows `LOCAL:`: zwift.sh opens it and never closes it.
     const hadLocal = exec ? xhostSnapshot(exec) : null;
-    // Eigene Prozessgruppe, damit der KILL nach der Frist alles trifft, was am Starter hängt.
+    // Own process group so the KILL after the deadline hits everything attached to the starter.
     const child = this.spawnRunner('zwift', true);
     feedLines(child.stdout, onLine);
     feedLines(child.stderr, onLine);
     let killer: NodeJS.Timeout | null = null;
     const signalGroup = (sig: NodeJS.Signals): void => {
-      try { if (child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch { try { child.kill(sig); } catch { /* schon beendet */ } }
+      try { if (child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch { try { child.kill(sig); } catch { /* already exited */ } }
     };
-    // Controller: Solange das Zwift-Fenster zu sehen ist, gibt Rollout das Steam-Gamepad als Tastatur und Maus weiter (gamepad-bridge.ts).
+    // Controller: while the Zwift window is visible, Rollout forwards the Steam gamepad as keyboard and mouse (gamepad-bridge.ts).
     let pad: PadBridge | null = null;
     const display = w?.display ?? ':0';
     const startPad = w?.pad ?? ((d: string) => ((this.o.env ?? process.env).ROLLOUT_ZWIFT_PAD === 'off' ? null : startPadBridge({ display: d, env: this.o.env, onNote: w?.onNote })));
     const stopPad = (): void => { pad?.stop(); pad = null; };
-    w?.onNote?.(`Start: Fensterüberwachung ${w ? 'an' : 'aus'}, Anzeige ${display}, AppID ${w ? (w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId) : '-'}`);
+    w?.onNote?.(`Start: window watching ${w ? 'on' : 'off'}, display ${display}, AppID ${w ? (w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId) : '-'}`);
     const watcher = w && exec
       ? watchZwiftWindow({
         exec, focusExec: w.focusExec ?? (w.exec ? undefined : realXExec(w.focusDisplay ?? ':0', this.o.env ?? process.env)), appId: w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId, intervalMs: w.intervalMs, onNote: w.onNote,
@@ -306,7 +306,7 @@ export class RealZwift implements ZwiftService {
       }
       if (exec && hadLocal) {
         const restored = await xhostRestore(exec, await hadLocal);
-        if (restored) w?.onNote?.('xhost -local: zurückgenommen');
+        if (restored) w?.onNote?.('xhost -local: revoked');
       }
       return code;
     };
@@ -317,9 +317,9 @@ export class RealZwift implements ZwiftService {
     return {
       done,
       stop: () => {
-        // Nur der Starter bekommt TERM: Er stoppt den Container selbst (podman stop, siehe rollout-run). Ein TERM an die ganze Gruppe
-        // träfe auch `podman run` und ließe den Container als Waise weiterlaufen (am Ally beobachtet).
-        try { child.kill('SIGTERM'); } catch { /* schon beendet */ }
+        // Only the starter gets TERM: it stops the container itself (podman stop, see rollout-run). A TERM to the whole group
+        // would also hit `podman run` and leave the container running as an orphan (observed on the Ally).
+        try { child.kill('SIGTERM'); } catch { /* already exited */ }
         killer ??= setTimeout(() => signalGroup('SIGKILL'), this.o.stopGraceMs ?? 60_000);
       }
     };
@@ -336,13 +336,13 @@ export class RealZwift implements ZwiftService {
       child.on('error', () => resolve(null));
       child.on('close', (c) => resolve(c));
     });
-    if (code !== 0) throw new ZwiftError(code === 10 ? 'runtime' : code === 11 ? 'tag' : 'error', `rollout-run --zwift-remove endete mit ${code ?? 'Fehler'}: ${last}`);
+    if (code !== 0) throw new ZwiftError(code === 10 ? 'runtime' : code === 11 ? 'tag' : 'error', `rollout-run --zwift-remove ended with ${code ?? 'error'}: ${last}`);
   }
 }
 
 /**
- * Wann Zwift echt läuft (Konzept 5.2): ohne ausdrückliche Wahl (`ROLLOUT_ZWIFT`) echt, sobald `rollout-run` da ist und der Pin gilt,
- * sonst wie bisher simuliert. `fake` und `real` erzwingen den Dienst, `sim` die Simulation.
+ * When Zwift runs for real (concept 5.2): without an explicit choice (`ROLLOUT_ZWIFT`) real as soon as `rollout-run` exists and the pin is valid,
+ * otherwise simulated as before. `fake` and `real` force the service, `sim` the simulation.
  */
 export function chooseZwiftMode(opts: { mode: string | undefined; runnerExists: boolean; pin: unknown }): 'real' | 'fake' | 'sim' {
   if (opts.mode === 'fake') return 'fake';
@@ -354,10 +354,10 @@ export function chooseZwiftMode(opts: { mode: string | undefined; runnerExists: 
 }
 
 /**
- * Attrappe für Oberfläche und Tests (ROLLOUT_ZWIFT=fake): kein Netz, kein Container. `mode` wählt den Zustand:
- * leer = nichts da, `ready` = Skript und Image da, `norun` = keine Laufzeit, `nonet` = Download scheitert, `nopull` = Ziehen scheitert,
- * `runcrash` = wie `ready`, aber der Start bricht nach den Meldungen mit Exit 1 ab, `runfail` = wie `ready`, aber der Start meldet Exit 12
- * (Image fehlt), `norem` = wie `ready`, aber das Entfernen scheitert.
+ * Fake for the UI and tests (ROLLOUT_ZWIFT=fake): no network, no container. `mode` selects the state:
+ * empty = nothing there, `ready` = script and image there, `norun` = no runtime, `nonet` = download fails, `nopull` = pull fails,
+ * `runcrash` = like `ready`, but the start aborts with exit 1 after the messages, `runfail` = like `ready`, but the start reports exit 12
+ * (image missing), `norem` = like `ready`, but the removal fails.
  */
 export class FakeZwift implements ZwiftService {
   readonly defaultTag = '1.0.0';
@@ -377,17 +377,17 @@ export class FakeZwift implements ZwiftService {
 
   async installScript(): Promise<void> {
     await new Promise((r) => setTimeout(r, this.stepMs));
-    if (this.mode === 'nonet') throw new ZwiftError('net', 'Attrappe: kein Netz');
+    if (this.mode === 'nonet') throw new ZwiftError('net', 'Fake: no network');
     this.script = true;
   }
 
   async pullImage(onLine: (line: string) => void): Promise<void> {
-    if (this.mode === 'norun') throw new ZwiftError('runtime', 'Attrappe: keine Laufzeit');
+    if (this.mode === 'norun') throw new ZwiftError('runtime', 'Fake: no runtime');
     for (let i = 1; i <= 4; i += 1) {
       await new Promise((r) => setTimeout(r, this.stepMs));
       onLine(`Copying blob ${i} done`);
     }
-    if (this.mode === 'nopull') throw new ZwiftError('pull', 'Attrappe: Ziehen gescheitert');
+    if (this.mode === 'nopull') throw new ZwiftError('pull', 'Fake: pull failed');
     this.image = true;
   }
 
@@ -405,13 +405,13 @@ export class FakeZwift implements ZwiftService {
       if (this.mode === 'runcrash') at(4, () => finish(1));
       else at(5, () => onVisible?.(true));
     }
-    // Beenden dauert wie beim echten Container einen Moment: sichtbar als Phase „stopping“.
+    // Quitting takes a moment, as with the real container: visible as phase "stopping".
     return { done, stop: () => { if (stopped) return; stopped = true; timers.forEach(clearTimeout); timers.length = 0; onVisible?.(false); at(4, () => finish(143)); } };
   }
 
   async removeImage(): Promise<void> {
     await new Promise((r) => setTimeout(r, this.stepMs));
-    if (this.mode === 'norem') throw new ZwiftError('error', 'Attrappe: Entfernen gescheitert');
+    if (this.mode === 'norem') throw new ZwiftError('error', 'Fake: removal failed');
     this.image = false;
   }
 }

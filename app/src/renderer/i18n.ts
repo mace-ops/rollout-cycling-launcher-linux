@@ -7,7 +7,7 @@ import { nl } from './locales/nl';
 import { pl } from './locales/pl';
 import { pt } from './locales/pt';
 
-/** Weitere Sprachen: Datei unter locales/ anlegen und hier eintragen. Der Typ `Messages` erzwingt alle Schlüssel. */
+/** More languages: create a file under locales/ and register it here. The `Messages` type enforces all keys. */
 const CATALOGS: Record<string, Messages> = { en, de, es, fr, it, pt, nl, pl };
 
 export const LANGUAGES: readonly string[] = Object.keys(CATALOGS);
@@ -15,7 +15,7 @@ export const languageName = (code: string): string => CATALOGS[code]?.['lang.nam
 
 let current = 'en';
 
-/** `choice` ist „auto“ oder ein Sprachcode, `system` die Sprache des Systems, etwa „de-DE“. */
+/** `choice` is "auto" or a language code, `system` the system language, e.g. "de-DE". */
 export function resolveLanguage(choice: string, system: string): string {
   if (choice !== 'auto' && CATALOGS[choice]) return choice;
   const base = system.toLowerCase().split(/[-_]/)[0];
@@ -32,7 +32,7 @@ export const language = (): string => current;
 const escapeHtml = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
-/** Übersetzt einen Schlüssel. Werte in `params` werden escaped, der Text selbst nicht. */
+/** Translates a key. Values in `params` are escaped, the text itself is not. */
 export function t(key: MessageKey, params: Record<string, string | number> = {}): string {
   const text = CATALOGS[current][key] ?? en[key];
   return text.replace(/\{(\w+)\}/g, (_match, name: string) => (name in params ? escapeHtml(String(params[name])) : `{${name}}`));

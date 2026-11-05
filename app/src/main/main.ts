@@ -18,7 +18,7 @@ import * as steam from './steam';
 
 let win: BrowserWindow | null = null;
 
-/** Aus Steam und im Gaming Mode startet Rollout im Vollbild. `--fullscreen` erzwingt es, `--windowed` verhindert es. */
+/** From Steam and in Gaming Mode Rollout starts fullscreen. `--fullscreen` forces it, `--windowed` prevents it. */
 const startsFullscreen = (): boolean => {
   if (process.argv.includes('--windowed')) return false;
   return process.argv.includes('--fullscreen') || !!process.env.SteamGameId || !!process.env.SteamAppId
@@ -27,12 +27,12 @@ const startsFullscreen = (): boolean => {
 
 const isApp = (value: unknown): value is AppId => APP_IDS.includes(value as AppId);
 
-/** Version dieses Ordners. `__dirname` zeigt auf den echten Versionsordner, `app.getAppPath()` nur auf den Symlink `current`. */
+/** Version of this directory. `__dirname` points to the real version directory, `app.getAppPath()` only to the `current` symlink. */
 const ownVersion = (): string => JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')).version;
 
 /**
- * Die Attrappe ersetzt das Netz durch einen Ordner und nimmt den Schlüssel aus der Umgebung. Sie gilt nur mit
- * ROLLOUT_HOME, ROLLOUT_SELFUPDATE_DIR und ROLLOUT_SELFUPDATE_KEY, sonst bricht die App ab.
+ * The fake replaces the network with a directory and takes the key from the environment. It applies only with
+ * ROLLOUT_HOME, ROLLOUT_SELFUPDATE_DIR and ROLLOUT_SELFUPDATE_KEY, otherwise the app aborts.
  */
 function selfUpdateService(settings: () => { autoUpdate: boolean; channel: UpdateChannel }, busy: () => boolean): SelfUpdateService {
   const env = process.env;
@@ -40,7 +40,7 @@ function selfUpdateService(settings: () => { autoUpdate: boolean; channel: Updat
   if (env.ROLLOUT_SIM_SELFUPDATE) return new FakeSelfUpdate(env.ROLLOUT_SIM_SELFUPDATE, version);
   const fake = env.ROLLOUT_SELFUPDATE === 'fake';
   if (fake && !(env.ROLLOUT_HOME && env.ROLLOUT_SELFUPDATE_DIR && env.ROLLOUT_SELFUPDATE_KEY)) {
-    console.error('ROLLOUT_SELFUPDATE=fake braucht ROLLOUT_HOME, ROLLOUT_SELFUPDATE_DIR und ROLLOUT_SELFUPDATE_KEY');
+    console.error('ROLLOUT_SELFUPDATE=fake requires ROLLOUT_HOME, ROLLOUT_SELFUPDATE_DIR and ROLLOUT_SELFUPDATE_KEY');
     app.exit(2);
   }
   return new SelfUpdater({
@@ -56,7 +56,7 @@ function selfUpdateService(settings: () => { autoUpdate: boolean; channel: Updat
   });
 }
 
-// Nur eine Instanz: Ein zweiter Start holt das vorhandene Fenster nach vorn.
+// Single instance only: a second start brings the existing window to the front.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -77,24 +77,24 @@ if (!app.requestSingleInstanceLock()) {
     : { status: steam.status, set: (on, restart) => steam.setRolloutInSteam(on, restart, (dir, id) => writeArtwork(dir, id, true)) };
 
   /**
-   * Zwift echt (`real`), als Attrappe (`fake`, Zustand aus ROLLOUT_SIM_ZWIFT) oder simuliert (`sim`). Ohne die Variable gilt `real`,
-   * sobald bin/rollout-run da ist und der Pin in upstreams.json stimmt (chooseZwiftMode); sonst bleibt es bei der Simulation.
+   * Zwift real (`real`), as a fake (`fake`, state from ROLLOUT_SIM_ZWIFT) or simulated (`sim`). Without the variable `real` applies
+   * as soon as bin/rollout-run exists and the pin in upstreams.json is valid (chooseZwiftMode); otherwise it stays simulated.
    */
   const zwiftService = (): ZwiftService | null => {
     const home = steam.rolloutHome();
     const mode = chooseZwiftMode({ mode: process.env.ROLLOUT_ZWIFT, runnerExists: fs.existsSync(path.join(home, 'bin/rollout-run')), pin: upstreams.zwift });
     if (mode === 'fake') return new FakeZwift(process.env.ROLLOUT_SIM_ZWIFT ?? '');
-    // Fenstersichtbarkeit im Spielmodus (zwift-window.ts): auf :0 das Zwift-Fenster erkennen und für gamescope kennzeichnen; ROLLOUT_ZWIFT_WINDOWS=off schaltet das ab.
+    // Window visibility in Gaming Mode (zwift-window.ts): detect the Zwift window on :0 and mark it for gamescope; ROLLOUT_ZWIFT_WINDOWS=off switches this off.
     if (mode === 'real') return new RealZwift({ home, pin: upstreams.zwift, download: realFeed.download, windows: process.env.ROLLOUT_ZWIFT_WINDOWS === 'off' ? undefined : { display: process.env.ROLLOUT_ZWIFT_DISPLAY || process.env.DISPLAY || ':0', onNote: (text) => {
-      // Protokoll für Fenster und Controller: <Rollout-Ordner>/state/zwift-window.log
-      try { fs.appendFileSync(path.join(home, 'state/zwift-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* Protokoll ist Zugabe */ }
+      // Log for window and controller: <Rollout directory>/state/zwift-window.log
+      try { fs.appendFileSync(path.join(home, 'state/zwift-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* log is a bonus */ }
     } } });
     return null;
   };
 
   /**
-   * MyWhoosh echt (`real`: vendor/mywhoosh.sh über bin/rollout-run, Zustand aus dem Spielordner) oder simuliert (`sim`). Ohne die Variable
-   * ROLLOUT_MYWHOOSH gilt `real`, sobald bin/rollout-run und die mitgelieferte mywhoosh.sh da sind. Die Datei liegt neben dist/ der laufenden Version.
+   * MyWhoosh real (`real`: vendor/mywhoosh.sh via bin/rollout-run, state from the game directory) or simulated (`sim`). Without the variable
+   * ROLLOUT_MYWHOOSH `real` applies as soon as bin/rollout-run and the bundled mywhoosh.sh exist. The file sits next to dist/ of the running version.
    */
   const mywhooshService = (): MywhooshService | null => {
     const home = steam.rolloutHome();
@@ -104,11 +104,11 @@ if (!app.requestSingleInstanceLock()) {
       scriptExists: fs.existsSync(path.join(__dirname, '../../vendor/mywhoosh.sh'))
     });
     if (mode !== 'real') return null;
-    // Fensterüberwachung und Controller im Spielmodus (wie bei Zwift): ROLLOUT_MYWHOOSH_WINDOWS=off schaltet beides ab, ROLLOUT_MYWHOOSH_PAD=off nur den Controller.
-    // Protokoll: <Rollout-Ordner>/state/mywhoosh-window.log
+    // Window watching and controller in Gaming Mode (as with Zwift): ROLLOUT_MYWHOOSH_WINDOWS=off switches both off, ROLLOUT_MYWHOOSH_PAD=off only the controller.
+    // Log: <Rollout directory>/state/mywhoosh-window.log
     const windows = process.env.ROLLOUT_MYWHOOSH_WINDOWS === 'off' ? undefined : {
       display: process.env.ROLLOUT_MYWHOOSH_DISPLAY || process.env.DISPLAY || ':0',
-      onNote: (text: string) => { try { fs.appendFileSync(path.join(home, 'state/mywhoosh-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* Protokoll ist Zugabe */ } }
+      onNote: (text: string) => { try { fs.appendFileSync(path.join(home, 'state/mywhoosh-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* log is a bonus */ } }
     };
     return new RealMywhoosh({ home, windows, cursorDir: path.join(home, 'state/cursors') });
   };
@@ -144,7 +144,7 @@ if (!app.requestSingleInstanceLock()) {
     setLanguage: (code) => typeof code === 'string' && /^[a-z]{2,3}(-[A-Za-z]{2,4})?$|^auto$/.test(code) && backend.setLanguage(code),
     remove: (id) => isApp(id) && backend.remove(id),
     createReport: () => backend.createReport(),
-    // Feste Adresse, nie vom Renderer bestimmt.
+    // Fixed address, never determined by the renderer.
     openZwiftProject: () => shell.openExternal('https://github.com/netbrain/zwift'),
     setOverrides: (id, patch) => isApp(id) && backend.setOverrides(id, cleanPatch(patch)),
     resetOverrides: () => backend.resetOverrides()
@@ -163,20 +163,20 @@ if (!app.requestSingleInstanceLock()) {
     if (!COMMANDS.includes(command as Command)) throw new Error('unbekannter Befehl');
     return handlers[command as Command](...args);
   });
-  /** Fehlen Bilder für einen vorhandenen Steam-Eintrag, entstehen sie beim Start. Steam zeigt sie nach seinem nächsten Start. */
+  /** If images are missing for an existing Steam entry, they are created at start. Steam shows them after its next start. */
   const ensureArtwork = async (): Promise<void> => {
     if (process.env.ROLLOUT_SIM_STEAM === 'fake') return;
     try {
       if (steam.status().state !== 'in') return;
       const paths = steam.rolloutSteamPaths();
       if (paths && !artworkComplete(paths.configDir, paths.appId)) await writeArtwork(paths.configDir, paths.appId, true);
-    } catch { /* Bilder sind kosmetisch */ }
+    } catch { /* images are cosmetic */ }
   };
 
   ipcMain.on('rollout-quit', () => app.quit());
 
-  // Beendet Steam Rollout (Spiel beenden, Fenster zu, Signal), muss das laufende Spiel mit enden: Der Container hängt nicht an Rollouts
-  // Prozessbaum und liefe sonst weiter. Der Starter bekommt sein TERM sofort; danach wird abgewartet, bis das Spiel weg ist.
+  // If Steam ends Rollout (quit game, window closed, signal), the running game must end with it: the container is not part of Rollout's
+  // process tree and would otherwise keep running. The starter gets its TERM immediately; then we wait until the game is gone.
   let leaving = false;
   const leave = (): void => {
     if (leaving) return;
@@ -192,7 +192,7 @@ if (!app.requestSingleInstanceLock()) {
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.on(signal, leave);
 
   app.whenReady().then(async () => {
-    // Nur für Tests: erzeugt die Steam-Bilder in einen Ordner, schreibt einen Bericht und beendet sich.
+    // Tests only: generates the Steam images into a directory, writes a report and exits.
     if (process.env.ROLLOUT_ART_OUT) {
       const out = process.env.ROLLOUT_ART_OUT;
       await writeArtwork(out, 1, true);
@@ -205,7 +205,7 @@ if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;
     }
-    // Das Backend entsteht erst danach und fragt den Dienst schon im Konstruktor: bis dahin gilt „nichts belegt“.
+    // The backend is created only afterwards and queries the service already in its constructor: until then "nothing busy" applies.
     const updates = selfUpdateService(() => (backend ? backend.settings() : { autoUpdate: true, channel: 'stable' }), () => (backend ? backend.busy() : false));
     backend = new SimBackend((snapshot: Snapshot) => win?.webContents.send('rollout-snapshot', snapshot), app.getLocale(), steamService(), fileStore, process.env.ROLLOUT_BT === 'fake' ? new FakeBluetooth(process.env.ROLLOUT_SIM_BT === 'problem') : realBluetooth, updates, process.env, zwiftService(), mywhooshService());
     updates.onChange(() => backend.refresh());
@@ -228,14 +228,14 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
     win.removeMenu();
-    // F11 wechselt zwischen Vollbild und Fenster.
+    // F11 toggles between fullscreen and windowed.
     win.webContents.on('before-input-event', (event, input) => {
       if (input.type === 'keyDown' && input.key === 'F11' && win) {
         win.setFullScreen(!win.isFullScreen());
         event.preventDefault();
       }
     });
-    // Nur lokale Inhalte: keine Navigation, keine neuen Fenster.
+    // Local content only: no navigation, no new windows.
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
     win.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -245,6 +245,6 @@ if (!app.requestSingleInstanceLock()) {
     win.on('closed', () => { win = null; });
   });
 
-  // Im Bilder-Modus gibt es zwischen zwei Bildern kurz kein Fenster.
+  // In image mode there is briefly no window between two images.
   app.on('window-all-closed', () => { if (!process.env.ROLLOUT_ART_OUT) app.quit(); });
 }

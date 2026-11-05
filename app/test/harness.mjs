@@ -1,6 +1,6 @@
-// Gemeinsamer Rahmen der Klicktests: startet Electron (direkt oder über bin/rollout) und steuert das Fenster über das Debug-Protokoll.
-// Nie echtes Steam: Die Attrappen, ein Wegwerf-ROLLOUT_HOME und ein Wegwerf-ROLLOUT_CONFIG_HOME stehen fest in der Umgebung des
-// Kindprozesses und lassen sich weder per `env` noch von außen überschreiben. Die Attrappen werden vor dem Start geprüft.
+// Shared frame for the click tests: starts Electron (directly or via bin/rollout) and drives the window over the debug protocol.
+// Never real Steam: the fakes, a throwaway ROLLOUT_HOME and a throwaway ROLLOUT_CONFIG_HOME are fixed in the environment of the
+// child process and can be overridden neither via `env` nor from outside. The fakes are checked before the start.
 import { spawn } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import fs from 'node:fs';
@@ -16,20 +16,20 @@ let failures = 0;
 export const failureCount = () => failures;
 export const electronBin = () => process.env.ELECTRON_BIN || require('electron');
 
-/** Testschlüssel für das Selbst-Update: der private bleibt im Test, der öffentliche geht in die Umgebung der App. */
+/** Test key for the self-update: the private one stays in the test, the public one goes into the app's environment. */
 export function testKey() {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   return { privateKey, publicB64: publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('base64') };
 }
 
 /**
- * Startet die App und führt `steps` aus. `opts`:
- *   home      Wegwerf-ROLLOUT_HOME (sonst ein leerer neuer Ordner, der danach verschwindet; ein angegebener bleibt)
- *   launcher  Pfad zu bin/rollout statt Electron direkt (die Wächter-Läufe), dann ohne `.` als App-Pfad
- *   feedDir, key  Ordner und öffentlicher Schlüssel (Base64) für die Update-Attrappe
- *   config    Text für die config.toml des Wegwerf-Ordners (zum Beispiel `auto_update = false`)
- *   shots     Ordner für Screenshots
- *   userData, configHome, electron  feste Ordner und Programm, damit zwei Läufe dasselbe Profil teilen (A3); sie bleiben stehen
+ * Starts the app and runs `steps`. `opts`:
+ *   home      throwaway ROLLOUT_HOME (otherwise an empty new directory that disappears afterwards; a given one stays)
+ *   launcher  path to bin/rollout instead of Electron directly (the watcher runs), then without `.` as app path
+ *   feedDir, key  directory and public key (base64) for the update fake
+ *   config    text for the config.toml of the throwaway directory (for example `auto_update = false`)
+ *   shots     directory for screenshots
+ *   userData, configHome, electron  fixed directories and program so two runs share the same profile (A3); they are kept
  */
 export async function session(name, env, steps, opts = {}) {
   if (process.env.ROLLOUT_ONLY && !name.startsWith(process.env.ROLLOUT_ONLY)) return;
@@ -41,10 +41,10 @@ export async function session(name, env, steps, opts = {}) {
   const feedDir = opts.feedDir ?? fs.mkdtempSync(path.join(os.tmpdir(), `rollout-smoke-feed-${stamp}-`));
   const childEnv = {
     ROLLOUT_SIM_LANG: 'en', ...process.env, ...env,
-    // Zwift ist ohne ausdrückliche Wahl simuliert: Mit einem Wegwerf-ROLLOUT_HOME ohne bin/rollout-run wäre es das ohnehin, die
-    // Festlegung schützt auch Läufe mit eigenem home vor dem echten Container. `real` braucht Attrappen (siehe unten).
+    // Zwift is simulated unless explicitly chosen: with a throwaway ROLLOUT_HOME without bin/rollout-run it would be anyway; the
+    // setting also protects runs with their own home from the real container. `real` needs fakes (see below).
     ROLLOUT_ZWIFT: env.ROLLOUT_ZWIFT || 'sim',
-    // Ebenso MyWhoosh: ohne ausdrückliche Wahl simuliert. `real` nur mit Attrappe als Upstream und Spielordner im Wegwerf-Ordner (unten geprüft).
+    // Same for MyWhoosh: simulated unless explicitly chosen. `real` only with a fake as upstream and the game directory in the throwaway directory (checked below).
     ROLLOUT_MYWHOOSH: env.ROLLOUT_MYWHOOSH || 'sim',
     ROLLOUT_SIM_STEAM: 'fake', ROLLOUT_BT: env.ROLLOUT_BT === 'real' ? 'real' : 'fake', ROLLOUT_SELFUPDATE: 'fake',
     ROLLOUT_HOME: home, ROLLOUT_CONFIG_HOME: opts.configHome ?? path.join(os.tmpdir(), `rollout-smoke-cfg-${stamp}`),
@@ -55,20 +55,20 @@ export async function session(name, env, steps, opts = {}) {
     fs.mkdirSync(childEnv.ROLLOUT_CONFIG_HOME, { recursive: true });
     fs.writeFileSync(path.join(childEnv.ROLLOUT_CONFIG_HOME, 'config.toml'), opts.config);
   }
-  // Prüfung vor dem Start, nicht erst danach: sonst bliebe ein wirkungsloses Überschreiben unbemerkt.
+  // Check before the start, not afterwards: otherwise an ineffective override would go unnoticed.
   const tmp = os.tmpdir();
   const forced = childEnv.ROLLOUT_SIM_STEAM === 'fake' && childEnv.ROLLOUT_SELFUPDATE === 'fake' && (childEnv.ROLLOUT_BT === 'fake' || env.ROLLOUT_BT === 'real')
     && childEnv.ROLLOUT_HOME.startsWith(tmp) && childEnv.ROLLOUT_CONFIG_HOME.startsWith(tmp);
-  if (!forced) throw new Error('Attrappen nicht erzwungen, Test abgebrochen');
-  // Echtes Zwift (ROLLOUT_ZWIFT=real) nur mit Container-Attrappen: Das erste PATH-Verzeichnis enthält podman und docker mit der Marke,
-  // und der Upstream von rollout-run ist ersetzt (nie das echte zwift.sh mit einem echten Container).
+  if (!forced) throw new Error('Fakes not enforced, test aborted');
+  // Real Zwift (ROLLOUT_ZWIFT=real) only with container fakes: the first PATH directory contains podman and docker with the marker,
+  // and rollout-run's upstream is replaced (never the real zwift.sh with a real container).
   if (childEnv.ROLLOUT_ZWIFT === 'real') {
     const first = (childEnv.PATH ?? '').split(':')[0];
     const marked = ['podman', 'docker'].every((tool) => { try { return fs.readFileSync(path.join(first, tool), 'utf8').includes('# rollout-test-attrappe'); } catch { return false; } });
-    if (!first.startsWith(tmp) || !marked || !childEnv.ROLLOUT_RUN_UPSTREAM) throw new Error('Container-Attrappen nicht erzwungen, Test abgebrochen');
+    if (!first.startsWith(tmp) || !marked || !childEnv.ROLLOUT_RUN_UPSTREAM) throw new Error('Container fakes not enforced, test aborted');
   }
   if (childEnv.ROLLOUT_MYWHOOSH === 'real'
-    && (!childEnv.ROLLOUT_RUN_UPSTREAM || !(childEnv.MYWHOOSH_ROOT ?? '').startsWith(tmp) || !(childEnv.HOME ?? '').startsWith(tmp))) throw new Error('MyWhoosh-Attrappe nicht erzwungen, Test abgebrochen');
+    && (!childEnv.ROLLOUT_RUN_UPSTREAM || !(childEnv.MYWHOOSH_ROOT ?? '').startsWith(tmp) || !(childEnv.HOME ?? '').startsWith(tmp))) throw new Error('MyWhoosh fake not enforced, test aborted');
   const userData = opts.userData ?? path.join(os.tmpdir(), `rollout-smoke-${stamp}`);
   const debug = `--remote-debugging-port=${port}`;
   const [cmd, args] = opts.launcher
@@ -83,16 +83,16 @@ export async function session(name, env, steps, opts = {}) {
       try {
         const list = await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(2000) })).json();
         target = list.find((t) => t.type === 'page' && t.url.includes('index.html'));
-      } catch { /* App startet noch */ }
+      } catch { /* app is still starting */ }
     }
-    if (!target) throw new Error('Fenster nicht erreichbar');
+    if (!target) throw new Error('Window not reachable');
     const ws = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       if (msg.id && conn.pending.has(msg.id)) { conn.pending.get(msg.id)(msg); conn.pending.delete(msg.id); }
     };
-    // Beendet sich die App mitten in einem Aufruf (Neustart durch den Wächter), kommt keine Antwort mehr: offene Aufrufe leer beantworten.
+    // If the app exits in the middle of a call (restart by the watcher), no answer ever arrives: answer open calls with an empty result.
     ws.onclose = () => { for (const resolve of conn.pending.values()) resolve({}); conn.pending.clear(); };
     conn.ws = ws;
   };
@@ -123,15 +123,15 @@ export async function session(name, env, steps, opts = {}) {
         return false;
       },
       snapshot: async () => JSON.parse((await evalJs('window.rollout.getSnapshot().then((s) => JSON.stringify(s))')) ?? 'null'),
-      /** Nach einem Neustart durch den Wächter: neues Fenster am selben Debug-Port suchen. */
-      reattach: async (ms = 40000) => { try { conn.ws.close(); } catch { /* schon zu */ } await attach(ms); await t.waitFor('Rollout', 15000); },
+      /** After a restart by the watcher: look for the new window on the same debug port. */
+      reattach: async (ms = 40000) => { try { conn.ws.close(); } catch { /* already closed */ } await attach(ms); await t.waitFor('Rollout', 15000); },
       shot: async (label, wait = 700) => {
         if (!shots) return;
         await sleep(wait);
         const { result } = await send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(path.join(shots, `${name}-${label}.png`), Buffer.from(result.data, 'base64'));
       },
-      /** Darstellungsgröße für Screenshots, unabhängig vom Fenstermanager (Medienabfragen und Layout folgen ihr). */
+      /** Rendering size for screenshots, independent of the window manager (media queries and layout follow it). */
       viewport: (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }),
       expect: async (ok, message) => { if (!(await ok)) { failures += 1; console.log(`  ✗ ${message}`); } else console.log(`  ✓ ${message}`); },
       focus: () => evalJs('document.activeElement && (document.activeElement.textContent || document.activeElement.getAttribute("aria-label") || "").trim()')
@@ -143,7 +143,7 @@ export async function session(name, env, steps, opts = {}) {
     failures += 1;
     console.log(`  ✗ ${name}: ${error.message}`);
   } finally {
-    try { conn.ws?.close(); } catch { /* schon zu */ }
+    try { conn.ws?.close(); } catch { /* already closed */ }
     child.kill();
     await sleep(500);
     for (const dir of [opts.userData ? null : userData, opts.configHome ? null : childEnv.ROLLOUT_CONFIG_HOME]) if (dir) fs.rmSync(dir, { recursive: true, force: true });
@@ -152,4 +152,4 @@ export async function session(name, env, steps, opts = {}) {
   }
 }
 
-export const failuresExit = () => { console.log(failures ? `${failures} Fehler` : 'alles ok'); process.exit(failures ? 1 : 0); };
+export const failuresExit = () => { console.log(failures ? `${failures} failures` : 'all ok'); process.exit(failures ? 1 : 0); };

@@ -1,11 +1,11 @@
-// Erzeugt die Bilder für die Steam-Bibliothek aus der Marke und dem Hintergrund der App. Nichts davon liegt im Repo,
-// die Dateien entstehen lokal in config/grid und enthalten keine Herstellerlogos.
+// Generates the images for the Steam library from the app's mark and background. None of it lives in the repo;
+// the files are created locally in config/grid and contain no vendor logos.
 import { BrowserWindow, nativeImage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { artworkFiles } from './steam';
 
-/** `transparent`: Das Bild wird auf Schwarz gerendert und die Deckkraft danach aus der Helligkeit gerechnet, weil verborgene Fenster keinen Alphakanal liefern. */
+/** `transparent`: the image is rendered on black and the opacity is computed from the brightness afterwards, because hidden windows deliver no alpha channel. */
 interface Art { kind: 'portrait' | 'wide' | 'hero' | 'logo'; width: number; height: number; transparent: boolean }
 
 const ART: Record<string, Art> = {
@@ -53,10 +53,10 @@ async function render(art: Art): Promise<Buffer> {
       }
     }
     for (let i = 0; i < 200 && win.getTitle() !== 'ready'; i += 1) await new Promise((r) => setTimeout(r, 100));
-    if (win.getTitle() !== 'ready') throw new Error(`Bild ${art.kind} wurde nicht fertig`);
+    if (win.getTitle() !== 'ready') throw new Error(`Image ${art.kind} was not finished`);
     await new Promise((r) => setTimeout(r, art.kind === 'hero' ? 2500 : 300));
     const image = await win.webContents.capturePage();
-    // Bei skalierter Anzeige ist das Bild größer: auf die Maße bringen, die Steam erwartet.
+    // With a scaled display the image is larger: bring it to the dimensions Steam expects.
     const size = image.getSize();
     const exact = size.width === art.width && size.height === art.height ? image : image.resize({ width: art.width, height: art.height, quality: 'best' });
     return art.transparent ? withAlphaFromBlack(exact).toPNG() : exact.toPNG();
@@ -65,7 +65,7 @@ async function render(art: Art): Promise<Buffer> {
   }
 }
 
-/** Schreibt fehlende Bilder (oder alle mit `force`). Gibt die Zahl der geschriebenen Dateien zurück. */
+/** Writes missing images (or all with `force`). Returns the number of files written. */
 export async function writeArtwork(configDir: string, appId: number, force = false): Promise<number> {
   const grid = path.join(configDir, 'grid');
   fs.mkdirSync(grid, { recursive: true });
@@ -82,7 +82,7 @@ export async function writeArtwork(configDir: string, appId: number, force = fal
   return written;
 }
 
-/** Prüft, ob alle Bilder da sind und die richtige Größe haben. */
+/** Checks whether all images exist and have the right size. */
 export function artworkComplete(configDir: string, appId: number): boolean {
   return artworkFiles(configDir, appId).every((file) => {
     if (!fs.existsSync(file)) return false;

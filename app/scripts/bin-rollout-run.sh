@@ -1,58 +1,58 @@
 #!/bin/sh
 # rollout-bootstrap: 8
-# Startet ein Spiel (Konzept 5.2), vom Launcher und von Steam gleich aufgerufen: rollout-run <mywhoosh|zwift> [Argumente].
-# Weitere Aufrufe: rollout-run --container-check (nennt die nutzbare Container-Laufzeit, sonst Meldung und Exit 10),
-# rollout-run --zwift-pull (zieht das eingestellte Zwift-Image und merkt sich die Zustimmung, nur nach Bestätigung durch den Nutzer) und
-# rollout-run --zwift-status (stdout: runtime=<podman|docker>, ref=<Image:Tag>, image=<present|missing>, consent=<yes|no>; zieht und startet nichts) und
-# rollout-run --zwift-remove (entfernt das eingestellte Image mit „rmi“ und vergisst die Zustimmung; nur nach Rückfrage des Nutzers, ohne Image ebenfalls Erfolg) und
-# rollout-run --mywhoosh <install [--hd]|update|uninstall> (richtet MyWhoosh über vendor/mywhoosh.sh ein, ändert oder entfernt es; Bildschirm bleibt wach; läuft ein Spiel, Exit 1).
-# Exit-Codes von Rollout selbst: 1 läuft schon, 2 Aufruf, 10 keine nutzbare Container-Laufzeit, 11 Zwift-Image nicht eingestellt,
-# 12 Zwift-Image fehlt (keine Zustimmung oder Ziehen gescheitert), 13 Image konnte nicht entfernt werden, 127 Upstream fehlt. Sonst der Exit-Code des Spiels
-# (bei --mywhoosh der des Skripts).
-# Reines POSIX-sh wie bin/rollout. state/run.pid nennt diesen Prozess, solange das Spiel läuft: Das Aufräumen
-# eines Updates löscht dann keine Version unter dem laufenden Spiel weg. Die Nummer oben nur bei echtem Bedarf erhöhen.
+# Starts a game (concept 5.2), called the same way by the launcher and by Steam: rollout-run <mywhoosh|zwift> [arguments].
+# Further calls: rollout-run --container-check (names the usable container runtime, otherwise message and exit 10),
+# rollout-run --zwift-pull (pulls the configured Zwift image and remembers the consent, only after confirmation by the user) and
+# rollout-run --zwift-status (stdout: runtime=<podman|docker>, ref=<Image:Tag>, image=<present|missing>, consent=<yes|no>; pulls and starts nothing) and
+# rollout-run --zwift-remove (removes the configured image with "rmi" and forgets the consent; only after asking the user, success without an image too) and
+# rollout-run --mywhoosh <install [--hd]|update|uninstall> (sets up, updates or removes MyWhoosh through vendor/mywhoosh.sh; the screen stays awake; if a game is running, exit 1).
+# Exit codes of Rollout itself: 1 already running, 2 usage, 10 no usable container runtime, 11 Zwift image not configured,
+# 12 Zwift image missing (no consent or pull failed), 13 image could not be removed, 127 upstream missing. Otherwise the game's exit code
+# (for --mywhoosh the script's).
+# Plain POSIX sh like bin/rollout. state/run.pid names this process while the game runs: the cleanup
+# of an update then does not delete a version from under the running game. Raise the number above only when really needed.
 if [ "${1:-}" = --bootstrap-selftest ]; then
   n=$(sed -n 's/^# rollout-bootstrap: //p' "$0")
   echo "rollout-bootstrap $n run"
   exit 0
 fi
 
-# Steam setzt LD_PRELOAD und LD_LIBRARY_PATH, die das System-Python des Upstreams stören.
+# Steam sets LD_PRELOAD and LD_LIBRARY_PATH, which disturb the upstream's system Python.
 unset LD_PRELOAD LD_LIBRARY_PATH
 home=$(cd "$(dirname "$0")/.." && pwd)
 state=$home/state
 app=${1:-}
 [ $# -gt 0 ] && shift
 
-# --- Container-Laufzeit für Zwift (netbrain/zwift, Konzept 5.1, E7/E8) -------------------------------------------------------------
-# Erkennt Podman vor Docker und prüft, ob die Laufzeit wirklich nutzbar ist (Dienst läuft, Rechte reichen). Setzt rt auf den
-# Programmnamen oder gibt eine verständliche Meldung aus und liefert 1. Pakete installiert diese Schicht nie (Einrichtung: E8, später).
+# --- Container runtime for Zwift (netbrain/zwift, concept 5.1, E7/E8) -------------------------------------------------------------
+# Detects Podman before Docker and checks whether the runtime is really usable (service running, permissions sufficient). Sets rt to the
+# program name or prints an understandable message and returns 1. This layer never installs packages (setup: E8, later).
 msg() { echo "Rollout: $*" >&2; }
 
-# Ein Aufruf mit Zeitgrenze, damit ein hängender Docker-Dienst den Start nie festhält.
+# A call with a time limit so a hanging Docker service never blocks the start.
 limited() { if command -v timeout >/dev/null 2>&1; then timeout 20 "$@"; else "$@"; fi; }
 
-# rt_probe <Programm>: 0 nutzbar; sonst 1 und rt_why nennt den Grund in einem Satz.
+# rt_probe <program>: 0 usable; otherwise 1 and rt_why gives the reason in one sentence.
 rt_probe() {
   rt_why=
-  if ! command -v "$1" >/dev/null 2>&1; then rt_why="$1 ist nicht installiert."; return 1; fi
+  if ! command -v "$1" >/dev/null 2>&1; then rt_why="$1 is not installed."; return 1; fi
   if rt_out=$(limited "$1" info 2>&1 </dev/null); then return 0; fi
   case $rt_out in
-    *[Pp]ermission\ denied*) rt_why="$1 ist da, aber du hast keine Berechtigung (bei Docker fehlt oft die Gruppe „docker“; Podman braucht keine)." ;;
-    *[Cc]annot\ connect*|*[Ii]s\ the\ docker\ daemon\ running*|*[Nn]o\ such\ file*|*[Cc]onnection\ refused*) rt_why="$1 ist da, aber der Dienst läuft nicht." ;;
-    *subuid*|*subgid*|*newuidmap*|*newgidmap*) rt_why="$1 ist da, aber für deinen Benutzer sind keine Benutzer-IDs für Container eingerichtet (subuid/subgid)." ;;
-    *) rt_why="$1 ist da, meldet aber einen Fehler: $(printf '%s\n' "$rt_out" | sed -n '1p' | cut -c1-160)" ;;
+    *[Pp]ermission\ denied*) rt_why="$1 is installed, but you have no permission (with Docker the group \"docker\" is often missing; Podman needs none)." ;;
+    *[Cc]annot\ connect*|*[Ii]s\ the\ docker\ daemon\ running*|*[Nn]o\ such\ file*|*[Cc]onnection\ refused*) rt_why="$1 is installed, but the service is not running." ;;
+    *subuid*|*subgid*|*newuidmap*|*newgidmap*) rt_why="$1 is installed, but no user IDs for containers are set up for your user (subuid/subgid)." ;;
+    *) rt_why="$1 is installed, but reports an error: $(printf '%s\n' "$rt_out" | sed -n '1p' | cut -c1-160)" ;;
   esac
   return 1
 }
 
-# rt_detect: Podman vor Docker; ROLLOUT_CONTAINER_TOOL=podman|docker legt die Wahl fest.
+# rt_detect: Podman before Docker; ROLLOUT_CONTAINER_TOOL=podman|docker fixes the choice.
 rt_detect() {
   rt=
   case ${ROLLOUT_CONTAINER_TOOL:-} in
     '') rt_list="podman docker" ;;
     podman|docker) rt_list=$ROLLOUT_CONTAINER_TOOL ;;
-    *) msg "ROLLOUT_CONTAINER_TOOL muss podman oder docker sein, nicht „$ROLLOUT_CONTAINER_TOOL“."; return 1 ;;
+    *) msg "ROLLOUT_CONTAINER_TOOL must be podman or docker, not \"$ROLLOUT_CONTAINER_TOOL\"."; return 1 ;;
   esac
   rt_notes=
   for rt_try in $rt_list; do
@@ -60,35 +60,35 @@ rt_detect() {
     rt_notes="$rt_notes
   - $rt_why"
   done
-  msg "Zwift läuft in einem Container, aber es gibt keine nutzbare Container-Laufzeit.$rt_notes"
-  echo "  Gebraucht wird Podman (empfohlen) oder Docker. Auf Bazzite richtet der Einrichtungs-Assistent das später ein; bis dahin im Desktop-Modus einrichten." >&2
+  msg "Zwift runs in a container, but there is no usable container runtime.$rt_notes"
+  echo "  Podman (recommended) or Docker is required. On Bazzite the setup assistant will do this later; until then set it up in Desktop Mode." >&2
   return 1
 }
 
-# zwift_config: liest Image, Tag und Digest. Ein Tag ist Pflicht und nie „latest“ (kein stilles Mitwandern des Images).
-# Quellen: Umgebung (ROLLOUT_ZWIFT_IMAGE, _TAG, _DIGEST), sonst zwift_tag und zwift_digest in config.toml.
+# zwift_config: reads image, tag and digest. A tag is mandatory and never "latest" (no silent drifting of the image).
+# Sources: environment (ROLLOUT_ZWIFT_IMAGE, _TAG, _DIGEST), otherwise zwift_tag and zwift_digest in config.toml.
 conf=${ROLLOUT_CONFIG_HOME:-$HOME/.config/rollout}/config.toml
 conf_get() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$conf" 2>/dev/null | sed -n '1p'; }
 zwift_config() {
   zw_image=${ROLLOUT_ZWIFT_IMAGE:-docker.io/netbrain/zwift}
   zw_tag=${ROLLOUT_ZWIFT_TAG:-$(conf_get zwift_tag)}
   zw_digest=${ROLLOUT_ZWIFT_DIGEST:-$(conf_get zwift_digest)}
-  case $zw_image in ''|[!a-z0-9]*|*..*|*[!a-z0-9./_:-]*) msg "ROLLOUT_ZWIFT_IMAGE ist ungültig: „$zw_image“."; return 1 ;; esac
+  case $zw_image in ''|[!a-z0-9]*|*..*|*[!a-z0-9./_:-]*) msg "ROLLOUT_ZWIFT_IMAGE is invalid: \"$zw_image\"."; return 1 ;; esac
   case $zw_tag in
-    '') msg "Kein Zwift-Image eingestellt. Trage in $conf die Version von netbrain/zwift ein, zum Beispiel: zwift_tag = \"1.2.3\" (nicht „latest“)."; return 1 ;;
-    latest|-*|.*|*[!A-Za-z0-9_.-]*) msg "Der Zwift-Tag „$zw_tag“ ist nicht zulässig. Erlaubt ist eine feste Version, nie „latest“."; return 1 ;;
+    '') msg "No Zwift image configured. Enter the netbrain/zwift version in $conf, for example: zwift_tag = \"1.2.3\" (not \"latest\")."; return 1 ;;
+    latest|-*|.*|*[!A-Za-z0-9_.-]*) msg "The Zwift tag \"$zw_tag\" is not allowed. A fixed version is required, never \"latest\"."; return 1 ;;
   esac
   if [ -n "$zw_digest" ]; then
     zw_hex=${zw_digest#sha256:}
     case $zw_digest in sha256:*) ;; *) zw_hex=x ;; esac
     case $zw_hex in *[!0-9a-f]*) zw_hex=x ;; esac
-    [ ${#zw_hex} = 64 ] || { msg "zwift_digest muss die Form sha256:<64 Hex-Zeichen> haben."; return 1; }
+    [ ${#zw_hex} = 64 ] || { msg "zwift_digest must have the form sha256:<64 hex characters>."; return 1; }
   fi
   zw_ref=$zw_image:$zw_tag
   zw_want=$zw_ref${zw_digest:+@$zw_digest}
 }
 
-# zwift_have: 0, wenn das Image lokal liegt (bei festem Digest: genau dieses).
+# zwift_have: 0 if the image exists locally (with a fixed digest: exactly that one).
 zwift_have() {
   "$rt" image inspect "$zw_ref" >/dev/null 2>&1 </dev/null || return 1
   [ -z "$zw_digest" ] && return 0
@@ -96,54 +96,54 @@ zwift_have() {
   return 1
 }
 
-# zwift_pull: zieht das Image und merkt sich die Zustimmung für genau diese Angabe. Nur nach Bestätigung durch den Nutzer aufrufen.
+# zwift_pull: pulls the image and remembers the consent for exactly this reference. Call only after confirmation by the user.
 zwift_pull() {
-  msg "Lade $zw_want (mehrere GB, das dauert) …"
+  msg "Pulling $zw_want (several GB, this takes a while) …"
   if [ -n "$zw_digest" ]; then
     "$rt" pull "$zw_image@$zw_digest" </dev/null && "$rt" tag "$zw_image@$zw_digest" "$zw_ref" </dev/null
   else
     "$rt" pull "$zw_ref" </dev/null
-  fi || { msg "Das Zwift-Image konnte nicht geladen werden (Netz, Speicherplatz oder Anmeldung bei der Registry)."; return 1; }
+  fi || { msg "The Zwift image could not be pulled (network, disk space or registry login)."; return 1; }
   mkdir -p "$state" && printf '%s\n' "$zw_want" > "$state/zwift-image-ok"
 }
 
-# zwift_remove: entfernt das eingestellte Image (nur die Marke Image:Tag, ein fester Digest hängt am selben Image) und vergisst die Zustimmung.
-# Ein Image, das nicht da ist, gilt als entfernt. Die Container-Laufzeit und netbrains Einstellungen bleiben.
+# zwift_remove: removes the configured image (only the image:tag reference; a fixed digest belongs to the same image) and forgets the consent.
+# An image that is not there counts as removed. The container runtime and netbrain's settings stay.
 zwift_remove() {
   if "$rt" image inspect "$zw_ref" >/dev/null 2>&1 </dev/null; then
-    "$rt" rmi "$zw_ref" </dev/null || { msg "Das Zwift-Image $zw_ref konnte nicht entfernt werden (läuft noch ein Container damit?)."; return 1; }
+    "$rt" rmi "$zw_ref" </dev/null || { msg "The Zwift image $zw_ref could not be removed (is a container still using it?)."; return 1; }
   fi
   rm -f "$state/zwift-image-ok"
 }
 
-# zwift_prepare: Laufzeit, Image und Umgebung für netbrains zwift.sh. Gezogen wird nur mit Zustimmung für genau diese Angabe.
+# zwift_prepare: runtime, image and environment for netbrain's zwift.sh. Pulling happens only with consent for exactly this reference.
 zwift_prepare() {
   rt_detect || return 10
   zwift_config || return 11
   if ! zwift_have; then
     if [ "$(sed -n '1p' "$state/zwift-image-ok" 2>/dev/null)" != "$zw_want" ]; then
-      msg "Das Zwift-Image $zw_want ist noch nicht geladen. Es ist mehrere GB groß und wird nur nach deiner Bestätigung geladen: im Launcher bestätigen oder von Hand $0 --zwift-pull."
+      msg "The Zwift image $zw_want has not been pulled yet. It is several GB in size and is pulled only after your confirmation: confirm in the launcher or run $0 --zwift-pull by hand."
       return 12
     fi
     zwift_pull || return 12
   fi
-  # DONT_UPDATE: Das Image ist festgelegt, zwift.sh zieht und prüft nichts selbst. ZWIFT_FG: Container im Vordergrund, damit Steam das Ende sieht.
+  # DONT_UPDATE: the image is fixed, zwift.sh pulls and checks nothing itself. ZWIFT_FG: container in the foreground so Steam sees the end.
   export CONTAINER_TOOL=$rt IMAGE=$zw_image VERSION=$zw_tag DONT_UPDATE=1 ZWIFT_FG=1
-  # Host-Netz: Die Zwift Companion App findet das Spiel per Broadcast im WLAN und kommt im Bridge-Netz nicht hinein (am Ally belegt: mit host
-  # verbindet sich Zwift zum Telefon, mit bridge nicht). Wer etwas anderes will, setzt NETWORKING selbst.
+  # Host network: the Zwift Companion app finds the game by broadcast on the Wi-Fi and cannot get into the bridge network (confirmed on the Ally: with host
+  # Zwift connects to the phone, with bridge it does not). Anyone who wants something else sets NETWORKING themselves.
   export NETWORKING=${NETWORKING:-host}
-  # zwift.sh bricht mit „USER: unbound variable“ ab, wenn USER fehlt (am Ally beim Probelauf mit leerer Umgebung aufgefallen).
+  # zwift.sh aborts with "USER: unbound variable" if USER is missing (noticed on the Ally during a trial run with an empty environment).
   [ -n "${USER:-}" ] || { USER=$(id -un 2>/dev/null) || USER=; export USER; }
-  # Name des Containers wie in zwift.sh (--name zwift-${ZWIFT_RIDER:-$USER}); beim Beenden stoppt der Starter ihn damit (siehe forward).
-  # Setzt der Nutzer ZWIFT_RIDER erst in netbrains eigener config, kennt der Starter den Namen nicht und stoppt nichts (bekannte Grenze).
+  # Container name as in zwift.sh (--name zwift-${ZWIFT_RIDER:-$USER}); on quit the starter stops it by that name (see forward).
+  # If the user sets ZWIFT_RIDER only in netbrain's own config, the starter does not know the name and stops nothing (known limitation).
   zw_name=zwift-${ZWIFT_RIDER:-$USER}
 }
 
-# mw_hd: nur die HD-Ausgabe ist installiert. Steam ruft ohne Argumente auf, und mywhoosh.sh erkennt die Ausgabe aus dem Vendor-Ordner nicht von selbst.
+# mw_hd: only the HD edition is installed. Steam calls without arguments, and mywhoosh.sh does not detect the edition on its own from the vendor directory.
 mw_hd() { [ -z "${MYWHOOSH_ROOT:-}" ] && [ ! -f "$HOME/Games/mywhoosh-linux/edition" ] && [ -f "$HOME/Games/mywhoosh-hd-linux/edition" ]; }
 mw_setup=
 
-# Upstream je App: MyWhoosh liegt im Launcher-Release, Zwift ist das Startskript von netbrain/zwift unter zwift/<sha>/ (ROLLOUT_ZWIFT_SCRIPT ersetzt es).
+# Upstream per app: MyWhoosh is part of the launcher release, Zwift is netbrain/zwift's start script under zwift/<sha>/ (ROLLOUT_ZWIFT_SCRIPT replaces it).
 case $app in
   --container-check) rt_detect || exit 10; echo "$rt"; exit 0 ;;
   --zwift-status)
@@ -159,19 +159,19 @@ case $app in
     case $mw_act in
       install) ;;
       update|uninstall) mw_hd && set -- "$@" --hd ;;
-      *) echo "Aufruf: rollout-run --mywhoosh install [--hd]|update|uninstall" >&2; exit 2 ;;
+      *) echo "Usage: rollout-run --mywhoosh install [--hd]|update|uninstall" >&2; exit 2 ;;
     esac
     up=$home/current/vendor/mywhoosh.sh; mw_setup=1 ;;
   mywhoosh) up=$home/current/vendor/mywhoosh.sh; if mw_hd; then set -- run --hd "$@"; else set -- run "$@"; fi ;;
   zwift) up=${ROLLOUT_ZWIFT_SCRIPT:-$(ls -td "$home"/zwift/*/zwift.sh 2>/dev/null | head -n 1)} ;;
-  *) echo "Aufruf: rollout-run mywhoosh|zwift" >&2; exit 2 ;;
+  *) echo "Usage: rollout-run mywhoosh|zwift" >&2; exit 2 ;;
 esac
 [ -n "${ROLLOUT_RUN_UPSTREAM:-}" ] && up=$ROLLOUT_RUN_UPSTREAM
-[ -n "$up" ] && [ -x "$up" ] || { echo "Rollout: Upstream für $app ist nicht installiert" >&2; exit 127; }
+[ -n "$up" ] && [ -x "$up" ] || { echo "Rollout: upstream for $app is not installed" >&2; exit 127; }
 if [ "$app" = zwift ]; then zwift_prepare || exit $?; fi
-# MyWhoosh bekommt das virtuelle Gamepad von Steam Input nicht: Rollout gibt es als Tastatur und Maus weiter (gamepad-bridge.ts), und die
-# Oberfläche des Spiels zeigt beim Navigieren per Gamepad keinen Fokus (A beendete es sogar). 045e:028e ist die Kennung, unter der Steam sein Gamepad meldet
-# (Wine liest es über SDL). Nur mit xdotool (sonst bliebe das Spiel ganz ohne Eingabe), nie bei ROLLOUT_MYWHOOSH_PAD=off, und eine eigene Vorgabe gilt.
+# MyWhoosh does not get the virtual gamepad of Steam Input: Rollout forwards it as keyboard and mouse (gamepad-bridge.ts), and the
+# game's UI shows no focus when navigating by gamepad (A even quit it). 045e:028e is the ID under which Steam reports its gamepad
+# (Wine reads it via SDL). Only with xdotool (otherwise the game would have no input at all), never with ROLLOUT_MYWHOOSH_PAD=off, and a user-set value wins.
 if [ "$app" = mywhoosh ] && [ "${ROLLOUT_MYWHOOSH_PAD:-}" != off ] && [ -z "${SDL_GAMECONTROLLER_IGNORE_DEVICES:-}" ] && command -v xdotool >/dev/null 2>&1; then
   export SDL_GAMECONTROLLER_IGNORE_DEVICES=0x045e/0x028e
 fi
@@ -180,10 +180,10 @@ mkdir -p "$state"
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
 reaper=
 if [ -n "$mw_setup" ]; then
-  # Einrichten ist kein Spiel und nimmt run.pid nicht, darf aber nie unter einem laufenden Spiel arbeiten (uninstall beendet dessen Wine-Server).
+  # Setup is not a game and does not take run.pid, but must never work under a running game (uninstall ends its Wine server).
   old=$(sed -n '1p' "$state/run.pid" 2>/dev/null)
   if alive "$old"; then
-    echo "Rollout: Es läuft schon eine App (Prozess $old)." >&2
+    echo "Rollout: an app is already running (process $old)." >&2
     exit 1
   fi
   trap '[ -n "$reaper" ] && kill "$reaper" 2>/dev/null' EXIT
@@ -191,7 +191,7 @@ else
   if ! ( set -C; echo $$ > "$state/run.pid" ) 2>/dev/null; then
     old=$(sed -n '1p' "$state/run.pid" 2>/dev/null)
     if alive "$old"; then
-      echo "Rollout: Es läuft schon eine App (Prozess $old). Trainer und Bluetooth lassen sich nicht teilen." >&2
+      echo "Rollout: an app is already running (process $old). Trainer and Bluetooth cannot be shared." >&2
       exit 1
     fi
     echo $$ > "$state/run.pid.tmp" && mv -f "$state/run.pid.tmp" "$state/run.pid"
@@ -199,18 +199,18 @@ else
   trap '[ "$(sed -n "1p" "$state/run.pid" 2>/dev/null)" = "$$" ] && rm -f "$state/run.pid"; [ -n "$reaper" ] && kill "$reaper" 2>/dev/null' EXIT
 fi
 
-# INT und HUP gehen als TERM weiter, damit das Spiel sich beenden kann. Bei Zwift reicht das nicht: Der Container hängt nicht am
-# Prozessbaum von zwift.sh, und sein PID 1 ignoriert TERM. Der Starter stoppt ihn deshalb selbst (Dienst „podman stop“, nach 10 s KILL)
-# und wartet dafür höchstens 20 s; ein Container dieses Namens, der noch nicht oder nicht mehr läuft, ist kein Fehler.
-# MyWhoosh (Spiel und Einrichtung) läuft in einer eigenen Sitzung (setsid, falls da): Wine, umu und der Bluetooth-Helfer hängen nicht
-# am Prozessbaum des Skripts und blieben bei einem TERM an das Skript allein als Waisen zurück. Beim Beenden bekommt die ganze Gruppe
-# TERM, und was nach 12 s noch lebt, KILL.
+# INT and HUP are passed on as TERM so the game can quit. For Zwift that is not enough: the container is not part of
+# zwift.sh's process tree, and its PID 1 ignores TERM. The starter therefore stops it itself (via "podman stop", KILL after 10 s)
+# and waits at most 20 s for that; a container of that name that is not yet or no longer running is not an error.
+# MyWhoosh (game and setup) runs in its own session (setsid, if available): Wine, umu and the Bluetooth helper are not part of
+# the script's process tree and would be left behind as orphans after a TERM to the script alone. On quit the whole group gets
+# TERM, and whatever still lives after 12 s gets KILL.
 grp=
 if { [ "$app" = mywhoosh ] || [ -n "$mw_setup" ]; } && command -v setsid >/dev/null 2>&1; then grp=1; fi
-# zw_quit: Zwift geordnet beenden. Netbrains Skript kopiert Zwifts Einstellungen samt Anmeldung (AppData) erst ins Volume zwischen Läufen, wenn
-# ZwiftApp.exe sich beendet hat. Ein „podman stop“ allein ließ den Container nach 10 s hart beenden, und die Anmeldung ging verloren.
-# Erst höflich (taskkill), nach ROLLOUT_ZWIFT_QUIT_WAIT s (8) hart (taskkill /f; das Skript kopiert dann trotzdem und beendet sich, es prüft alle 5 s),
-# dann bis ROLLOUT_ZWIFT_KILL_WAIT s (15) warten; was bleibt, stoppt der Aufrufer mit „stop“.
+# zw_quit: quit Zwift in an orderly way. Netbrain's script copies Zwift's settings including the login (AppData) into the volume between runs only when
+# ZwiftApp.exe has exited. A "podman stop" alone made the container end hard after 10 s, and the login was lost.
+# First politely (taskkill), after ROLLOUT_ZWIFT_QUIT_WAIT s (8) hard (taskkill /f; the script then still copies and exits, it checks every 5 s),
+# then wait up to ROLLOUT_ZWIFT_KILL_WAIT s (15); whatever remains, the caller stops with "stop".
 zw_gone() { [ -z "$(limited "$rt" ps -q --filter "name=^${zw_name}\$" 2>/dev/null </dev/null)" ]; }
 zw_wait_gone() { zw_n=$1; while [ "$zw_n" -gt 0 ]; do zw_gone && return 0; sleep 1; zw_n=$((zw_n - 1)); done; zw_gone; }
 zw_quit() {
@@ -238,10 +238,10 @@ forward() {
 }
 trap forward TERM INT HUP
 
-# Bildschirm wachhalten, wo systemd-inhibit da ist und es darf (in einer SSH-Sitzung verweigert polkit es): vorher ausprobieren,
-# damit ein Fehler der Sperre nie das Spiel verhindert.
-why="$app läuft"
-[ -n "$mw_setup" ] && why="MyWhoosh wird eingerichtet"
+# Keep the screen awake where systemd-inhibit exists and is allowed (in an SSH session polkit refuses it): try it first,
+# so a failure of the inhibitor never prevents the game.
+why="$app is running"
+[ -n "$mw_setup" ] && why="MyWhoosh is being set up"
 inhibit() { systemd-inhibit --what=idle:sleep --who=Rollout --why="$why" "$@"; }
 if [ -z "${ROLLOUT_RUN_NO_INHIBIT:-}" ] && command -v systemd-inhibit >/dev/null 2>&1 && inhibit true >/dev/null 2>&1; then
   set -- systemd-inhibit --what=idle:sleep --who=Rollout --why="$why" "$up" "$@"
@@ -253,8 +253,8 @@ pid=$!
 while :; do
   wait "$pid"; code=$?
   if ! kill -0 "$pid" 2>/dev/null; then
-    # Ein Signal unterbrach das Warten, und das Spiel endete, während forward lief (podman stop dauert): den echten Exit-Code holen.
-    # War es schon abgeholt (127), gilt der erste Wert.
+    # A signal interrupted the wait and the game ended while forward was running (podman stop takes a while): fetch the real exit code.
+    # If it was already collected (127), the first value counts.
     if [ "$sig" = 1 ] && [ "$code" -gt 128 ]; then wait "$pid" 2>/dev/null; again=$?; [ "$again" = 127 ] || code=$again; fi
     break
   fi

@@ -1,12 +1,12 @@
-// Bluetooth über bluetoothctl (BlueZ): Adapter prüfen und Trainer sowie Herzfrequenz-Gurte in der Nähe finden.
-// Rollout koppelt hier nichts. Gefunden wird, was gerade sendet und einen passenden Dienst anbietet.
+// Bluetooth via bluetoothctl (BlueZ): check the adapter and find trainers and heart-rate straps nearby.
+// Rollout pairs nothing here. What is found is whatever is currently broadcasting and offers a matching service.
 import { spawn, spawnSync } from 'node:child_process';
 import type { Sensor } from '../shared/api';
 
 export interface BluetoothService {
-  /** „ready“, wenn ein eingeschalteter Adapter da ist */
+  /** "ready" if a powered-on adapter exists */
   adapter(): Promise<'ready' | 'problem'>;
-  /** Sucht `seconds` Sekunden lang und meldet jeden Fund sofort. */
+  /** Scans for `seconds` seconds and reports every find immediately. */
   scan(onFound: (sensor: Sensor) => void, seconds: number): Promise<void>;
 }
 
@@ -16,12 +16,12 @@ const HEART_RATE = '0000180d';
 
 const strip = (text: string): string => text.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '');
 
-/** Adressen aus der Ausgabe von `bluetoothctl devices`. */
+/** Addresses from the output of `bluetoothctl devices`. */
 export function parseDevices(text: string): string[] {
   return [...strip(text).matchAll(/^Device ((?:[0-9A-F]{2}:){5}[0-9A-F]{2})/gim)].map((m) => m[1].toUpperCase());
 }
 
-/** Macht aus der Ausgabe von `bluetoothctl info <Adresse>` einen Sensor, sofern das Gerät gerade sendet und passt. */
+/** Turns the output of `bluetoothctl info <address>` into a sensor, provided the device is currently broadcasting and fits. */
 export function classify(address: string, info: string): Sensor | null {
   const text = strip(info);
   if (!/^\s*RSSI:/m.test(text)) return null;
@@ -39,7 +39,7 @@ const ctl = (args: string[]): string => {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Wie `ctl`, aber ohne den Hauptprozess zu blockieren: Der Zustand wird bei jedem Öffnen des App-Menüs und vor jedem Start abgefragt. */
+/** Like `ctl`, but without blocking the main process: the state is queried every time the app menu opens and before every start. */
 const ctlAsync = (args: string[]): Promise<string> => new Promise((resolve) => {
   let out = '';
   const child = spawn('bluetoothctl', args, { stdio: ['ignore', 'pipe', 'ignore'] });
@@ -75,7 +75,7 @@ export const realBluetooth: BluetoothService = {
   }
 };
 
-/** Attrappe für Tests und die Simulation: findet nach kurzer Zeit einen Trainer und einen Gurt. */
+/** Fake for tests and the simulation: finds a trainer and a strap after a short time. */
 export class FakeBluetooth implements BluetoothService {
   constructor(private readonly problem: boolean) {}
   async adapter(): Promise<'ready' | 'problem'> { return this.problem ? 'problem' : 'ready'; }

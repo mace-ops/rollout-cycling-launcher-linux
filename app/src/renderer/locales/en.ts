@@ -1,5 +1,5 @@
-// Englisch ist die Quellsprache. Jede andere Sprache muss dieselben Schlüssel liefern (Typ `Messages`).
-// Platzhalter: {name}. Einige Texte enthalten <strong>, die Texte sind eigene und werden nicht escaped.
+// English is the source language. Every other language must provide the same keys (type `Messages`).
+// Placeholders: {name}. Some texts contain <strong>; the texts are our own and are not escaped.
 export const en = {
   'lang.name': 'English',
   'lang.auto': 'Automatic',

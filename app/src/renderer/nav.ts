@@ -1,5 +1,5 @@
-// Bedienung per Tastatur und Controller: Pfeile, Steuerkreuz und linker Stick wechseln zwischen
-// allen Bedienelementen, A oder Enter löst aus, B oder Esc geht zurück, rechter Stick scrollt.
+// Operation by keyboard and controller: arrows, d-pad and left stick move between
+// all controls, A or Enter activates, B or Esc goes back, right stick scrolls.
 
 export type Dir = 'up' | 'down' | 'left' | 'right';
 
@@ -17,7 +17,7 @@ export function focusables(scope: ParentNode): HTMLElement[] {
   });
 }
 
-/** Der Hauptknopf, sonst das erste Element. */
+/** The primary button, otherwise the first element. */
 export function focusInitial(scope: ParentNode): void {
   const items = focusables(scope);
   const target = items.find((el) => el.matches('[data-initial]')) ?? items.find((el) => el.matches('.btn.primary')) ?? items[0];
@@ -31,9 +31,9 @@ function gap(aMin: number, aMax: number, bMin: number, bMax: number): number {
 }
 
 /**
- * Nach Maus oder Touch blendet der Browser den Fokusring aus, auch wenn Tasten oder Controller den
- * Fokus setzen. Der Controller löst keine Tastenereignisse aus, darum steuert die Klasse `nav` den Ring.
- * Gibt true zurück, wenn der Ring gerade erst sichtbar wurde.
+ * After mouse or touch the browser hides the focus ring, even when keys or controller set the
+ * focus. The controller triggers no key events, so the `nav` class controls the ring.
+ * Returns true if the ring just became visible.
  */
 let navMode = false;
 function enterNavMode(): boolean {
@@ -50,7 +50,7 @@ export function move(scope: ParentNode, dir: Dir, reveal = false): void {
     focusInitial(scope);
     return;
   }
-  // Erster Druck nach Touch oder Maus zeigt nur, wo der Fokus liegt.
+  // The first press after touch or mouse only shows where the focus is.
   if (reveal) return;
   const c = current.getBoundingClientRect();
   const cx = c.left + c.width / 2;
@@ -77,13 +77,13 @@ export function move(scope: ParentNode, dir: Dir, reveal = false): void {
 }
 
 export interface NavHooks {
-  /** Bereich, in dem die Bedienelemente liegen: der Dialog, sonst die Ansicht. */
+  /** Area in which the controls live: the dialog, otherwise the view. */
   scope(): ParentNode;
   modalOpen(): boolean;
   back(): void;
   /**
-   * Nimmt Rollout Gamepad-Eingaben an? Läuft ein Spiel im Vordergrund, bekommen Spiel und Rollout dasselbe virtuelle Gamepad von Steam
-   * Input: Ein A im Spiel drückte sonst auch in Rollout den Knopf „Spiel beenden“ unter dem Fenster. Ohne Angabe: ja.
+   * Does Rollout accept gamepad input? If a game runs in the foreground, game and Rollout get the same virtual gamepad from Steam
+   * Input: an A in the game would otherwise also press the "Quit game" button under the window in Rollout. Default: yes.
    */
   padEnabled?(): boolean;
 }
@@ -107,7 +107,7 @@ export function initNav(hooks: NavHooks): void {
       return;
     }
     if (event.key === 'Tab' && hooks.modalOpen()) {
-      // Im Dialog bleibt der Fokus eingesperrt.
+      // Inside the dialog the focus stays trapped.
       event.preventDefault();
       const items = focusables(hooks.scope());
       if (!items.length) return;
@@ -144,7 +144,7 @@ export function initNav(hooks: NavHooks): void {
   };
 
   const poll = (now: number): void => {
-    // Zuerst den nächsten Takt anmelden: Ein Fehler in einem Durchlauf darf die Abfrage nie beenden (so fiel der Controller einmal ganz aus).
+    // Schedule the next tick first: an error in one pass must never end the polling (this once made the controller fail completely).
     requestAnimationFrame(poll);
     scrollAxis = 0;
     const enabled = hooks.padEnabled?.() ?? true;
@@ -152,7 +152,7 @@ export function initNav(hooks: NavHooks): void {
       if (!pad) continue;
       const button = (i: number): boolean => !!pad.buttons[i]?.pressed;
       if (!enabled) {
-        // Tasten, die beim Wiedereinschalten noch gedrückt sind, lösen nichts aus.
+        // Buttons still held down when re-enabled trigger nothing.
         for (const i of [0, 1]) pressedBefore.set(pad.index * 100 + i, button(i));
         held.clear();
         continue;

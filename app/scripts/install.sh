@@ -1,21 +1,21 @@
 #!/bin/sh
-# Legt Rollout an den festen Pfad ~/.local/share/rollout (oder $ROLLOUT_HOME), Aufbau nach Konzept 4.3:
-# bin/rollout (Wächter), bin/rollout-run (Spielstart), versions/<version>/ (dist, vendor, bootstrap), current, electron/<version>/, state/.
-# Der Pfad bin/rollout ändert sich nie, deshalb bleiben Steam-Eintrag, Artwork und Spielzeit bei Updates erhalten.
-# Ein alter Aufbau (app/dist, app/electron) zieht beim nächsten Lauf um und behält sein Electron.
-# Aufruf nach `npm run build`: scripts/install.sh [Electron-Ordner]. Rollout dabei beenden.
-# Ohne Angabe bleibt ein vorhandenes Electron, sonst wird node_modules/electron/dist genommen.
-# REPLACE_ELECTRON=1 nimmt immer den angegebenen Ordner.
+# Installs Rollout at the fixed path ~/.local/share/rollout (or $ROLLOUT_HOME), layout per concept 4.3:
+# bin/rollout (watcher), bin/rollout-run (game start), versions/<version>/ (dist, vendor, bootstrap), current, electron/<version>/, state/.
+# The path bin/rollout never changes, so the Steam entry, artwork and play time are preserved across updates.
+# An old layout (app/dist, app/electron) is migrated on the next run and keeps its Electron.
+# Usage after `npm run build`: scripts/install.sh [Electron directory]. Quit Rollout first.
+# Without an argument an existing Electron stays, otherwise node_modules/electron/dist is used.
+# REPLACE_ELECTRON=1 always takes the given directory.
 set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 home="${ROLLOUT_HOME:-$HOME/.local/share/rollout}"
 given="${1:-${ELECTRON_DIR:-}}"
 
-[ -d "$here/dist" ] || { echo "dist/ fehlt, erst 'npm run build' ausführen." >&2; exit 1; }
+[ -d "$here/dist" ] || { echo "dist/ is missing, run 'npm run build' first." >&2; exit 1; }
 
 version=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$here/package.json" | head -n 1)
-case $version in ''|.*|*[!0-9a-zA-Z.+-]*) echo "Ungültige Version in package.json: '$version'" >&2; exit 1 ;; esac
+case $version in ''|.*|*[!0-9a-zA-Z.+-]*) echo "Invalid version in package.json: '$version'" >&2; exit 1 ;; esac
 
 electron_version() {
   if [ -r "$1/version" ]; then head -n 1 "$1/version"
@@ -24,7 +24,7 @@ electron_version() {
 
 mkdir -p "$home/bin" "$home/versions" "$home/electron" "$home/state"
 
-# Welches Electron: angegebenes, sonst vorhandenes, sonst das aus node_modules.
+# Which Electron: the given one, otherwise the existing one, otherwise the one from node_modules.
 source_dir=
 if [ -n "$given" ] || [ "${REPLACE_ELECTRON:-0}" = 1 ]; then
   source_dir="${given:-$here/node_modules/electron/dist}"
@@ -36,9 +36,9 @@ else
   source_dir="$here/node_modules/electron/dist"
 fi
 if [ -n "$source_dir" ]; then
-  [ -x "$source_dir/electron" ] || { echo "Electron nicht gefunden: $source_dir" >&2; echo "Ordner mit der Datei 'electron' als Argument angeben." >&2; exit 1; }
+  [ -x "$source_dir/electron" ] || { echo "Electron not found: $source_dir" >&2; echo "Pass the directory containing the file 'electron' as an argument." >&2; exit 1; }
   runtime=$(electron_version "$source_dir")
-  case $runtime in ''|.*|*[!0-9a-zA-Z.+-]*) echo "Electron-Version nicht lesbar: '$runtime'" >&2; exit 1 ;; esac
+  case $runtime in ''|.*|*[!0-9a-zA-Z.+-]*) echo "Electron version not readable: '$runtime'" >&2; exit 1 ;; esac
   if [ ! -x "$home/electron/$runtime/electron" ] || [ "${REPLACE_ELECTRON:-0}" = 1 ]; then
     rm -rf "$home/electron/.new"
     if [ "$source_dir" = "$home/app/electron" ]; then mv "$source_dir" "$home/electron/.new"
@@ -48,7 +48,7 @@ if [ -n "$source_dir" ]; then
   fi
 fi
 
-# Neue Version bereitlegen, dann current per rename umlegen.
+# Stage the new version, then switch current by rename.
 new="$home/versions/.new-$$"
 rm -rf "$new"
 mkdir -p "$new/bootstrap"
@@ -68,7 +68,7 @@ ln -s "versions/$version" "$home/.current.new"
 mv -T "$home/.current.new" "$home/current"
 rm -rf "$home/versions/.old-$$"
 
-# Alter Aufbau: nur noch Reste.
+# Old layout: only leftovers.
 rm -rf "$home/app"
 
 cp "$here/dist/renderer/assets/brand/logo.png" "$home/icon.png"
@@ -79,5 +79,5 @@ cp "$here/scripts/bin-rollout-run.sh" "$home/bin/.rollout-run.new"
 chmod +x "$home/bin/.rollout-run.new"
 mv -f "$home/bin/.rollout-run.new" "$home/bin/rollout-run"
 
-echo "Rollout $version liegt in $home (Electron $runtime)"
+echo "Rollout $version is in $home (Electron $runtime)"
 echo "Steam-Ziel: $home/bin/rollout (Spiele: $home/bin/rollout-run)"

@@ -1,52 +1,52 @@
-# Rollout-Website
+# Rollout website
 
-Statische, mehrsprachige Seite für GitHub Pages: <https://mace-ops.github.io/rollout-cycling-launcher-linux/>. Sprachen: en, de, es, fr, it, pt, nl, pl (Pfade `/`, `/de/`, `/es/` …).
-Jede Seite ist vorgerendert und ohne JavaScript lesbar; das Skript (`src/site.js`) ist nur Komfort (Theme-Umschalter, Karussell, Feature-Bühne, Einblenden, Sprachhinweis).
-Keine externen Skripte, keine Google Fonts, kein Tracking. Kein Actions-Workflow, die Veröffentlichung läuft lokal über `deploy.sh`.
+Static, multilingual site for GitHub Pages: <https://mace-ops.github.io/rollout-cycling-launcher-linux/>. Languages: en, de, es, fr, it, pt, nl, pl (paths `/`, `/de/`, `/es/` …).
+Every page is pre-rendered and readable without JavaScript; the script (`src/site.js`) is only a convenience (theme switch, carousel, feature stage, fade-in, language hint).
+No external scripts, no Google Fonts, no tracking. No Actions workflow; publishing runs locally through `deploy.sh`.
 
-## Aufbau
+## Layout
 
 ```text
-src/page.html      eine Vorlage für alle Sprachen ({{t:key}} Text, {{h:key}} Text mit HTML, {{v:name}} Wert des Builders, <!--each:name--> Schleifen)
-src/site.css       Gestaltung („clean“: flache Flächen, eine Akzentfarbe), hell/dunkel nach System
-src/site.js        Komfort-Skript
-src/bg.js          animierter Hintergrund „Two riders“ (Canvas, Punktraster, pausiert bei verstecktem Tab, steht still bei reduzierter Bewegung)
-src/404.html       404-Seite (alle Sprachen eingebettet, das Skript wählt nach Pfad)
-i18n/<lang>.json   Texte je Sprache; en.json ist die Quelle
-static/            Schriften (Archivo, Figtree samt OFL), Favicon, Screenshots je Sprache, Schrift-Instanzen für die OG-Bilder
-build.mjs          baut nach dist/ (Node ohne Framework, sharp für Bilder)
-check.mjs          Prüfskript (npm test)
-deploy.sh          baut, prüft, veröffentlicht auf den Branch gh-pages
-scripts/process-shots.mjs   Rohaufnahmen → static/screens und media
+src/page.html      one template for all languages ({{t:key}} text, {{h:key}} text with HTML, {{v:name}} builder value, <!--each:name--> loops)
+src/site.css       styling ("clean": flat surfaces, one accent colour), light/dark by system
+src/site.js        convenience script
+src/bg.js          animated "Two riders" background (canvas, dot grid, pauses on a hidden tab, still with reduced motion)
+src/404.html       404 page (all languages embedded, the script picks by path)
+i18n/<lang>.json   texts per language; en.json is the source
+static/            fonts (Archivo, Figtree with OFL), favicon, screenshots per language, font instances for the OG images
+build.mjs          builds into dist/ (plain Node, sharp for images)
+check.mjs          check script (npm test)
+deploy.sh          builds, checks, publishes to the gh-pages branch
+scripts/process-shots.mjs   raw captures → static/screens and media
 ```
 
-`npm test` baut und prüft. Der Build bricht ab, wenn in einer Sprache ein Schlüssel fehlt oder übrig ist, ein Platzhalter von en abweicht oder ein Schlüssel aus en.json nirgends benutzt wird.
-`check.mjs` prüft: alle Seiten und Dateien vorhanden, `<html lang>`, Titel ≤ 60 und Beschreibung ≤ 155 Zeichen, genau ein `h1`, canonical, hreflang wechselseitig inkl. `x-default`, Open Graph und
-Twitter, JSON-LD parsebar (SoftwareApplication mit Version aus `app/package.json`, FAQPage identisch zum sichtbaren Text), keine toten Links und Anker, Bilder mit Größe und Alt-Text, genau ein eager-Bild
-(LCP), keine externen Ressourcen, Marken-Hinweis, kein CLI-Befehl, keine Erwähnung von KI, sitemap und robots.
+`npm test` builds and checks. The build aborts if a language has a missing or extra key, a placeholder differs from en, or a key from en.json is not used anywhere.
+`check.mjs` checks: all pages and files present, `<html lang>`, title ≤ 60 and description ≤ 155 characters, exactly one `h1`, canonical, reciprocal hreflang including `x-default`, Open Graph and
+Twitter, JSON-LD parsable (SoftwareApplication with the version from `app/package.json`, FAQPage identical to the visible text), no dead links and anchors, images with size and alt text, exactly one eager image
+(LCP), no external resources, trademark notice, no CLI command, no mention of AI, sitemap and robots.
 
-## Befehle
+## Commands
 
 ```sh
 cd site
 npm ci
-npm test          # bauen + prüfen
-npm run serve     # dist/ lokal ansehen (npx serve)
+npm test          # build + check
+npm run serve     # view dist/ locally (npx serve)
 ```
 
-Zum Bauen braucht sharp nur Node ≥ 20. Die OG-Bilder setzen Text mit den Schriften aus `static/og-fonts/` (Instanzen von Archivo und Figtree, umbenannt in „Archivo OG“ und „Figtree OG“, Lizenz OFL
-wie in `static/fonts/`); dafür muss auf dem Rechner ein funktionierendes Fontconfig vorhanden sein.
+Building needs only Node ≥ 20 for sharp. The OG images set text with the fonts from `static/og-fonts/` (instances of Archivo and Figtree, renamed "Archivo OG" and "Figtree OG", OFL licence
+as in `static/fonts/`); this requires a working Fontconfig on the machine.
 
-## Neue Sprache
+## New language
 
-1. `i18n/<lang>.json` aus `en.json` ableiten (alle Schlüssel, gleiche Platzhalter). Fachbegriffe aus `app/src/renderer/locales/<lang>.ts` übernehmen, damit Website und App gleich sprechen.
-2. Code in `LANGS`, `NATIVE` und `LOCALE` in `build.mjs` und `LANGS`/`LOCALE` in `check.mjs` eintragen.
-3. Screenshots aufnehmen (unten) und `npm test`.
+1. Derive `i18n/<lang>.json` from `en.json` (all keys, same placeholders). Take technical terms from `app/src/renderer/locales/<lang>.ts` so the website and the app speak the same way.
+2. Add the code to `LANGS`, `NATIVE` and `LOCALE` in `build.mjs` and `LANGS`/`LOCALE` in `check.mjs`.
+3. Capture screenshots (below) and run `npm test`.
 
-## Screenshots neu erzeugen
+## Regenerating screenshots
 
-Die Bilder kommen aus der echten App mit simulierten Daten (kein Konto, kein Spiel), nicht aus dem Mockup. Alle Sprachseiten und beide READMEs zeigen dieselben englischen Aufnahmen, nur die Bildtexte sind übersetzt. Aufnahme mit `app/test/shots.mjs` (nutzt den Rahmen der Klicktests,
-1600 × 1000, Selektoren statt Beschriftungen):
+The images come from the real app with simulated data (no account, no game), not from the mockup. All language pages and both READMEs show the same English captures, only the captions are translated. Capturing uses `app/test/shots.mjs` (it uses the click tests' frame,
+1600 × 1000, selectors instead of labels):
 
 ```sh
 cd app && npm run build
@@ -54,12 +54,12 @@ ROLLOUT_SIM_LANG=en ROLLOUT_SHOTS=../site/shots-raw/en ELECTRON_RUN_AS_NODE=1 np
 cd ../site && node scripts/process-shots.mjs
 ```
 
-Am Ally `DISPLAY=:0` und `TMPDIR` auf btrfs setzen (siehe `app/README.md`). `process-shots.mjs` schreibt `static/screens/en/<name>.{webp,jpg}` und `<name>-640.webp` (1280 × 800 und 640 × 400)
-sowie für die READMEs `media/screens/en/<name>.jpg` (je unter 300 KB) und `media/hero-carousel.gif` (960 px, 5 Ansichten). Namen: home, pick, before-install, installing, done,
-bluetooth, starting, error, settings, advanced, light, steam. `shots-raw/` ist nicht im Repo.
+On the Ally set `DISPLAY=:0` and `TMPDIR` on btrfs (see `app/README.md`). `process-shots.mjs` writes `static/screens/en/<name>.{webp,jpg}` and `<name>-640.webp` (1280 × 800 and 640 × 400)
+and, for the READMEs, `media/screens/en/<name>.jpg` (each under 300 KB) and `media/hero-carousel.gif` (960 px, 5 views). Names: home, pick, before-install, installing, done,
+bluetooth, starting, error, settings, advanced, light, steam. `shots-raw/` is not in the repo.
 
-## Veröffentlichen
+## Publishing
 
-1. Download-Knöpfe: Solange `config.json` `"downloadLive": false` hat, sind sie ausgegraut (Hinweis „Download folgt“, kein `downloadUrl` im JSON-LD). Auf `true` stellen, sobald `Rollout.desktop` Asset des neuesten Releases ist (`releases/latest/download/Rollout.desktop`), sonst sind die Download-Knöpfe tot. `deploy.sh` prüft das vorab.
-2. `site/deploy.sh` baut, prüft, committet den Inhalt von `dist/` in einen Worktree des Branches `gh-pages` (mit `.nojekyll`) und fragt vor dem Push nach. `--no-push` lässt den Push aus, `--yes` überspringt die Frage.
-3. Einmalig: GitHub Pages auf „Deploy from branch“, Branch `gh-pages`, Ordner `/` stellen (Einstellungen oder `gh api repos/mace-ops/rollout-cycling-launcher-linux/pages`).
+1. Download buttons: as long as `config.json` has `"downloadLive": false`, they are greyed out ("download coming", no `downloadUrl` in the JSON-LD). Set it to `true` as soon as `Rollout.desktop` is an asset of the latest release (`releases/latest/download/Rollout.desktop`), otherwise the download buttons are dead. `deploy.sh` checks this beforehand.
+2. `site/deploy.sh` builds, checks, commits the content of `dist/` into a worktree of the `gh-pages` branch (with `.nojekyll`) and asks before pushing. `--no-push` skips the push, `--yes` skips the question.
+3. Once: set GitHub Pages to "Deploy from branch", branch `gh-pages`, folder `/` (settings or `gh api repos/mace-ops/rollout-cycling-launcher-linux/pages`).

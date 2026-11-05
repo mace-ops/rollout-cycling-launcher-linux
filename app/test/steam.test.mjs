@@ -1,4 +1,4 @@
-// Prüft die Steam-Anbindung gegen eine nachgebaute shortcuts.vdf in einem Wegwerf-Ordner. Echte Steam-Dateien werden nie angefasst.
+// Checks the Steam integration against a rebuilt shortcuts.vdf in a throwaway directory. Real Steam files are never touched.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import fs from 'node:fs';
@@ -23,24 +23,24 @@ const entry = (index, name, exe, extra = []) => ({
     { key: 'exe', value: `"${exe}"` },
     { key: 'StartDir', value: '"/tmp/"' },
     { key: 'LastPlayTime', value: 1767000000 },
-    { key: 'tags', value: [{ key: '0', value: 'Favorit Ä' }] },
+    { key: 'tags', value: [{ key: '0', value: 'Favourite Ä' }] },
     ...extra
   ]
 });
 const fixture = () => [{ key: 'shortcuts', value: [entry(0, 'Spiel Eins', '/opt/eins.sh'), entry(1, 'Zwei', '/opt/zwei.sh')] }];
 const spec = { name: 'Rollout', exe: '/home/x/.local/share/rollout/bin/rollout', startDir: '/home/x/.local/share/rollout/bin', icon: '', launchOptions: '' };
 
-test('AppID wie Steam: crc32 aus Exe mit Anführungszeichen und Name, höchstes Bit gesetzt', () => {
-  // Wert aus einer echten Steam-Datei: Eintrag „Xenia“ eines Emulator-Starters
+test('AppID like Steam: crc32 of exe with quotes and name, highest bit set', () => {
+  // Value from a real Steam file: the "Xenia" entry of an emulator launcher
   assert.equal(vdf.shortcutAppId('"/var/home/mace/emudeck/Emulation/tools/launchers/xenia.sh"', 'Xenia'), 3728923498);
 });
 
-test('Lesen und Schreiben ist verlustfrei', () => {
+test('reading and writing is lossless', () => {
   const bytes = vdf.serializeVdf(fixture());
   assert.ok(vdf.serializeVdf(vdf.parseVdf(bytes)).equals(bytes));
 });
 
-test('Hinzufügen ist einmalig, nummeriert weiter und lässt fremde Einträge unverändert', () => {
+test('adding happens once, continues numbering and leaves foreign entries unchanged', () => {
   const tree = fixture();
   assert.equal(vdf.addShortcut(tree, spec), true);
   assert.equal(vdf.addShortcut(tree, spec), false);
@@ -50,7 +50,7 @@ test('Hinzufügen ist einmalig, nummeriert weiter und lässt fremde Einträge un
   assert.equal(vdf.hasShortcut(tree, spec), true);
 });
 
-test('Entfernen stellt den Ausgangszustand wieder her', () => {
+test('removing restores the original state', () => {
   const original = vdf.serializeVdf(fixture());
   const tree = vdf.parseVdf(original);
   vdf.addShortcut(tree, spec);
@@ -59,12 +59,12 @@ test('Entfernen stellt den Ausgangszustand wieder her', () => {
   assert.equal(vdf.removeShortcut(tree, spec), false);
 });
 
-test('Defekte Dateien werden abgelehnt', () => {
+test('broken files are rejected', () => {
   assert.throws(() => vdf.parseVdf(Buffer.from([0, 0x73, 0])));
   assert.throws(() => vdf.parseVdf(Buffer.from([9, 0x61, 0, 8])));
 });
 
-test('Schreiben: Sicherung, atomar, nur drei Sicherungen', () => {
+test('writing: backup, atomic, only three backups', () => {
   const file = path.join(work, 'config/shortcuts.vdf');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const original = vdf.serializeVdf(fixture());
@@ -80,7 +80,7 @@ test('Schreiben: Sicherung, atomar, nur drei Sicherungen', () => {
   assert.equal(steam.writeShortcuts(file, () => false), false);
 });
 
-test('Schreiben bricht ab, wenn die Datei nicht verlustfrei lesbar ist', () => {
+test('writing aborts if the file cannot be read losslessly', () => {
   const file = path.join(work, 'broken/shortcuts.vdf');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, Buffer.from([0, 0x73, 0, 8, 8, 0xff]));
@@ -98,7 +98,7 @@ test('Konto: letzte Anmeldung gewinnt', () => {
   assert.equal(steam.findAccountDir(root), path.join(root, 'userdata/200'));
 });
 
-test('Verknüpfung zeigt auf den festen Pfad', () => {
+test('shortcut points to the fixed path', () => {
   const s = steam.rolloutShortcut();
   assert.equal(s.exe, path.join(work, 'rollout/bin/rollout'));
   assert.equal(s.name, 'Rollout');

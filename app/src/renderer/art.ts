@@ -13,6 +13,6 @@ if (kind === 'logo') stage.innerHTML = `${mark}<span class="word">Rollout</span>
 else if (kind === 'hero') stage.innerHTML = '<img class="hero-img" src="assets/img/mywhoosh.jpg" alt=""><div class="hero-fade"></div>';
 else stage.innerHTML = `${mesh}${mark}<span class="word">Rollout</span>`;
 
-// Meldet dem Hauptprozess, dass Schrift und Bild fertig sind.
+// Reports to the main process that font and image are ready.
 const heroImage = document.querySelector<HTMLImageElement>('.hero-img');
 void Promise.all([document.fonts.ready, heroImage ? heroImage.decode() : Promise.resolve()]).then(() => { document.title = 'ready'; });

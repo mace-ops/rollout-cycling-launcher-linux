@@ -1,23 +1,23 @@
-// Platzhalter für die echten Adapter: simuliert Installation, Start und Bluetooth-Suche,
-// damit sich die Oberfläche vollständig bedienen lässt. Ersetzt wird nur diese Datei.
-// Zustände für Tests über Umgebungsvariablen:
-//   ROLLOUT_SIM_STATE=fresh      keine App installiert
-//   ROLLOUT_SIM_UPDATE=1         für installierte Apps ist ein Update da
-//   ROLLOUT_BT=fake              Bluetooth-Attrappe statt bluetoothctl (der Klicktest erzwingt das)
-//   ROLLOUT_SIM_BT=problem       mit der Attrappe: Adapter meldet ein Problem, nichts wird gefunden
-//   ROLLOUT_SIM_CRASH=1          Spiel beendet sich nach dem Start
-//   ROLLOUT_SIM_LANG=de          Sprache fest wählen (sonst die gespeicherte oder „auto“ nach Systemsprache)
-//   ROLLOUT_SIM_THEME=light      Aussehen fest wählen (dark oder light)
-//   ROLLOUT_CONFIG_HOME=<Ordner> Ort der config.toml, im Test ein Wegwerf-Ordner
-//   ROLLOUT_SIM_SELFUPDATE=<Zustand> Launcher-Update fest wählen, siehe selfupdate-fake.ts (kein Teil dieser Datei)
-//   ROLLOUT_ZWIFT=real|fake      Zwift echt (zwift.sh laden, Image ziehen, Zustand aus der Container-Laufzeit) oder als Attrappe, siehe zwift.ts;
-//                                ohne die Variable gilt Zwift als echt, sobald bin/rollout-run da ist (chooseZwiftMode in zwift.ts); ROLLOUT_ZWIFT=sim erzwingt die Simulation.
-//                                Mit dem Dienst starten, beenden und entfernen auch Zwift echt (rollout-run zwift, podman rmi über rollout-run --zwift-remove).
-//   ROLLOUT_ZWIFT_WINDOWS=off    Zwift-Fenster im Spielmodus nicht erkennen und nicht für gamescope kennzeichnen (zwift-window.ts); ROLLOUT_ZWIFT_DISPLAY=<:N> wählt den X-Server (Vorgabe :0)
-//   ROLLOUT_ZWIFT_RUNNING_MS=<ms> Zeit vom Start des Containers bis „Läuft“ (Vorgabe 20000; Zwift meldet das nicht selbst)
-//   ROLLOUT_MYWHOOSH=real|sim    MyWhoosh echt (vendor/mywhoosh.sh über rollout-run, Zustand aus ~/Games/mywhoosh-linux) oder simuliert, siehe mywhoosh.ts;
-//                                ohne die Variable gilt MyWhoosh als echt, sobald bin/rollout-run und vendor/mywhoosh.sh da sind (chooseMywhooshMode).
-//                                MYWHOOSH_ROOT=<Ordner> verlegt den Spielordner (Tests); ROLLOUT_MYWHOOSH_RUNNING_MS=<ms> Zeit vom Start bis „Läuft“ (Vorgabe 20000).
+// Placeholder for the real adapters: simulates installation, start and Bluetooth scan
+// so the UI can be operated completely. Only this file is replaced.
+// States for tests via environment variables:
+//   ROLLOUT_SIM_STATE=fresh      no app installed
+//   ROLLOUT_SIM_UPDATE=1         an update is available for installed apps
+//   ROLLOUT_BT=fake              Bluetooth fake instead of bluetoothctl (the click test enforces this)
+//   ROLLOUT_SIM_BT=problem       with the fake: adapter reports a problem, nothing is found
+//   ROLLOUT_SIM_CRASH=1          game exits after the start
+//   ROLLOUT_SIM_LANG=de          fix the language (otherwise the saved one or "auto" by system language)
+//   ROLLOUT_SIM_THEME=light      fix the appearance (dark or light)
+//   ROLLOUT_CONFIG_HOME=<dir> location of config.toml, a throwaway directory in tests
+//   ROLLOUT_SIM_SELFUPDATE=<state> fix the launcher update, see selfupdate-fake.ts (not part of this file)
+//   ROLLOUT_ZWIFT=real|fake      Zwift real (download zwift.sh, pull image, state from the container runtime) or as a fake, see zwift.ts;
+//                                without the variable Zwift counts as real as soon as bin/rollout-run exists (chooseZwiftMode in zwift.ts); ROLLOUT_ZWIFT=sim forces the simulation.
+//                                With the service, Zwift is also started, quit and removed for real (rollout-run zwift, podman rmi via rollout-run --zwift-remove).
+//   ROLLOUT_ZWIFT_WINDOWS=off    do not detect the Zwift window in Gaming Mode and do not mark it for gamescope (zwift-window.ts); ROLLOUT_ZWIFT_DISPLAY=<:N> selects the X server (default :0)
+//   ROLLOUT_ZWIFT_RUNNING_MS=<ms> time from the container start to "Running" (default 20000; Zwift does not report this itself)
+//   ROLLOUT_MYWHOOSH=real|sim    MyWhoosh real (vendor/mywhoosh.sh via rollout-run, state from ~/Games/mywhoosh-linux) or simulated, see mywhoosh.ts;
+//                                without the variable MyWhoosh counts as real as soon as bin/rollout-run and vendor/mywhoosh.sh exist (chooseMywhooshMode).
+//                                MYWHOOSH_ROOT=<dir> moves the game directory (tests); ROLLOUT_MYWHOOSH_RUNNING_MS=<ms> time from the start to "Running" (default 20000).
 import type {
   AppId, AppProblem, InstallOptions, Launch, LaunchOptions, Overrides, RolloutApi, Snapshot, SteamResult, UpdateChannel
 } from '../shared/api';
@@ -31,19 +31,19 @@ import { RUN_PROBLEM, ZwiftError, isRunningLine, isStartLine, type ZwiftRun, typ
 const TICK_MS = 120;
 const LAUNCH_STEPS = 30;
 const SCAN_SECONDS = 15;
-/** Beim echten Zwift-Zustand fragt die Oberfläche höchstens so oft nach der Container-Laufzeit. */
+/** For the real Zwift state the UI asks the container runtime at most this often. */
 const ZWIFT_STATUS_TTL_MS = 5000;
-/** Fortschritt beim Laden von zwift.sh und bei jeder fertigen Image-Schicht (Schätzung: die Gesamtzahl der Schichten ist unbekannt). */
+/** Progress when downloading zwift.sh and for each finished image layer (estimate: the total number of layers is unknown). */
 const ZWIFT_SCRIPT_PERCENT = 5;
 const ZWIFT_LAYER_PERCENT = 6;
 const ZWIFT_MAX_PERCENT = 95;
-/** Der Container meldet „läuft“ nicht; Rollout nimmt es an, wenn er so lange nach dem Start noch lebt. */
+/** The container does not report "running"; Rollout assumes it if it is still alive this long after the start. */
 const ZWIFT_RUNNING_MS = 20_000;
-/** Fehlt die Startzeile in der Ausgabe von zwift.sh (anderer Wortlaut), läuft die Anzeige nach dieser Zeit trotzdem weiter. */
+/** If the start line is missing from zwift.sh's output (different wording), the display moves on after this time anyway. */
 const ZWIFT_START_FALLBACK_MS = 8000;
-/** Endet der Start mit einem Fehler innerhalb dieser Zeit, gilt er als Absturz direkt nach dem Start. */
+/** If the start ends with an error within this time, it counts as a crash right after the start. */
 const ZWIFT_CRASH_WINDOW_MS = 90_000;
-/** MyWhoosh meldet „läuft“ nicht; Rollout nimmt es an, wenn das Spiel so lange nach der Zeile „starting“ noch lebt (Wine und umu brauchen einen Moment). */
+/** MyWhoosh does not report "running"; Rollout assumes it if the game is still alive this long after the "starting" line (Wine and umu need a moment). */
 const MYWHOOSH_RUNNING_MS = 20_000;
 const LAYER_DONE = /Copying blob .* done|Pull complete|Already exists|already exists/i;
 
@@ -52,7 +52,7 @@ const freshOverrides = (): Record<AppId, Overrides> => ({
   zwift: { mode: 'rec', version: 'GE-Proton11-12', graphics: 'auto' }
 });
 
-/** Zugriff auf Steam. Im Test ersetzt `FakeSteam` den echten Zugriff, damit keine Steam-Dateien angefasst werden. */
+/** Access to Steam. In tests `FakeSteam` replaces the real access so no Steam files are touched. */
 export interface SteamService {
   status(): SteamInfo;
   set(on: boolean, restart: boolean): Promise<{ status: SteamStatus; message: string }>;
@@ -117,7 +117,7 @@ export class SimBackend implements Backend {
     };
     this.syncZwiftTag();
     this.crash = env.ROLLOUT_SIM_CRASH === '1';
-    // Echtes MyWhoosh: der Zustand kommt von der Platte, schon der erste Snapshot zeigt ihn.
+    // Real MyWhoosh: the state comes from disk, even the first snapshot shows it.
     this.refreshMywhoosh();
   }
 
@@ -138,7 +138,7 @@ export class SimBackend implements Backend {
 
   private realJob = false;
   private zwiftCheckedAt = 0;
-  /** Fehler der letzten Installation und Befund der letzten Prüfung; die Karte zeigt zuerst den Installationsfehler. */
+  /** Error of the last installation and result of the last check; the card shows the installation error first. */
   private zwiftInstallProblem: AppProblem = '';
   private zwiftStatusProblem: AppProblem = '';
   private zwiftRemoveProblem: AppProblem = '';
@@ -149,32 +149,32 @@ export class SimBackend implements Backend {
   private launchStartedAt = 0;
   private phaseStartedAt = 0;
 
-  /** Tag, den „Installieren“ zieht: Umgebung vor config.toml vor dem Pin (so wählt es auch rollout-run). Leer ohne Dienst. */
+  /** Tag that "Install" pulls: environment before config.toml before the pin (rollout-run chooses the same way). Empty without a service. */
   private syncZwiftTag(): void {
     this.state.zwiftTag = this.zwift ? this.env.ROLLOUT_ZWIFT_TAG || this.store.load().zwiftTag || this.zwift.defaultTag : '';
   }
 
   /**
-   * Zwift gilt als installiert, wenn das gepinnte `zwift.sh` da ist und das eingestellte Image lokal liegt. Der Zustand kommt
-   * aus der Container-Laufzeit, nicht aus dem Gedächtnis dieser Sitzung; während einer Installation bleibt er unberührt.
+   * Zwift counts as installed when the pinned `zwift.sh` is there and the configured image exists locally. The state comes
+   * from the container runtime, not from this session's memory; during an installation it stays untouched.
    */
   private async refreshZwift(force = false): Promise<void> {
-    // Während Installation, Entfernen und Spiel fragt niemand die Laufzeit: Der Zustand gehört dann dem laufenden Vorgang.
+    // During installation, removal and game nobody queries the runtime: the state then belongs to the running operation.
     if (!this.zwift || this.realJob || this.zwiftRemoving || this.zwiftRun || (!force && Date.now() - this.zwiftCheckedAt < ZWIFT_STATUS_TTL_MS)) return;
     let status = await this.zwift.status();
-    // Das Image ist schon da (zum Beispiel von Hand gezogen), nur das kleine, geprüfte Startskript fehlt: still nachladen, statt
-    // „Installieren“ zu zeigen. Scheitert das (kein Netz), bleibt es bei „nicht installiert“ und der nächste Check versucht es wieder.
+    // The image is already there (for example pulled by hand), only the small verified start script is missing: reload it quietly instead of
+    // showing "Install". If that fails (no network), it stays "not installed" and the next check tries again.
     if (status.image && !status.script) {
-      try { await this.zwift.installScript(new AbortController().signal); status = await this.zwift.status(); } catch { /* nächster Check */ }
+      try { await this.zwift.installScript(new AbortController().signal); status = await this.zwift.status(); } catch { /* next check */ }
     }
     this.zwiftCheckedAt = Date.now();
     if (this.realJob || this.zwiftRemoving || this.zwiftRun) return;
     this.syncZwiftTag();
-    // Leer heißt „fehlt“ nur, wenn die Laufzeit wirklich fehlt (Exit 10); bei anderen Fehlern ist sie unbekannt.
+    // Empty means "missing" only if the runtime is really missing (exit 10); for other errors it is unknown.
     this.state.zwiftRuntime = status.runtime || (status.problem === 'runtime' ? '' : null);
     const info = this.state.apps.zwift;
     info.installed = status.script && status.image;
-    // „Kein Tag“ ist vor der ersten Installation normal und kein Fehler.
+    // "No tag" is normal before the first installation and not an error.
     this.zwiftStatusProblem = info.installed || status.problem === 'tag' ? '' : status.problem;
     if (info.installed) this.zwiftInstallProblem = '';
     else info.steam = false;
@@ -185,13 +185,13 @@ export class SimBackend implements Backend {
 
   private mwInstallProblem: AppProblem = '';
   private mwRemoveProblem: AppProblem = '';
-  /** Einrichten, Aktualisieren oder Entfernen läuft; `abort` bricht es ab (Beenden von Rollout). */
+  /** Setup, update or removal is running; `abort` cancels it (Rollout quitting). */
   private mwJob: { abort: AbortController; done: Promise<void> } | null = null;
   private mwRun: MywhooshRun | null = null;
   private mwStopping = false;
   private mwTimers: NodeJS.Timeout[] = [];
 
-  /** Zustand aus dem Spielordner. Während eines Vorgangs oder Spiels gehört er dem Vorgang. */
+  /** State from the game directory. During an operation or a game it belongs to that operation. */
   private refreshMywhoosh(): void {
     if (!this.mywhoosh || this.mwJob || this.mwRun) return;
     const status = this.mywhoosh.status();
@@ -203,7 +203,7 @@ export class SimBackend implements Backend {
     info.problem = this.mwRemoveProblem || (status.installed ? '' : this.mwInstallProblem);
   }
 
-  /** Führt `work` als Einrichtung oder Aktualisierung von MyWhoosh aus; ein Fehlschlag erscheint als Problem der Karte, nichts bleibt hängen. */
+  /** Runs `work` as setup or update of MyWhoosh; a failure shows up as a problem on the card, nothing hangs. */
   private async runMywhooshJob(kind: 'install' | 'update', steam: boolean, hd: boolean, work: (svc: MywhooshService, onPercent: (p: number) => void, signal: AbortSignal) => Promise<void>): Promise<void> {
     const svc = this.mywhoosh;
     if (!svc) return;
@@ -243,7 +243,7 @@ export class SimBackend implements Backend {
     this.launchStartedAt = Date.now();
     this.phaseStartedAt = this.launchStartedAt;
     this.mwStopping = false;
-    // Bluetooth zuerst: Ohne Adapter startet das Spiel, findet aber keinen Trainer. „Trotzdem starten“ überspringt die Prüfung.
+    // Bluetooth first: without an adapter the game starts but finds no trainer. "Start anyway" skips the check.
     this.state.launch = { app: 'mywhoosh', phase: 'bluetooth', progress: 3, problem: '' };
     this.changed();
     const token = this.launchStartedAt;
@@ -300,7 +300,7 @@ export class SimBackend implements Backend {
     const stopped = this.mwStopping;
     this.mwStopping = false;
     if (launch) launch.visible = false;
-    // Ein Update im Start kann die Version geändert haben.
+    // An update during the start may have changed the version.
     this.refreshMywhoosh();
     if (!launch || stopped || code === 0) this.state.launch = null;
     else if (code !== null && MYWHOOSH_RUN_PROBLEM[code]) Object.assign(launch, { phase: 'failed', problem: MYWHOOSH_RUN_PROBLEM[code] });
@@ -346,7 +346,7 @@ export class SimBackend implements Backend {
     try {
       await zwift.installScript(signal);
       this.setJobProgress(ZWIFT_SCRIPT_PERCENT);
-      // Die Bestätigung im Installieren-Dialog gilt für genau diese Version des Images: Ohne eigenen Eintrag trägt Rollout den Pin ein.
+      // The confirmation in the install dialog applies to exactly this version of the image: without its own entry Rollout writes the pin.
       const saved = this.store.load();
       if (!saved.zwiftTag) this.store.save({ ...saved, zwiftTag: zwift.defaultTag });
       this.syncZwiftTag();
@@ -355,13 +355,13 @@ export class SimBackend implements Backend {
         if (LAYER_DONE.test(line)) { layers += 1; this.setJobProgress(Math.min(ZWIFT_MAX_PERCENT, ZWIFT_SCRIPT_PERCENT + layers * ZWIFT_LAYER_PERCENT)); }
       }, signal);
       const status = await zwift.status();
-      if (!(status.script && status.image)) throw new ZwiftError('pull', 'Image nach dem Ziehen nicht gefunden');
+      if (!(status.script && status.image)) throw new ZwiftError('pull', 'Image not found after pulling');
       info.installed = true;
       info.steam = steam;
       info.updateAvailable = false;
       this.state.finished = { seq: (this.seq += 1), app: 'zwift', kind: 'install' };
     } catch (e) {
-      // Über das Feld `problem` statt `instanceof`: Dienst und Backend können aus verschiedenen Bündeln stammen (Tests).
+      // Via the `problem` field instead of `instanceof`: service and backend may come from different bundles (tests).
       const code = (e as { problem?: string }).problem;
       this.zwiftInstallProblem = code === 'abort' ? '' : (code as AppProblem | undefined) || 'error';
       info.problem = this.zwiftInstallProblem || this.zwiftStatusProblem;
@@ -377,10 +377,10 @@ export class SimBackend implements Backend {
     if (this.state.job) { this.state.job.progress = percent; this.changed(); }
   }
 
-  /** Spiel oder Installation läuft: Launcher-Updates werden dann weder geladen noch eingespielt. */
+  /** A game or installation is running: launcher updates are then neither downloaded nor applied. */
   busy(): boolean { return !!(this.state.job || this.state.launch); }
 
-  /** Das Launcher-Update hat sich geändert, die Oberfläche bekommt den neuen Zustand. */
+  /** The launcher update has changed, the UI receives the new state. */
   refresh(): void { this.emit(this.view()); }
 
   settings(): { autoUpdate: boolean; channel: UpdateChannel } {
@@ -421,9 +421,9 @@ export class SimBackend implements Backend {
   }
 
   /**
-   * Zwift echt starten: `rollout-run zwift` im Vordergrund. Die Phasen kommen aus seiner Ausgabe: „Vorbereiten“ bis zur Zeile, mit der
-   * zwift.sh den Container startet, danach „Spiel startet“ und nach ZWIFT_RUNNING_MS „Läuft“. Bluetooth prüft Rollout hier nicht (Zwift
-   * nimmt Sensoren über Telefon oder Direct Connect, Konzept 8).
+   * Start Zwift for real: `rollout-run zwift` in the foreground. The phases come from its output: "Preparing" up to the line with which
+   * zwift.sh starts the container, then "Game starting" and after ZWIFT_RUNNING_MS "Running". Rollout does not check Bluetooth here (Zwift
+   * takes sensors via phone or Direct Connect, concept 8).
    */
   private launchZwift(zwift: ZwiftService): void {
     if (this.zwiftRun || this.zwiftRemoving || this.realJob) return;
@@ -456,7 +456,7 @@ export class SimBackend implements Backend {
     this.changed();
   }
 
-  /** „Läuft“: Meldung des Containers, spätestens nach ZWIFT_RUNNING_MS. Kam die Startzeile nicht, geht es über „Zwift startet“. */
+  /** "Running": message of the container, at the latest after ZWIFT_RUNNING_MS. If the start line did not come, it goes via "Starting Zwift". */
   private zwiftRunning(): void {
     if (this.state.launch?.phase === 'updates') this.zwiftStarting();
     const launch = this.state.launch;
@@ -483,7 +483,7 @@ export class SimBackend implements Backend {
     this.changed();
   }
 
-  /** Fortschritt des echten Zwift-Starts: weich gegen das Ende jeder Phase, nie rückwärts. */
+  /** Progress of the real Zwift start: soft towards the end of each phase, never backwards. */
   private stepZwiftLaunch(launch: Launch): void {
     if (launch.phase !== 'updates' && launch.phase !== 'starting') return;
     const seconds = (Date.now() - this.phaseStartedAt) / 1000;
@@ -491,13 +491,13 @@ export class SimBackend implements Backend {
     launch.progress = Math.max(launch.progress, Math.round(from + span * (1 - Math.exp(-seconds / tau))));
   }
 
-  /** Läuft ein echtes Spiel, das beim Beenden von Rollout mit beendet werden muss? */
+  /** Is a real game running that must be quit when Rollout quits? */
   hasRunningGame(): boolean { return this.zwiftRun !== null || this.mwRun !== null || this.mwJob !== null; }
 
   async stopLaunch(): Promise<void> {
     const job = this.mwJob;
     if (job) {
-      // Einrichten oder Entfernen abbrechen und abwarten: Sonst bliebe ein halbes Spiel im Ordner und das Skript liefe als Waise weiter.
+      // Cancel setup or removal and wait: otherwise a half game would remain in the directory and the script would keep running as an orphan.
       job.abort.abort();
       await job.done;
       return;
@@ -510,11 +510,11 @@ export class SimBackend implements Backend {
       await mw.done;
       return;
     }
-    // Abbruch während der Bluetooth-Prüfung: nichts läuft, die Antwort der Prüfung wird verworfen (Marke launchStartedAt).
+    // Abort during the Bluetooth check: nothing is running, the check's answer is discarded (marker launchStartedAt).
     if (this.state.launch?.app === 'mywhoosh' && this.state.launch.phase === 'bluetooth') this.launchStartedAt = 0;
     const run = this.zwiftRun;
     if (run) {
-      // Das Spiel beenden und abwarten: Erst danach ist run.pid weg und ein neuer Start möglich.
+      // Quit the game and wait: only then is run.pid gone and a new start possible.
       this.zwiftStopping = true;
       if (this.state.launch) { this.state.launch.phase = 'stopping'; this.changed(); }
       run.stop();
@@ -545,7 +545,7 @@ export class SimBackend implements Backend {
 
   private persist(): void {
     const { language, theme, scale, autoUpdate, updateChannel } = this.state;
-    // Zwift-Tag und -Digest pflegt der Nutzer von Hand in config.toml: Beim Speichern bleiben sie erhalten.
+    // The user maintains the Zwift tag and digest by hand in config.toml: they are preserved when saving.
     const { zwiftTag, zwiftDigest } = this.store.load();
     const settings: Settings = { language, theme, scale, autoUpdate, updateChannel, zwiftTag, zwiftDigest };
     this.store.save(settings);
@@ -622,7 +622,7 @@ export class SimBackend implements Backend {
     this.changed();
   }
 
-  /** Image entfernen (Konzept 5.3). Die Rückfrage stellt die Oberfläche. Das Skript und die Container-Laufzeit bleiben. */
+  /** Remove the image (concept 5.3). The UI asks for confirmation. The script and the container runtime stay. */
   private async removeZwift(zwift: ZwiftService): Promise<void> {
     if (this.zwiftRemoving || this.realJob || this.zwiftRun) return;
     const info = this.state.apps.zwift;
@@ -644,11 +644,11 @@ export class SimBackend implements Backend {
     this.changed();
   }
 
-  /** Das Öffnen im Browser übernimmt der Hauptprozess (main.ts); hier nur für die Schnittstelle. */
-  async openZwiftProject(): Promise<void> { /* nichts */ }
+  /** Opening in the browser is handled by the main process (main.ts); here only for the interface. */
+  async openZwiftProject(): Promise<void> { /* nothing */ }
 
   async createReport(): Promise<void> {
-    // Die echte Hilfedatei entsteht später im Adapter.
+    // The real help file is created later in the adapter.
   }
 
   async setOverrides(app: AppId, patch: Partial<Overrides>): Promise<void> {

@@ -1,19 +1,19 @@
-// Vertrag zwischen Oberfläche und Hauptprozess. Der Hauptprozess liefert den Zustand,
-// die Oberfläche zeichnet ihn und löst nur Befehle aus.
+// Contract between the UI and the main process. The main process delivers the state,
+// the UI renders it and only triggers commands.
 
 export type AppId = 'mywhoosh' | 'zwift';
 export const APP_IDS: readonly AppId[] = ['mywhoosh', 'zwift'];
 export const APP_NAMES: Record<AppId, string> = { mywhoosh: 'MyWhoosh', zwift: 'Zwift' };
 
 /**
- * Warum eine Installation oder Prüfung nicht klappte (leer = kein Problem). `net` Download, `verify` Prüfsumme oder Pin,
- * `disk` Ablegen, `runtime` keine nutzbare Container-Laufzeit, `tag` kein Image eingestellt, `pull` Ziehen des Images, `error` sonst.
+ * Why an installation or check failed (empty = no problem). `net` download, `verify` checksum or pin,
+ * `disk` storing, `runtime` no usable container runtime, `tag` no image configured, `pull` pulling the image, `error` otherwise.
  */
 export type AppProblem = '' | 'net' | 'verify' | 'disk' | 'runtime' | 'tag' | 'pull' | 'error';
 
 export interface AppInfo {
   installed: boolean;
-  /** Version des installierten Spiels, wenn bekannt (echtes MyWhoosh: aus dem Spielordner), sonst leer */
+  /** Version of the installed game if known (real MyWhoosh: from the game directory), otherwise empty */
   version: string;
   steam: boolean;
   updateAvailable: boolean;
@@ -37,8 +37,8 @@ export interface Job {
 }
 
 /**
- * `failed`: der Start kam nicht zustande, `Launch.problem` nennt den Grund (nur bei echtem Zwift).
- * `stopping`: Zwift wird beendet (der Container braucht dafür bis zu etwa 12 s), ein neuer Start ist so lange gesperrt.
+ * `failed`: the start did not happen, `Launch.problem` names the reason (real Zwift only).
+ * `stopping`: Zwift is being quit (the container needs up to about 12 s for that), a new start is blocked until then.
  */
 export type LaunchPhase = 'updates' | 'bluetooth' | 'starting' | 'running' | 'bterror' | 'crash' | 'failed' | 'stopping';
 
@@ -46,15 +46,15 @@ export interface Launch {
   app: AppId;
   phase: LaunchPhase;
   progress: number;
-  /** Grund bei `phase === 'failed'`, sonst leer */
+  /** Reason when `phase === 'failed'`, otherwise empty */
   problem: AppProblem;
-  /** Nur Zwift im Spielmodus: Das Spielfenster ist im Fokus, also zu sehen (sonst fehlt das Feld oder ist `false`) */
+  /** Zwift in Gaming Mode only: the game window is in focus, i.e. visible (otherwise the field is missing or `false`) */
   visible?: boolean;
 }
 
 export interface Sensor {
   kind: 'trainer' | 'heartrate';
-  /** Die letzten vier Stellen der Adresse */
+  /** The last four digits of the address */
   id: string;
   name: string;
 }
@@ -73,31 +73,31 @@ export interface Finished {
 export type UpdateChannel = 'stable' | 'beta';
 
 /**
- * Zustand des Launcher-Updates (Konzept 6.1). `none`: ohne Wächter oder auf anderer Architektur, die Oberfläche zeigt nichts.
- * `next` und `mb` gelten für available, downloading und ready, `progress` nur beim Laden.
+ * State of the launcher update (concept 6.1). `none`: without watcher or on a different architecture, the UI shows nothing.
+ * `next` and `mb` apply to available, downloading and ready, `progress` only while downloading.
  */
 export type SelfUpdateStatus =
   | 'none' | 'current' | 'checking' | 'checkFailed' | 'available' | 'downloading' | 'ready' | 'invalid' | 'noSpace' | 'manual';
 
 export interface SelfUpdate {
   status: SelfUpdateStatus;
-  /** Laufende Version */
+  /** Running version */
   version: string;
   next: string;
   mb: number;
   progress: number;
-  /** Spiel oder Installation läuft: Neustart gesperrt */
+  /** Game or installation running: restart blocked */
   blocked: boolean;
-  /** Vorherige Version, leer wenn es keine gibt oder sie gesperrt ist */
+  /** Previous version, empty if there is none or it is blocked */
   previous: string;
-  /** Version, die zurückgenommen wurde, leer wenn kein Hinweis offen ist */
+  /** Version that was rolled back, empty if no notice is pending */
   notice: string;
 }
 
 export type SteamState = 'in' | 'out' | 'unavailable';
 export type SteamResult = 'done' | 'steam-running' | 'unavailable' | 'error';
 
-/** Rollout als Nicht-Steam-Spiel in der Steam-Bibliothek */
+/** Rollout as a non-Steam game in the Steam library */
 export interface RolloutSteam {
   state: SteamState;
   steamRunning: boolean;
@@ -115,18 +115,18 @@ export interface Snapshot {
   updateChannel: UpdateChannel;
   selfUpdate: SelfUpdate;
   rolloutSteam: RolloutSteam;
-  /** „auto“ oder ein Sprachcode wie „en“ */
+  /** "auto" or a language code like "en" */
   language: string;
   theme: 'auto' | 'dark' | 'light';
-  /** „auto“ oder Prozent, etwa „125“ */
+  /** "auto" or a percentage, e.g. "125" */
   scale: string;
   /** Sprache des Systems, etwa „de-DE“ */
   systemLocale: string;
   overrides: Record<AppId, Overrides>;
   finished: Finished | null;
-  /** Tag des Zwift-Images, das die Installation zieht (Zustimmungsdialog); leer, solange Zwift nur simuliert wird */
+  /** Tag of the Zwift image the installation pulls (consent dialog); empty while Zwift is only simulated */
   zwiftTag: string;
-  /** Gefundene Container-Laufzeit für Zwift: `podman`, `docker`, leer = keine nutzbare, `null` = unbekannt (noch nicht geprüft oder Zwift simuliert) */
+  /** Detected container runtime for Zwift: `podman`, `docker`, empty = none usable, `null` = unknown (not checked yet or Zwift simulated) */
   zwiftRuntime: string | null;
 }
 
@@ -150,23 +150,23 @@ export interface RolloutApi {
   setSteam(app: AppId, on: boolean): Promise<void>;
   setAutoUpdate(on: boolean): Promise<void>;
   setUpdateChannel(channel: UpdateChannel): Promise<void>;
-  /** Launcher-Update: von Hand prüfen, laden, Laden abbrechen, neu starten (Hauptprozess prüft „belegt“ erneut) */
+  /** Launcher update: check by hand, download, cancel download, restart (the main process checks "busy" again) */
   checkSelfUpdate(): Promise<void>;
   downloadSelfUpdate(): Promise<void>;
   cancelSelfUpdate(): Promise<void>;
   restartForUpdate(): Promise<void>;
   startPreviousVersion(): Promise<void>;
   dismissUpdateNotice(): Promise<void>;
-  /** Meldet, dass die Oberfläche das erste Mal gezeichnet hat (Gesund-Meldung an den Wächter) */
+  /** Reports that the UI has painted for the first time (healthy report to the watcher) */
   uiReady(): void;
   setLanguage(code: string): Promise<void>;
   setTheme(theme: 'auto' | 'dark' | 'light'): Promise<void>;
   setScale(scale: string): Promise<void>;
-  /** Mit `restart` schließt Rollout Steam kurz und startet es wieder, sonst meldet es „steam-running“. */
+  /** With `restart` Rollout briefly closes Steam and starts it again, otherwise it reports "steam-running". */
   setRolloutInSteam(on: boolean, restart: boolean): Promise<SteamResult>;
   remove(app: AppId): Promise<void>;
   createReport(): Promise<void>;
-  /** Öffnet die Seite von netbrain/zwift im Browser */
+  /** Opens the netbrain/zwift page in the browser */
   openZwiftProject(): Promise<void>;
   setOverrides(app: AppId, patch: Partial<Overrides>): Promise<void>;
   resetOverrides(): Promise<void>;
@@ -174,7 +174,7 @@ export interface RolloutApi {
   onSnapshot(listener: (snapshot: Snapshot) => void): void;
 }
 
-/** Namen der Befehle, die der Hauptprozess annimmt. Alles andere wird abgelehnt. */
+/** Names of the commands the main process accepts. Everything else is rejected. */
 export const COMMANDS = [
   'getSnapshot', 'install', 'startUpdate', 'launch', 'stopLaunch', 'scanBluetooth', 'setSteam',
   'setAutoUpdate', 'setUpdateChannel', 'checkSelfUpdate', 'downloadSelfUpdate', 'cancelSelfUpdate', 'restartForUpdate',
@@ -183,8 +183,8 @@ export const COMMANDS = [
 export type Command = (typeof COMMANDS)[number];
 
 /**
- * Beispielwerte, bis die Adapter echte Größen liefern. Zwift: Docker Hub liefert für 1.124.0 etwa 6 GB, entpackt belegt das Image am Ally
- * (Podman 5.8.2, Stand 2026-11-05) 20,4 GB.
+ * Example values until the adapters deliver real sizes. Zwift: Docker Hub delivers about 6 GB for 1.124.0; unpacked, the image takes up on the Ally
+ * (Podman 5.8.2, as of 2026-11-05) 20.4 GB.
  */
 export const download = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 15 : 4) : 6.2);
 export const space = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 20 : 8) : 20.4);

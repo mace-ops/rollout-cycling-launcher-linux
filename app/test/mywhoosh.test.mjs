@@ -1,6 +1,6 @@
-// Prüft den MyWhoosh-Adapter (src/main/mywhoosh.ts) und seine Anbindung an SimBackend (M1 bis M16) in Wegwerf-Ordnern.
-// Kein echtes MyWhoosh, kein Netz, kein Wine, nie das echte ~/Games: Der Upstream ist die Attrappe `mywhoosh.sh` (ROLLOUT_RUN_UPSTREAM) und
-// legt dieselben Dateien an wie das echte Skript; HOME und MYWHOOSH_ROOT zeigen in den Wegwerf-Ordner. `rollout-run` ist das echte.
+// Checks the MyWhoosh adapter (src/main/mywhoosh.ts) and its connection to SimBackend (M1 to M16) in throwaway directories.
+// No real MyWhoosh, no network, no Wine, never the real ~/Games: the upstream is the fake `mywhoosh.sh` (ROLLOUT_RUN_UPSTREAM) and
+// creates the same files as the real script; HOME and MYWHOOSH_ROOT point into the throwaway directory. `rollout-run` is the real one.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -24,8 +24,8 @@ const config = await import(path.join(work, 'config.mjs'));
 const upstreams = JSON.parse(fs.readFileSync(path.join(root, 'upstreams.json'), 'utf8'));
 
 const EXE = 'MyWhoosh/Binaries/Win64/MyWhoosh-Win64-Shipping.exe';
-// Attrappe von mywhoosh.sh. FAKE_FAIL=<Text> lässt install und update mit dieser Meldung scheitern, FAKE_UNINSTALL_FAIL=1 das Entfernen,
-// RUN_MODE steuert `run` (exit N, wait). Wie das Original bricht install ab, wenn der Spielordner schon da ist.
+// Fake of mywhoosh.sh. FAKE_FAIL=<text> makes install and update fail with that message, FAKE_UNINSTALL_FAIL=1 the removal,
+// RUN_MODE controls `run` (exit N, wait). Like the original, install aborts if the game directory already exists.
 const FAKE_UPSTREAM = `#!/bin/sh
 echo "$*" >> "$ROLLOUT_HOME/calls.log"
 echo "pid=$$ pgid=$(ps -o pgid= -p $$ | tr -d ' ') pidfile=$(cat "$ROLLOUT_HOME/state/run.pid" 2>/dev/null)" >> "$ROLLOUT_HOME/env.log"
@@ -65,7 +65,7 @@ esac
 `;
 
 let counter = 0;
-/** Wegwerf-Aufbau: ROLLOUT_HOME mit dem echten rollout-run, eigenes HOME, Spielordner unter MYWHOOSH_ROOT (oder HOME bei `homeRoot`). */
+/** Throwaway setup: ROLLOUT_HOME with the real rollout-run, own HOME, game directory under MYWHOOSH_ROOT (or HOME with `homeRoot`). */
 function setup({ homeRoot = false, extra = {} } = {}) {
   counter += 1;
   const home = path.join(work, `h${counter}`);
@@ -104,7 +104,7 @@ const settle = async (backend, until, ms = 10000) => {
   for (;;) {
     const snap = await backend.getSnapshot();
     if (until(snap)) return snap;
-    if (Date.now() > end) throw new Error('Zeitüberschreitung');
+    if (Date.now() > end) throw new Error('Timeout');
     await new Promise((r) => setTimeout(r, 20));
   }
 };
@@ -118,11 +118,11 @@ function placeGame(gameRoot, version = '6.2.3.0') {
   fs.writeFileSync(path.join(gameRoot, 'game/AppxManifest.xml'), `<Package><Identity Name="A.644173E064ED2" Version="${version}" ProcessorArchitecture="x64"/></Package>`);
 }
 
-test('M1 Zustand von der Platte: nicht installiert, installiert mit Version, nur HD, Ordner ohne Spiel, unlesbares Manifest', () => {
+test('M1 State from disk: not installed, installed with version, HD only, directory without game, unreadable manifest', () => {
   const a = setup();
   assert.deepEqual(mw.readStatus(a.env), { installed: false, version: '', edition: 'standard' });
   fs.mkdirSync(path.join(a.gameRoot, 'game'), { recursive: true });
-  assert.equal(mw.readStatus(a.env).installed, false, 'Ordner ohne Spiel zählt nicht');
+  assert.equal(mw.readStatus(a.env).installed, false, 'directory without a game does not count');
   placeGame(a.gameRoot);
   assert.deepEqual(mw.readStatus(a.env), { installed: true, version: '6.2.3.0', edition: 'standard' });
   fs.writeFileSync(path.join(a.gameRoot, 'game/AppxManifest.xml'), 'kaputt');
@@ -131,10 +131,10 @@ test('M1 Zustand von der Platte: nicht installiert, installiert mit Version, nur
   placeGame(path.join(hd.userHome, 'Games/mywhoosh-hd-linux'), '6.2.3.0');
   assert.deepEqual(mw.readStatus(hd.env), { installed: true, version: '6.2.3.0', edition: 'hd' });
   placeGame(path.join(hd.userHome, 'Games/mywhoosh-linux'), '6.1.0.0');
-  assert.equal(mw.readStatus(hd.env).edition, 'standard', 'bei beiden gilt die Standard-Ausgabe');
+  assert.equal(mw.readStatus(hd.env).edition, 'standard', 'with both, the standard edition applies');
 });
 
-test('M2 Installation über SimBackend: Job mit Fortschritt (nie rückwärts, Zeilen setzen Mindestwerte), am Ende installiert mit Version, Protokoll liegt da', async () => {
+test('M2 Installation via SimBackend: job with progress (never backwards, lines set minimum values), finally installed with version, log exists', async () => {
   const a = setup();
   const { backend, snaps } = backendWith(a.service);
   assert.equal((await backend.getSnapshot()).apps.mywhoosh.installed, false);
@@ -148,26 +148,26 @@ test('M2 Installation über SimBackend: Job mit Fortschritt (nie rückwärts, Ze
   assert.equal(done.finished.app, 'mywhoosh');
   assert.deepEqual(a.calls(), ['install']);
   const progress = snaps.filter((s) => s.job).map((s) => s.job.progress);
-  assert.ok(progress.some((p) => p >= 92), 'Zeile „preparing Windows environment“ setzt mindestens 92');
-  assert.deepEqual([...progress].sort((x, y) => x - y), progress, 'Fortschritt fällt nie');
-  assert.ok(progress.every((p) => p < 100), 'bei 100 ist der Job schon weg');
+  assert.ok(progress.some((p) => p >= 92), 'line "preparing Windows environment" sets at least 92');
+  assert.deepEqual([...progress].sort((x, y) => x - y), progress, 'progress never decreases');
+  assert.ok(progress.every((p) => p < 100), 'at 100 the job is already gone');
   assert.match(fs.readFileSync(path.join(a.home, 'state/mywhoosh.log'), 'utf8'), /MyWhoosh 6\.2\.3\.0 installed/);
   assert.equal(fs.existsSync(path.join(a.home, 'state/mywhoosh-setup.pid')), false);
-  assert.equal(fs.existsSync(path.join(a.home, 'state/run.pid')), false, 'Einrichten nimmt run.pid nicht');
+  assert.equal(fs.existsSync(path.join(a.home, 'state/run.pid')), false, 'setup does not take run.pid');
 });
 
-test('M3 Fortschritt aus der Größe der geschriebenen Dateien', async () => {
+test('M3 Progress from the size of the written files', async () => {
   const a = setup();
   const percents = [];
   const grow = setInterval(() => { fs.mkdirSync(path.join(a.gameRoot, 'cache'), { recursive: true }); fs.appendFileSync(path.join(a.gameRoot, 'cache/x'), Buffer.alloc(3e6)); }, 20);
-  // Die Attrappe schreibt nichts Großes; die Messung liest, was hier wächst. Erwartete Menge ist 9 GB, also bleibt es klein, aber sichtbar > 0 nur mit echten GB.
+  // The fake writes nothing large; the measurement reads what grows here. The expected amount is 9 GB, so it stays small, visibly > 0 only with real GB.
   await a.service.install({ hd: false }, (p) => percents.push(p), new AbortController().signal);
   clearInterval(grow);
   assert.deepEqual([...percents].sort((x, y) => x - y), percents);
   assert.ok(percents.every((p) => p >= 0 && p <= 99));
 });
 
-test('M4 HD: install --hd legt den HD-Ordner an, Zustand und Entfernen folgen der Ausgabe (ohne MYWHOOSH_ROOT)', async () => {
+test('M4 HD: install --hd creates the HD directory, state and removal follow the edition (without MYWHOOSH_ROOT)', async () => {
   const a = setup({ homeRoot: true });
   await a.service.install({ hd: true }, () => {}, new AbortController().signal);
   assert.deepEqual(a.calls(), ['install --hd']);
@@ -180,7 +180,7 @@ test('M4 HD: install --hd legt den HD-Ordner an, Zustand und Entfernen folgen de
   assert.equal(mw.readStatus(a.env).installed, false);
 });
 
-test('M5 Fehler der Einrichtung: Grund aus der Ausgabe, nichts bleibt hängen, ein erneuter Versuch geht', async () => {
+test('M5 Setup errors: reason from the output, nothing hangs, a retry works', async () => {
   for (const [fail, problem] of [['download failed: https://x', 'net'], ['checksum mismatch: https://x', 'verify'], ['kaputt', 'error']]) {
     const a = setup({ extra: { FAKE_FAIL: fail } });
     const { backend } = backendWith(a.service);
@@ -193,7 +193,7 @@ test('M5 Fehler der Einrichtung: Grund aus der Ausgabe, nichts bleibt hängen, e
     assert.equal(fs.existsSync(path.join(a.home, 'state/mywhoosh-setup.pid')), false);
   }
   assert.equal(mw.problemFromOutput(1, 'tar: write error: No space left on device'), 'disk');
-  // Zweiter Versuch ohne Fehler: das Problem verschwindet.
+  // Second attempt without error: the problem disappears.
   const a = setup({ extra: { FAKE_FAIL: 'download failed: x' } });
   const retry = new mw.RealMywhoosh({ home: a.home, env: { ...a.env, FAKE_FAIL: '' }, pollMs: 50, checkSpace: false });
   const { backend } = backendWith(a.service);
@@ -204,31 +204,31 @@ test('M5 Fehler der Einrichtung: Grund aus der Ausgabe, nichts bleibt hängen, e
   assert.equal((await backend.getSnapshot()).apps.mywhoosh.problem, '');
 });
 
-test('M6 Reste eines abgebrochenen Versuchs (Spielordner ohne Spiel) werden aufgeräumt; ein vorhandenes Spiel bleibt unberührt', async () => {
+test('M6 Leftovers of an aborted attempt (game directory without game) are cleaned up; an existing game stays untouched', async () => {
   const a = setup();
   fs.mkdirSync(path.join(a.gameRoot, 'game/halb'), { recursive: true });
   await a.service.install({ hd: false }, () => {}, new AbortController().signal);
   assert.equal(mw.readStatus(a.env).installed, true);
   assert.equal(fs.existsSync(path.join(a.gameRoot, 'game/halb')), false);
-  // Mit Spiel bricht das Skript ab (wie das Original), die Dateien bleiben.
+  // With a game the script aborts (like the original), the files stay.
   fs.writeFileSync(path.join(a.gameRoot, 'game/eigene-datei'), 'x');
   await assert.rejects(a.service.install({ hd: false }, () => {}, new AbortController().signal), (e) => e.problem === 'error');
   assert.equal(fs.readFileSync(path.join(a.gameRoot, 'game/eigene-datei'), 'utf8'), 'x');
 });
 
-test('M7 Eine noch laufende Einrichtung eines früheren Rollout sperrt eine neue; die Reste werden dann nicht angefasst', async () => {
+test('M7 A still-running setup from an earlier Rollout blocks a new one; the leftovers are then not touched', async () => {
   const a = setup();
   fs.mkdirSync(path.join(a.gameRoot, 'game/halb'), { recursive: true });
   fs.writeFileSync(path.join(a.home, 'state/mywhoosh-setup.pid'), `${process.pid}\n`);
-  await assert.rejects(a.service.install({ hd: false }, () => {}, new AbortController().signal), (e) => e.problem === 'error' && /läuft noch/.test(e.message));
+  await assert.rejects(a.service.install({ hd: false }, () => {}, new AbortController().signal), (e) => e.problem === 'error' && /still running/.test(e.message));
   assert.equal(fs.existsSync(path.join(a.gameRoot, 'game/halb')), true);
   assert.deepEqual(a.calls(), []);
   fs.writeFileSync(path.join(a.home, 'state/mywhoosh-setup.pid'), '999999999\n');
   await a.service.install({ hd: false }, () => {}, new AbortController().signal);
-  assert.equal(mw.readStatus(a.env).installed, true, 'veraltete Pid-Datei sperrt nicht');
+  assert.equal(mw.readStatus(a.env).installed, true, 'stale pid file does not block');
 });
 
-test('M8 Aktualisieren: neue Version, update läuft über rollout-run; Fehler tragen ihren Grund', async () => {
+test('M8 Update: new version, update runs through rollout-run; errors carry their reason', async () => {
   const a = setup();
   placeGame(a.gameRoot);
   const percents = [];
@@ -239,7 +239,7 @@ test('M8 Aktualisieren: neue Version, update läuft über rollout-run; Fehler tr
   await assert.rejects(bad.update(() => {}, new AbortController().signal), (e) => e.problem === 'net');
 });
 
-test('M9 Entfernen über SimBackend: Ordner weg, nicht mehr installiert, Overrides zurück; Fehler bleiben sichtbar und nichts geht verloren', async () => {
+test('M9 Removal via SimBackend: directory gone, no longer installed, overrides back; errors stay visible and nothing is lost', async () => {
   const a = setup();
   placeGame(a.gameRoot);
   const { backend } = backendWith(a.service);
@@ -255,7 +255,7 @@ test('M9 Entfernen über SimBackend: Ordner weg, nicht mehr installiert, Overrid
   assert.equal(snap.apps.mywhoosh.problem, '');
   assert.equal(snap.overrides.mywhoosh.mode, 'rec');
   assert.equal(fs.existsSync(a.gameRoot), false);
-  // Scheitert uninstall, bleibt MyWhoosh installiert und die Karte nennt das Problem.
+  // If uninstall fails, MyWhoosh stays installed and the card names the problem.
   const b = setup({ extra: { FAKE_UNINSTALL_FAIL: '1' } });
   placeGame(b.gameRoot);
   const { backend: b2 } = backendWith(b.service);
@@ -266,7 +266,7 @@ test('M9 Entfernen über SimBackend: Ordner weg, nicht mehr installiert, Overrid
   assert.equal(kept.apps.mywhoosh.problem, 'error');
 });
 
-test('M10 Start: Bluetooth, Updates, Startet, Läuft (Phasen aus der Ausgabe), Fortschritt fällt nie; Beenden stoppt Spiel und Enkel', async () => {
+test('M10 Start: Bluetooth, Updates, Starting, Running (phases from the output), progress never decreases; quitting stops game and grandchildren', async () => {
   const a = setup({ extra: { ROLLOUT_MYWHOOSH_RUNNING_MS: '300' } });
   placeGame(a.gameRoot);
   const { backend, snaps } = backendWith(a.service, { env: { ROLLOUT_MYWHOOSH_RUNNING_MS: '300' } });
@@ -278,10 +278,10 @@ test('M10 Start: Bluetooth, Updates, Startet, Läuft (Phasen aus der Ausgabe), F
   const seen = snaps.filter((s) => s.launch).map((s) => s.launch.phase);
   assert.deepEqual([...new Set(seen)], ['bluetooth', 'updates', 'starting', 'running']);
   const progress = snaps.filter((s) => s.launch).map((s) => s.launch.progress);
-  assert.ok(progress.every((p, i) => i === 0 || p >= progress[i - 1] || seen[i] === 'updates'), 'Fortschritt fällt nie (außer beim Wechsel Bluetooth zu Updates)');
+  assert.ok(progress.every((p, i) => i === 0 || p >= progress[i - 1] || seen[i] === 'updates'), 'progress never decreases (except on the switch from Bluetooth to Updates)');
   assert.equal(backend.hasRunningGame(), true);
   assert.deepEqual(a.calls(), ['run']);
-  await backend.launch('mywhoosh'); // zweiter Start läuft nicht an
+  await backend.launch('mywhoosh'); // second start does not begin
   assert.deepEqual(a.calls(), ['run']);
   assert.match(fs.readFileSync(path.join(a.home, 'state/run.pid'), 'utf8'), /^\d+$/m);
   const grandchild = Number(fs.readFileSync(path.join(a.home, 'child.pid'), 'utf8'));
@@ -291,12 +291,12 @@ test('M10 Start: Bluetooth, Updates, Startet, Läuft (Phasen aus der Ausgabe), F
   await stopping;
   assert.equal((await backend.getSnapshot()).launch, null);
   assert.equal(backend.hasRunningGame(), false);
-  assert.ok(await until(() => !alive(grandchild)), 'Enkel (Wine) ist weg');
+  assert.ok(await until(() => !alive(grandchild)), 'grandchild (Wine) is gone');
   assert.equal(fs.existsSync(path.join(a.home, 'state/run.pid')), false);
   assert.equal((await backend.getSnapshot()).apps.mywhoosh.installed, true);
 });
 
-test('M11 Bluetooth vor dem Start: ohne Adapter „bterror“ und kein Start; „Trotzdem starten“ startet; Abbruch in der Prüfung verwirft die Antwort', async () => {
+test('M11 Bluetooth before the start: without adapter "bterror" and no start; "Start anyway" starts; abort during the check discards the answer', async () => {
   const a = setup();
   placeGame(a.gameRoot);
   let adapter = 'problem';
@@ -311,7 +311,7 @@ test('M11 Bluetooth vor dem Start: ohne Adapter „bterror“ und kein Start; �
   assert.ok(await until(() => a.calls().length === 1), 'Spiel gestartet');
   assert.deepEqual(a.calls(), ['run']);
   await backend.stopLaunch();
-  // Beenden während der Prüfung: Die späte Antwort startet nichts.
+  // Quitting during the check: the late answer starts nothing.
   fs.rmSync(path.join(a.home, 'calls.log'), { force: true });
   let release = () => {};
   let first = true;
@@ -323,11 +323,11 @@ test('M11 Bluetooth vor dem Start: ohne Adapter „bterror“ und kein Start; �
   assert.equal(slow.snaps.at(-1).launch, null);
   release();
   await new Promise((r) => setTimeout(r, 300));
-  assert.deepEqual(a.calls(), [], 'die späte Antwort startete nichts');
+  assert.deepEqual(a.calls(), [], 'the late answer started nothing');
   assert.equal(slow.backend.hasRunningGame(), false);
 });
 
-test('M12 Start endet: Exit 0 = beendet, Fehler kurz nach dem Start = Absturz, fehlender Starter = „kann nicht starten“; nach einem Update im Start stimmt die Version', async () => {
+test('M12 Start ends: exit 0 = ended, error shortly after start = crash, missing starter = "cannot start"; after an update during the start the version is right', async () => {
   const ok = setup({ extra: { RUN_MODE: 'exit 0' } });
   placeGame(ok.gameRoot);
   const b1 = backendWith(ok.service);
@@ -341,7 +341,7 @@ test('M12 Start endet: Exit 0 = beendet, Fehler kurz nach dem Start = Absturz, f
   await b2.backend.launch('mywhoosh');
   assert.equal((await settle(b2.backend, (s) => s.launch?.phase === 'crash')).launch.phase, 'crash');
   assert.equal(b2.backend.hasRunningGame(), false);
-  await b2.backend.stopLaunch(); // die Absturz-Ansicht hält den Takt der Anzeige an: aufräumen
+  await b2.backend.stopLaunch(); // the crash view keeps the display ticker running: clean up
   const missing = setup({ extra: { ROLLOUT_RUN_UPSTREAM: '' } });
   placeGame(missing.gameRoot);
   const b3 = backendWith(missing.service);
@@ -351,26 +351,26 @@ test('M12 Start endet: Exit 0 = beendet, Fehler kurz nach dem Start = Absturz, f
   assert.equal(failed.launch.problem, 'error');
   await b3.backend.stopLaunch();
   const none = new mw.RealMywhoosh({ home: path.join(work, 'leer'), env: ok.env });
-  assert.equal(await none.start(() => {}).done, 127, 'ohne rollout-run');
+  assert.equal(await none.start(() => {}).done, 127, 'without rollout-run');
 });
 
-test('M13 Beenden von Rollout während der Einrichtung: bricht ab, das Skript und seine Kinder sind weg, kein Problem in der Karte', async () => {
+test('M13 Quitting Rollout during setup: aborts, the script and its children are gone, no problem on the card', async () => {
   const a = setup({ extra: { RUN_MODE: 'slow' } });
   const { backend } = backendWith(a.service);
   await backend.getSnapshot();
   await backend.install('mywhoosh', { steam: false, hd: false });
-  assert.ok(await until(() => fs.existsSync(path.join(a.home, 'started'))), 'Einrichtung läuft');
-  assert.equal(backend.hasRunningGame(), true, 'zählt als laufend: Rollout wartet beim Beenden');
+  assert.ok(await until(() => fs.existsSync(path.join(a.home, 'started'))), 'setup is running');
+  assert.equal(backend.hasRunningGame(), true, 'counts as running: Rollout waits on quit');
   await backend.stopLaunch();
   const snap = await backend.getSnapshot();
   assert.equal(snap.job, null);
   assert.equal(snap.apps.mywhoosh.installed, false);
-  assert.equal(snap.apps.mywhoosh.problem, '', 'Abbruch ist kein Fehler');
+  assert.equal(snap.apps.mywhoosh.problem, '', 'abort is not an error');
   assert.equal(backend.hasRunningGame(), false);
   assert.equal(fs.existsSync(path.join(a.home, 'state/mywhoosh-setup.pid')), false);
 });
 
-test('M14 Bluetooth-Zustand im Snapshot kommt bei jeder Abfrage frisch aus dem Dienst', async () => {
+test('M14 Bluetooth state in the snapshot comes fresh from the service on every query', async () => {
   const a = setup();
   let state = 'ready';
   const { backend } = backendWith(a.service, { adapter: async () => state });
@@ -381,7 +381,7 @@ test('M14 Bluetooth-Zustand im Snapshot kommt bei jeder Abfrage frisch aus dem D
   assert.equal((await backend.getSnapshot()).bluetooth.state, 'ready');
 });
 
-test('M15 chooseMywhooshMode: echt, sobald Starter und Skript da sind; ausdrückliche Wahl gewinnt; sonst Simulation. Ohne Dienst bleibt MyWhoosh simuliert', async () => {
+test('M15 chooseMywhooshMode: real as soon as starter and script exist; explicit choice wins; otherwise simulation. Without a service MyWhoosh stays simulated', async () => {
   const c = mw.chooseMywhooshMode;
   assert.equal(c({ mode: undefined, runnerExists: true, scriptExists: true }), 'real');
   assert.equal(c({ mode: undefined, runnerExists: false, scriptExists: true }), 'sim');
@@ -390,31 +390,31 @@ test('M15 chooseMywhooshMode: echt, sobald Starter und Skript da sind; ausdrück
   assert.equal(c({ mode: 'real', runnerExists: false, scriptExists: false }), 'real');
   const plain = backendWith(null).backend;
   const first = await plain.getSnapshot();
-  assert.equal(first.apps.mywhoosh.installed, true, 'Simulation: von Anfang an installiert');
+  assert.equal(first.apps.mywhoosh.installed, true, 'simulation: installed from the start');
   await plain.remove('mywhoosh');
   assert.equal((await plain.getSnapshot()).apps.mywhoosh.installed, false);
 });
 
-test('M16 Mitgelieferte Dateien: vendor/ stimmt mit den Prüfsummen in upstreams.json überein, ist ausführbar und hat seine Lizenz', () => {
+test('M16 Bundled files: vendor/ matches the checksums in upstreams.json, is executable and has its licence', () => {
   const pin = upstreams.mywhoosh;
   assert.match(pin.commit, /^[0-9a-f]{40}$/);
   assert.equal(pin.repo, 'Parapeth962/mywhoosh-linux-installer');
-  assert.deepEqual(Object.keys(pin.files).sort(), ['ble-bridge.py', 'mywhoosh.sh'], 'install kopiert ble-bridge.py, ohne sie bricht es ab');
+  assert.deepEqual(Object.keys(pin.files).sort(), ['ble-bridge.py', 'mywhoosh.sh'], 'install copies ble-bridge.py, without it it aborts');
   for (const [name, sha] of Object.entries(pin.files)) {
     const file = path.join(root, 'vendor', name);
     assert.equal(createHash('sha256').update(fs.readFileSync(file)).digest('hex'), sha, name);
-    assert.ok(fs.statSync(file).mode & 0o100, `${name} ausführbar`);
+    assert.ok(fs.statSync(file).mode & 0o100, `${name} executable`);
   }
   assert.match(fs.readFileSync(path.join(root, 'vendor/LICENSE-mywhoosh-linux-installer'), 'utf8'), /MIT License/);
   assert.equal(spawnSync('bash', ['-n', path.join(root, 'vendor/mywhoosh.sh')]).status, 0);
-  // Das Skript nennt in seinen Hilfetext genau die Befehle, die der Adapter benutzt.
+  // The script's help text names exactly the commands the adapter uses.
   const help = fs.readFileSync(path.join(root, 'vendor/mywhoosh.sh'), 'utf8');
   for (const cmd of ['install', 'run', 'update', 'uninstall']) assert.match(help, new RegExp(`mywhoosh\\.sh ${cmd}`));
   assert.equal(mw.percentForLine('[mywhoosh] preparing Windows environment (x)'), 92);
   assert.equal(mw.percentForLine('irgendwas'), 0);
 });
 
-// --- Spielfenster und Controller im Spielmodus (M17, M18) ---------------------------------------------------------------------
+// --- Game window and controller in Gaming Mode (M17, M18) ---------------------------------------------------------------------
 const TREE = (...windows) => `\nxwininfo: Window id: 0x3d9 (the root window) (has no name)\n\n  Root window id: 0x3d9 (the root window) (has no name)\n  Parent window id: 0x0 (none)\n     ${windows.length} children:\n${windows.join('\n')}\n`;
 const WIN = (id, name, cls, size) => `     ${id} "${name}": ("${cls}" "${cls}")  ${size}+4+30  +4+30`;
 const focusOut = (id) => `GAMESCOPE_FOCUSED_WINDOW(CARDINAL) = ${id}\n`;
@@ -429,7 +429,7 @@ function fakeX(state) {
   return { exec, calls };
 }
 
-test('M17 Fenster und Controller: erst wenn das MyWhoosh-Fenster im Fokus ist, startet die Weitergabe; bei Verlust und am Ende stoppt sie; nie STEAM_GAME setzen', async () => {
+test('M17 Window and controller: forwarding starts only when the MyWhoosh window is in focus; it stops on loss and at the end; never set STEAM_GAME', async () => {
   const a = setup({ extra: { RUN_MODE: 'wait' } });
   placeGame(a.gameRoot);
   const state = { tree: TREE(WIN('0x1', 'Rollout', 'rollout', '1280x800')), focus: 1 };
@@ -442,10 +442,10 @@ test('M17 Fenster und Controller: erst wenn das MyWhoosh-Fenster im Fokus ist, s
   await backend.launch('mywhoosh');
   await settle(backend, (s) => s.launch?.phase === 'updates' || s.launch?.phase === 'starting');
   await new Promise((r) => setTimeout(r, 80));
-  assert.deepEqual(events, [], 'ohne Spielfenster keine Weitergabe (A wäre ein Klick in Rollout)');
+  assert.deepEqual(events, [], 'no forwarding without a game window (A would be a click in Rollout)');
   state.tree = TREE(WIN('0x1', 'Rollout', 'rollout', '1280x800'), WIN('0x4200005', 'MyWhoosh', 'MyWhoosh-Win64-Shipping.exe', '1912x1046'));
   await new Promise((r) => setTimeout(r, 80));
-  assert.deepEqual(events, [], 'Fenster da, aber noch nicht im Fokus');
+  assert.deepEqual(events, [], 'window present, but not in focus yet');
   state.focus = 0x4200005;
   await settle(backend, (s) => s.launch?.visible === true);
   assert.deepEqual(events, ['start :7']);
@@ -457,13 +457,13 @@ test('M17 Fenster und Controller: erst wenn das MyWhoosh-Fenster im Fokus ist, s
   await backend.stopLaunch();
   assert.deepEqual(events, ['start :7', 'stop', 'start :7', 'stop']);
   assert.equal(snaps.at(-1).launch, null);
-  assert.ok(calls.every((c) => c.startsWith('xwininfo') || c.startsWith('xprop -root')), 'es wird nur gelesen');
+  assert.ok(calls.every((c) => c.startsWith('xwininfo') || c.startsWith('xprop -root')), 'read only');
   const n = calls.length;
   await new Promise((r) => setTimeout(r, 60));
-  assert.equal(calls.length, n, 'nach dem Ende keine Abfragen mehr');
+  assert.equal(calls.length, n, 'no more queries after the end');
 });
 
-test('M18 Ohne `windows` berührt start keinen X-Server und startet keine Weitergabe; ROLLOUT_MYWHOOSH_PAD=off schaltet nur den Controller ab', async () => {
+test('M18 Without `windows`, start touches no X server and starts no forwarding; ROLLOUT_MYWHOOSH_PAD=off switches off only the controller', async () => {
   const a = setup({ extra: { RUN_MODE: 'exit 0' } });
   const lines = [];
   const run = a.service.start((l) => lines.push(l));
@@ -475,26 +475,26 @@ test('M18 Ohne `windows` berührt start keinen X-Server und startet keine Weiter
   const shown = [];
   const r2 = off.start(() => {}, (v) => shown.push(v));
   assert.equal(await r2.done, 0);
-  assert.ok(notes.some((n) => /Fensterüberwachung an/.test(n)));
-  assert.ok(!notes.some((n) => /Controller-Weitergabe aktiv/.test(n)), 'Controller aus');
+  assert.ok(notes.some((n) => /window watching on/.test(n)));
+  assert.ok(!notes.some((n) => /Gamepad bridge active/.test(n)), 'controller off');
 });
 
-test('M19 Runder Zeiger: Thema als Xcursor-Dateien, dem Spiel über XCURSOR_* genannt; ROLLOUT_MYWHOOSH_CURSOR=off und fehlender Ordner lassen den normalen Zeiger', async () => {
+test('M19 Round pointer: theme as Xcursor files, passed to the game via XCURSOR_*; ROLLOUT_MYWHOOSH_CURSOR=off and a missing directory leave the normal pointer', async () => {
   const cur = await (async () => {
     await build({ entryPoints: [path.join(root, 'src/main/xcursor.ts')], bundle: true, platform: 'node', format: 'esm', outfile: path.join(work, 'xcursor.mjs'), logLevel: 'error' });
     return import(path.join(work, 'xcursor.mjs'));
   })();
   const file = cur.cursorFile();
   assert.equal(file.readUInt32LE(0), 0x72756358, 'Xcur');
-  assert.equal(file.readUInt32LE(12), 1, 'ein Bild');
+  assert.equal(file.readUInt32LE(12), 1, 'one image');
   const at = file.readUInt32LE(24);
-  assert.deepEqual([file.readUInt32LE(at + 16), file.readUInt32LE(at + 20), file.readUInt32LE(at + 24), file.readUInt32LE(at + 28)], [48, 48, 24, 24], 'Größe und Hotspot in der Mitte');
+  assert.deepEqual([file.readUInt32LE(at + 16), file.readUInt32LE(at + 20), file.readUInt32LE(at + 24), file.readUInt32LE(at + 28)], [48, 48, 24, 24], 'size and hotspot in the centre');
   assert.equal(file.length, at + 36 + 48 * 48 * 4);
   const px = (x, y) => file.readUInt32LE(at + 36 + (y * 48 + x) * 4);
   assert.equal(px(0, 0) >>> 24, 0, 'Ecke durchsichtig');
   assert.equal(px(24, 24) >>> 24, 255, 'Mitte deckend');
   assert.ok(((px(24, 24) >>> 16) & 255) < 100 && (px(24, 24) & 255) > 200, 'blaue Mitte');
-  assert.ok((px(24, 8) & 255) > 240 && ((px(24, 8) >>> 16) & 255) > 240, 'weißer Ring');
+  assert.ok((px(24, 8) & 255) > 240 && ((px(24, 8) >>> 16) & 255) > 240, 'white ring');
 
   const a = setup({ extra: { RUN_MODE: 'exit 0' } });
   placeGame(a.gameRoot);
@@ -504,12 +504,12 @@ test('M19 Runder Zeiger: Thema als Xcursor-Dateien, dem Spiel über XCURSOR_* ge
   assert.ok(fs.existsSync(path.join(dir, 'rollout-dot/index.theme')));
   assert.ok(fs.existsSync(path.join(dir, 'rollout-dot/cursors/left_ptr')));
   assert.deepEqual(fs.readFileSync(path.join(a.home, 'cursor.log'), 'utf8').trim().split('\n'), [`cursor=rollout-dot size=48 path=${dir}`]);
-  for (const [name, svc] of [['off', new mw.RealMywhoosh({ home: a.home, env: { ...a.env, ROLLOUT_MYWHOOSH_CURSOR: 'off' }, cursorDir: dir })], ['ohne Ordner', new mw.RealMywhoosh({ home: a.home, env: a.env })]]) {
+  for (const [name, svc] of [['off', new mw.RealMywhoosh({ home: a.home, env: { ...a.env, ROLLOUT_MYWHOOSH_CURSOR: 'off' }, cursorDir: dir })], ['without directory', new mw.RealMywhoosh({ home: a.home, env: a.env })]]) {
     fs.rmSync(path.join(a.home, 'cursor.log'));
     assert.equal(await svc.start(() => {}).done, 0);
     assert.deepEqual(fs.readFileSync(path.join(a.home, 'cursor.log'), 'utf8').trim().split('\n'), ['cursor= size= path='], name);
   }
-  // Ein Ordner, der sich nicht anlegen lässt, verhindert den Start nicht.
+  // A directory that cannot be created does not prevent the start.
   fs.writeFileSync(path.join(a.home, 'datei'), '');
   fs.rmSync(path.join(a.home, 'cursor.log'));
   assert.equal(await new mw.RealMywhoosh({ home: a.home, env: a.env, cursorDir: path.join(a.home, 'datei/x') }).start(() => {}).done, 0);

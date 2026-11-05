@@ -1,4 +1,4 @@
-// Binäres VDF, wie Steam es für shortcuts.vdf nutzt. Unbekannte Typen führen zu einem Fehler statt zu stillem Datenverlust.
+// Binary VDF as Steam uses it for shortcuts.vdf. Unknown types lead to an error instead of silent data loss.
 
 export type VdfValue = string | number | VdfMap;
 export interface VdfEntry {
@@ -16,7 +16,7 @@ export function parseVdf(buf: Buffer): VdfMap {
   let pos = 0;
   const cstring = (): string => {
     const end = buf.indexOf(0, pos);
-    if (end < 0) throw new Error('VDF: Zeichenkette ohne Ende');
+    if (end < 0) throw new Error('VDF: unterminated string');
     const text = buf.toString('utf8', pos, end);
     pos = end + 1;
     return text;
@@ -24,7 +24,7 @@ export function parseVdf(buf: Buffer): VdfMap {
   const readMap = (): VdfMap => {
     const entries: VdfMap = [];
     for (;;) {
-      if (pos >= buf.length) throw new Error('VDF: Ende der Datei vor dem Abschluss');
+      if (pos >= buf.length) throw new Error('VDF: end of file before completion');
       const type = buf[pos++];
       if (type === T_END) return entries;
       const key = cstring();
@@ -38,7 +38,7 @@ export function parseVdf(buf: Buffer): VdfMap {
     }
   };
   const root = readMap();
-  if (pos !== buf.length) throw new Error('VDF: Daten nach dem Ende');
+  if (pos !== buf.length) throw new Error('VDF: data after the end');
   return root;
 }
 
@@ -79,7 +79,7 @@ export function crc32(text: string): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** AppID eines Nicht-Steam-Eintrags: crc32(Exe samt Anführungszeichen + Name) mit gesetztem höchsten Bit. */
+/** AppID of a non-Steam entry: crc32(exe including quotes + name) with the highest bit set. */
 export const shortcutAppId = (exe: string, name: string): number => (crc32(exe + name) | 0x80000000) >>> 0;
 
 const field = (map: VdfMap, key: string): VdfEntry | undefined => map.find((e) => e.key.toLowerCase() === key.toLowerCase());
@@ -136,7 +136,7 @@ const same = (entry: VdfEntry, spec: ShortcutSpec): boolean => {
 
 export const hasShortcut = (root: VdfMap, spec: ShortcutSpec): boolean => !!shortcutsOf(root, false)?.some((e) => same(e, spec));
 
-/** Fügt den Eintrag hinzu, sofern er fehlt. Fremde Einträge bleiben unberührt. Gibt zurück, ob etwas geändert wurde. */
+/** Adds the entry if it is missing. Foreign entries stay untouched. Returns whether anything was changed. */
 export function addShortcut(root: VdfMap, spec: ShortcutSpec): boolean {
   const list = shortcutsOf(root, true) as VdfMap;
   if (list.some((e) => same(e, spec))) return false;

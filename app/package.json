@@ -3,7 +3,7 @@
   "version": "0.9.0-beta.2",
   "license": "MIT",
   "private": true,
-  "description": "Rollout: Launcher für MyWhoosh und Zwift unter Linux",
+  "description": "Rollout: launcher for MyWhoosh and Zwift on Linux",
   "main": "dist/main/main.js",
   "scripts": {
     "build": "node build.mjs",

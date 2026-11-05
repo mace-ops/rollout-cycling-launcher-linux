@@ -1,4 +1,4 @@
-// Bündelt Hauptprozess, Preload und Oberfläche nach dist/ und kopiert die statischen Dateien.
+// Bundles main process, preload and UI into dist/ and copies the static files.
 import { build } from 'esbuild';
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 

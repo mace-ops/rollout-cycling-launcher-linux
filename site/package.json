@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Statische Website von Rollout (GitHub Pages)",
+  "description": "Static website of Rollout (GitHub Pages)",
   "scripts": {
     "build": "node build.mjs",
     "test": "node build.mjs && node check.mjs",

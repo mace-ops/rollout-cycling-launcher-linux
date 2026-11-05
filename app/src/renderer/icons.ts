@@ -1,7 +1,7 @@
 const svg = (path: string, extra = ''): string =>
   `<svg class="icon ${extra}" viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
 
-// Marke für kleine Größen: gleiche Form wie assets/brand/logo.svg, aber dickere Linien, damit die zwei Ringe lesbar bleiben.
+// Mark for small sizes: same shape as assets/brand/logo.svg, but thicker lines so the two rings stay legible.
 const LOGO = '<svg class="logo" viewBox="130 130 764 764" fill="none" stroke-linecap="round" aria-hidden="true">'
   + '<path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="currentColor" stroke-width="32"/>'
   + '<path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="currentColor" stroke-width="32"/>'

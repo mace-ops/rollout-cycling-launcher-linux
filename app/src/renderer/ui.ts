@@ -6,7 +6,7 @@ export type Screen =
 
 export type AdvTab = AppId | 'bluetooth' | 'launcher';
 
-/** Zustand, der nur die Oberfläche betrifft. Alles Fachliche kommt aus dem Snapshot. */
+/** State that concerns only the UI. Everything domain-related comes from the snapshot. */
 export interface Ui {
   screen: Screen;
   setupApp: AppId;
@@ -14,22 +14,22 @@ export interface Ui {
   hd: boolean;
   updateDone: boolean;
   launchApp: AppId;
-  /** App, deren Menü (Zahnrad auf der Karte) offen ist */
+  /** App whose menu (gear on the card) is open */
   menuApp: AppId;
   btHelp: boolean;
   reportDone: boolean;
   steamModal: boolean;
-  /** Gewünschter Zustand, solange der Dialog „Steam muss neu starten“ für Rollout offen ist */
+  /** Desired state while the dialog "Steam has to restart" is open for Rollout */
   steamRollout: boolean | null;
-  /** Eigene Auswahlliste statt des nativen Menüs, damit Controller und Touch sie bedienen können */
+  /** Own selection list instead of the native menu so controller and touch can operate it */
   picker: { id: string; title: string; options: { label: string; selected: boolean }[] } | null;
   confirmRemove: AppId | null;
   confirmQuit: boolean;
-  /** Dialog „Rollout neu starten?“ */
+  /** Dialog "Restart Rollout?" */
   confirmRestart: boolean;
-  /** Dialog „Version x starten?“ (vorherige Version) */
+  /** Dialog "Start version x?" (previous version) */
   confirmPrevious: boolean;
-  /** Zustimmungsdialog „Zwift-Image herunterladen?“ (nur wenn Zwift echt installiert wird) */
+  /** Consent dialog "Download the Zwift image?" (only when Zwift is installed for real) */
   confirmImage: boolean;
   gatePassed: boolean;
   advTab: AdvTab;
@@ -43,7 +43,7 @@ export const freshUi = (): Ui => ({
 
 export const LAUNCH_SCREENS: readonly Screen[] = ['launching', 'running', 'bterror', 'crash', 'failed'];
 
-/** Wohin „Zurück“ führt, auch für Esc und die B-Taste. `null`: kein Zurück. */
+/** Where "Back" leads, also for Esc and the B button. `null`: no back. */
 export const BACK: Partial<Record<Screen, Screen>> = {
   setup: 'library', progress: 'library', done: 'library', bluetooth: 'appmenu', appmenu: 'library', settings: 'library',
   help: 'settings', remove: 'settings', gate: 'settings', advanced: 'settings'

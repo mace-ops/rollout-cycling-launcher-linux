@@ -1,5 +1,5 @@
-// Netzzugriff des Selbst-Updates über Electron (net.fetch): feste Asset-URLs von GitHub, keine REST-API, kein Token,
-// keine Cookies. Nur der Hauptprozess spricht mit dem Netz (Konzept 6.1 SU5, 6.7).
+// Network access of the self-update through Electron (net.fetch): fixed asset URLs from GitHub, no REST API, no token,
+// no cookies. Only the main process talks to the network (concept 6.1 SU5, 6.7).
 import { net } from 'electron';
 import fs from 'node:fs';
 import type { UpdateChannel } from '../shared/api';
@@ -32,7 +32,7 @@ export const realFeed: Feed = {
   },
 
   async download(url, dest, { maxBytes, signal, onBytes }: DownloadOptions) {
-    // Eigener Abbruch, damit der Abbruch von außen und die Überwachung auf denselben Weg gehen. 30 s ohne neue Daten gelten als hängend.
+    // Own abort so the external abort and the monitoring take the same path. 30 s without new data count as hanging.
     const inner = new AbortController();
     const onAbort = (): void => inner.abort();
     signal.addEventListener('abort', onAbort);
@@ -52,7 +52,7 @@ export const realFeed: Feed = {
         clearTimeout(stall);
         stall = setTimeout(onAbort, STALL_MS);
         total += chunk.value.length;
-        if (total > maxBytes) { await reader.cancel(); throw new FeedError('size', 'mehr Bytes als angegeben'); }
+        if (total > maxBytes) { await reader.cancel(); throw new FeedError('size', 'more bytes than declared'); }
         await out.write(chunk.value);
         onBytes(chunk.value.length);
       }

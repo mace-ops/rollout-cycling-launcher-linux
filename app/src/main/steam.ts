@@ -1,5 +1,5 @@
-// Steam-Verknüpfung: legt Rollout als Nicht-Steam-Spiel in shortcuts.vdf an oder entfernt es.
-// Geschrieben wird nur bei beendetem Steam, mit Sicherung, Prüfung und atomarem Umbenennen.
+// Steam integration: adds Rollout to shortcuts.vdf as a non-Steam game or removes it.
+// Writing happens only while Steam is closed, with a backup, verification and atomic rename.
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -31,7 +31,7 @@ export function rolloutShortcut(): ShortcutSpec {
 
 const exists = (p: string): boolean => { try { return fs.existsSync(p); } catch { return false; } };
 
-/** Steam-Ordner: native Installation. Flatpak und Snap sind nicht unterstützt. */
+/** Steam directory: native installation. Flatpak and Snap are not supported. */
 export function findSteamRoot(): string | null {
   const home = os.homedir();
   const candidates = [path.join(home, '.local/share/Steam'), path.join(home, '.steam/steam')];
@@ -39,12 +39,12 @@ export function findSteamRoot(): string | null {
     try {
       const real = fs.realpathSync(candidate);
       if (exists(path.join(real, 'userdata'))) return real;
-    } catch { /* nächster Kandidat */ }
+    } catch { /* next candidate */ }
   }
   return null;
 }
 
-/** Konto der letzten Anmeldung aus loginusers.vdf, sonst der zuletzt veränderte userdata-Ordner. */
+/** Account of the last login from loginusers.vdf, otherwise the most recently modified userdata directory. */
 export function findAccountDir(root: string): string | null {
   const userdata = path.join(root, 'userdata');
   let best: { id: string; time: number } | null = null;
@@ -57,7 +57,7 @@ export function findAccountDir(root: string): string | null {
       const id = String(BigInt(match[1]) - STEAM_ID64_BASE);
       if (exists(path.join(userdata, id)) && (!best || stamp > best.time)) best = { id, time: stamp };
     }
-  } catch { /* ohne loginusers.vdf weiter mit dem Ordnerstand */ }
+  } catch { /* without loginusers.vdf continue with the directory state */ }
   if (best) return path.join(userdata, best.id);
   const dirs = fs.readdirSync(userdata).filter((d) => /^\d+$/.test(d) && d !== '0');
   dirs.sort((a, b) => fs.statSync(path.join(userdata, b)).mtimeMs - fs.statSync(path.join(userdata, a)).mtimeMs);
@@ -75,7 +75,7 @@ function readRoot(file: string): VdfMap {
   return parseVdf(fs.readFileSync(file));
 }
 
-/** Ordner und AppID des Rollout-Eintrags im aktiven Steam-Konto, sonst `null`. */
+/** Directory and AppID of the Rollout entry in the active Steam account, otherwise `null`. */
 export function rolloutSteamPaths(): { configDir: string; appId: number } | null {
   const root = findSteamRoot();
   const dir = root && findAccountDir(root);
@@ -84,7 +84,7 @@ export function rolloutSteamPaths(): { configDir: string; appId: number } | null
   return { configDir: path.join(dir, 'config'), appId: shortcutAppId(`"${spec.exe}"`, spec.name) };
 }
 
-/** Dateien in config/grid, die zum Eintrag gehören: Hochformat, Breitformat, Hintergrund, Logo. */
+/** Files in config/grid that belong to the entry: portrait, landscape, background, logo. */
 export const artworkFiles = (configDir: string, appId: number): string[] =>
   ['p', '', '_hero', '_logo'].map((suffix) => path.join(configDir, 'grid', `${appId}${suffix}.png`));
 
@@ -106,14 +106,14 @@ export function status(): SteamInfo {
   }
 }
 
-/** Schreibt die Datei nur, wenn die Prüfung bestanden ist: alte Einträge unverändert, Round-Trip stimmt. */
+/** Writes the file only if the verification passes: old entries unchanged, round trip matches. */
 export function writeShortcuts(file: string, change: (tree: VdfMap) => boolean): boolean {
   const original = exists(file) ? fs.readFileSync(file) : null;
   const tree = original ? parseVdf(original) : [{ key: 'shortcuts', value: [] } as const] as VdfMap;
-  if (original && !serializeVdf(parseVdf(original)).equals(original)) throw new Error('shortcuts.vdf lässt sich nicht verlustfrei lesen, nichts geändert');
+  if (original && !serializeVdf(parseVdf(original)).equals(original)) throw new Error('shortcuts.vdf cannot be read losslessly, nothing changed');
   if (!change(tree)) return false;
   const bytes = serializeVdf(tree);
-  if (!serializeVdf(parseVdf(bytes)).equals(bytes)) throw new Error('Prüfung der neuen shortcuts.vdf fehlgeschlagen, nichts geändert');
+  if (!serializeVdf(parseVdf(bytes)).equals(bytes)) throw new Error('Verification of the new shortcuts.vdf failed, nothing changed');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (original) {
     fs.writeFileSync(`${file}.rollout-backup-${Date.now()}`, original);
@@ -162,7 +162,7 @@ export async function setRolloutInSteam(
     } else {
       apply();
     }
-    // Bilder sind kosmetisch: Scheitern ändert nichts am Ergebnis.
+    // Images are cosmetic: failure changes nothing about the result.
     if (on) await artwork?.(configDir, appId).catch(() => undefined);
     else removeArtwork(configDir, appId);
     return { status: 'done', message: '' };

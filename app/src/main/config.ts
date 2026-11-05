@@ -1,4 +1,4 @@
-// ~/.config/rollout/config.toml: speichert nur Abweichungen von den Vorgaben. Unterstützt wird nur, was Rollout selbst schreibt.
+// ~/.config/rollout/config.toml: stores only deviations from the defaults. Only what Rollout writes itself is supported.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,13 +7,13 @@ import type { UpdateChannel } from '../shared/api';
 export interface Settings {
   language: string;
   theme: 'auto' | 'dark' | 'light';
-  /** „auto“ oder Prozent der Referenzgröße, 100 bis 200 */
+  /** "auto" or percent of the reference size, 100 to 200 */
   scale: string;
   autoUpdate: boolean;
   updateChannel: UpdateChannel;
-  /** Fester Tag des Zwift-Images (netbrain/zwift), leer = nicht eingestellt; nie „latest“. `rollout-run` liest ihn aus derselben Datei. */
+  /** Fixed tag of the Zwift image (netbrain/zwift), empty = not configured; never "latest". `rollout-run` reads it from the same file. */
   zwiftTag: string;
-  /** Optionaler fester Digest des Zwift-Images (`sha256:` und 64 Hex-Zeichen), leer = nur der Tag zählt */
+  /** Optional fixed digest of the Zwift image (`sha256:` and 64 hex characters), empty = only the tag counts */
   zwiftDigest: string;
 }
 
@@ -55,7 +55,7 @@ export function serializeConfig(settings: Settings): string {
   if (settings.updateChannel !== DEFAULTS.updateChannel) lines.push(`update_channel = "${settings.updateChannel}"`);
   if (settings.zwiftTag !== DEFAULTS.zwiftTag) lines.push(`zwift_tag = "${settings.zwiftTag}"`);
   if (settings.zwiftDigest !== DEFAULTS.zwiftDigest) lines.push(`zwift_digest = "${settings.zwiftDigest}"`);
-  return lines.length ? `# Rollout: nur eigene Abweichungen\n${lines.join('\n')}\n` : '';
+  return lines.length ? `# Rollout: only deviations from the defaults\n${lines.join('\n')}\n` : '';
 }
 
 export const fileStore: SettingsStore = {
@@ -78,6 +78,6 @@ export const fileStore: SettingsStore = {
       const temp = `${file}.tmp`;
       fs.writeFileSync(temp, text);
       fs.renameSync(temp, file);
-    } catch { /* Einstellungen gehen dann beim Beenden verloren, die App läuft weiter */ }
+    } catch { /* settings are then lost on quit, the app keeps running */ }
   }
 };

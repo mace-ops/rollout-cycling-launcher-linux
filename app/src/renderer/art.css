@@ -1,4 +1,4 @@
-/* Bilder für die Steam-Bibliothek. Die Art wird über body[data-kind] gewählt, siehe art.ts. */
+/* Images for the Steam library. The kind is chosen via body[data-kind], see art.ts. */
 html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#08090E; color:#fff; --accent:#E8673C; }
 .stage { position:relative; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
 .stage .logo { flex:none; }
@@ -12,7 +12,7 @@ body[data-kind=wide] .stage { gap:5vh; }
 body[data-kind=wide] .logo { width:46vh; height:46vh; }
 body[data-kind=wide] .word { font-size:34vh; }
 
-/* Hintergrund aus dem Foto der App. Steam legt das Logo darüber, links unten bleibt es deshalb ruhig. */
+/* Background from the app's photo. Steam places the logo over it, so the bottom left stays calm. */
 .hero-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 40%; display:block; }
 .hero-fade { position:absolute; inset:0; background:linear-gradient(to right, rgba(6,6,14,.55) 0, rgba(6,6,14,.15) 45%, transparent 70%), linear-gradient(to top, rgba(6,6,14,.45) 0, transparent 40%); }
 

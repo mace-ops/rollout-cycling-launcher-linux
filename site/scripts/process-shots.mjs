@@ -1,5 +1,5 @@
-// Rohaufnahmen (site/shots-raw/en/s<n>-<name>.png, 1600 × 1000, englische Oberfläche) → Website (site/static/screens/en) und README (media).
-// Aufruf: node scripts/process-shots.mjs [Rohordner]. Aufnahme siehe site/README.md (app/test/shots.mjs).
+// Raw captures (site/shots-raw/en/s<n>-<name>.png, 1600 × 1000, English UI) → website (site/static/screens/en) and README (media).
+// Usage: node scripts/process-shots.mjs [raw directory]. For capturing see site/README.md (app/test/shots.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.resolve(HERE, '..');
 const REPO = path.resolve(SITE, '..');
 const RAW = path.resolve(process.argv[2] ?? path.join(SITE, 'shots-raw'));
-// Alle Sprachseiten und beide READMEs zeigen dieselben englischen Aufnahmen (nur die Bildtexte sind übersetzt).
+// All language pages and both READMEs show the same English captures (only the captions are translated).
 const LANGS = ['en'];
 const NAMES = ['home', 'pick', 'before-install', 'installing', 'done', 'bluetooth', 'starting', 'error', 'settings', 'advanced', 'light', 'steam'];
 const README_LANGS = ['en'];
@@ -28,7 +28,7 @@ async function jpgUnder(buf, max) {
     const out = await sharp(buf).jpeg({ quality: q, mozjpeg: true }).toBuffer();
     if (out.length < max) return out;
   }
-  throw new Error('JPG bleibt über dem Limit');
+  throw new Error('JPG stays over the limit');
 }
 
 const frames = {};
@@ -51,7 +51,7 @@ for (const lang of LANGS) {
   console.log('Bilder', lang);
 }
 
-// README-Kopfbild: 960 px breit, 5 Ansichten im Wechsel
+// README header image: 960 px wide, 5 views in rotation
 const GIF = ['home', 'before-install', 'installing', 'bluetooth', 'settings'];
 const w = 960, h = 600;
 const pages = await Promise.all(GIF.map((n) => sharp(frames[n]).resize(w, h).png().toBuffer()));

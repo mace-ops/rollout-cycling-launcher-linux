@@ -186,7 +186,7 @@ option { background:var(--opt); color:var(--text); }
 
 .app.light input[type=checkbox]:checked { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
 
-/* Hilfsklassen: ersetzen die style-Attribute des Mockups, weil die CSP keine Inline-Stile erlaubt */
+/* Helper classes: replace the mockup's style attributes because the CSP does not allow inline styles */
 .mb-20 { margin-bottom:20px; } .mb-28 { margin-bottom:28px; } .mb-32 { margin-bottom:32px; }
 .mt-16 { margin-top:16px; } .mt-24 { margin-top:24px; }
 .push { margin-left:auto; } .pull { margin-left:-14px; } .wrap { flex-wrap:wrap; }
@@ -196,14 +196,14 @@ option { background:var(--opt); color:var(--text); }
 .h1-sm { font-size:clamp(30px,3.4vw,48px); }
 button, select, input { -webkit-tap-highlight-color:transparent; }
 html, body { overflow-x:hidden; }
-/* Im Gaming Mode kommt Touch als Maus an: Ziehen scrollt (siehe main.ts), Text wird nie markiert. */
+/* In Gaming Mode touch arrives as a mouse: dragging scrolls (see main.ts), text is never selected. */
 body { user-select:none; -webkit-user-select:none; touch-action:pan-y; }
-/* Touch kommt als Maus an: Zeiger verstecken, bis sich eine echte Maus ohne gedrückte Taste bewegt. */
+/* Touch arrives as a mouse: hide the pointer until a real mouse moves without a button pressed. */
 html.touching, html.touching * { cursor:none !important; }
 input, select { user-select:auto; -webkit-user-select:auto; }
 .logo { width:30px; height:30px; flex:none; display:block; }
 
-/* Schmale, zurückhaltende Scrollbalken. In Auswahllisten entfallen sie ganz, dort scrollt man mit Steuerkreuz, Stick oder Touch. */
+/* Narrow, subtle scrollbars. In selection lists they are omitted entirely; there you scroll with d-pad, stick or touch. */
 ::-webkit-scrollbar { width:12px; height:12px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background-color:rgba(255,255,255,.2); border:4px solid transparent; background-clip:content-box; border-radius:12px; }

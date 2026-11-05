@@ -1,6 +1,6 @@
-// Selbst-Update des Launchers (Konzept 6.1 bis 6.7): Manifest prüfen, laden, Signatur und Prüfsumme prüfen,
-// als neue Version bereitlegen. Eingespielt wird beim nächsten Start durch den Wächter (scripts/bin-rollout.sh).
-// Unabhängig von sim.ts. Das Netz steckt hinter `Feed`, im Test ersetzt `FakeFeed` es durch einen Ordner.
+// Self-update of the launcher (concept 6.1 to 6.7): check the manifest, download, verify signature and checksum,
+// stage as a new version. It is applied at the next start by the watcher (scripts/bin-rollout.sh).
+// Independent of sim.ts. The network sits behind `Feed`; in tests `FakeFeed` replaces it with a directory.
 import { execFile } from 'node:child_process';
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ export function parseSemver(version: string): Semver | null {
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]), pre };
 }
 
-/** SemVer-Rangfolge: 1.3.0-beta.9 < 1.3.0-beta.10 < 1.3.0 < 1.10.0. Ungültige Versionen zählen als niedrigste. */
+/** SemVer ordering: 1.3.0-beta.9 < 1.3.0-beta.10 < 1.3.0 < 1.10.0. Invalid versions count as the lowest. */
 export function compareSemver(a: string, b: string): number {
   const x = parseSemver(a);
   const y = parseSemver(b);
@@ -50,7 +50,7 @@ export function compareSemver(a: string, b: string): number {
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
-/** Ed25519 über die exakten Bytes von `signed`. Schlüssel: 32 Byte Base64, Signatur: 64 Byte Base64. */
+/** Ed25519 over the exact bytes of `signed`. Key: 32 bytes base64, signature: 64 bytes base64. */
 export function verifySignature(signed: string, signatureB64: string, publicKeyB64: string): boolean {
   try {
     if (!BASE64.test(signatureB64) || !BASE64.test(publicKeyB64)) return false;
@@ -75,7 +75,7 @@ export interface Manifest {
   runtime: Archive & { electron: string; min: string };
 }
 
-/** `format`: neueres Manifest-Format, Neuinstallation nötig. `invalid`: Signatur oder Inhalt falsch. `old`: nicht höher. `bad`: gesperrt. */
+/** `format`: newer manifest format, fresh install needed. `invalid`: signature or content wrong. `old`: not higher. `bad`: blocked. */
 export type Rejection = 'format' | 'invalid' | 'old' | 'bad';
 export type Verdict = { ok: true; manifest: Manifest } | { ok: false; reason: Rejection; detail: string };
 
@@ -103,43 +103,43 @@ function archiveOf(value: unknown, limit: number): Archive | null {
   return { url, size: size as number, unpacked: unpacked as number, sha256 };
 }
 
-/** Prüft Umschlag, Signatur und Inhalt in dieser Reihenfolge. Vor der Signatur wird nichts vom Inhalt benutzt. */
+/** Checks envelope, signature and content in this order. Nothing of the content is used before the signature. */
 export function evaluateManifest(raw: Buffer | string, ctx: ManifestContext): Verdict {
   const bytes = typeof raw === 'string' ? Buffer.byteLength(raw) : raw.length;
-  if (bytes > LIMITS.manifest) return reject('invalid', 'zu groß');
+  if (bytes > LIMITS.manifest) return reject('invalid', 'too large');
   let envelope: unknown;
-  try { envelope = JSON.parse(raw.toString()); } catch { return reject('invalid', 'kein JSON'); }
-  if (!isRecord(envelope)) return reject('invalid', 'kein Umschlag');
+  try { envelope = JSON.parse(raw.toString()); } catch { return reject('invalid', 'not JSON'); }
+  if (!isRecord(envelope)) return reject('invalid', 'not an envelope');
   const { keyId, signature, signed } = envelope;
-  if (typeof keyId !== 'string' || typeof signature !== 'string' || typeof signed !== 'string') return reject('invalid', 'Umschlag unvollständig');
-  if (!Object.hasOwn(ctx.keys, keyId)) return reject('invalid', 'unbekannter Schlüssel');
+  if (typeof keyId !== 'string' || typeof signature !== 'string' || typeof signed !== 'string') return reject('invalid', 'envelope incomplete');
+  if (!Object.hasOwn(ctx.keys, keyId)) return reject('invalid', 'unknown key');
   if (!verifySignature(signed, signature, ctx.keys[keyId])) return reject('invalid', 'Signatur falsch');
   let m: unknown;
-  try { m = JSON.parse(signed); } catch { return reject('invalid', 'Manifest kein JSON'); }
-  if (!isRecord(m)) return reject('invalid', 'Manifest kein Objekt');
+  try { m = JSON.parse(signed); } catch { return reject('invalid', 'manifest is not JSON'); }
+  if (!isRecord(m)) return reject('invalid', 'manifest is not an object');
   if (typeof m.format !== 'number') return reject('invalid', 'format fehlt');
   if (m.format > MANIFEST_FORMAT) return reject('format', `format ${m.format}`);
   if (m.format !== MANIFEST_FORMAT) return reject('invalid', 'format unbekannt');
   if (m.product !== 'rollout') return reject('invalid', 'falsches Produkt');
   if (m.channel !== ctx.channel) return reject('invalid', 'falscher Kanal');
-  if (typeof m.version !== 'string' || !parseSemver(m.version)) return reject('invalid', 'Version ungültig');
+  if (typeof m.version !== 'string' || !parseSemver(m.version)) return reject('invalid', 'invalid version');
   if (typeof m.published !== 'string') return reject('invalid', 'published fehlt');
   const app = archiveOf(m.app, LIMITS.app);
   const runtimeRaw = isRecord(m.runtime) ? m.runtime : null;
   const runtime = archiveOf(runtimeRaw, LIMITS.runtime);
-  if (!app || !runtime || !runtimeRaw) return reject('invalid', 'Archiv ungültig');
+  if (!app || !runtime || !runtimeRaw) return reject('invalid', 'invalid archive');
   const { electron, min } = runtimeRaw;
   if (typeof electron !== 'string' || typeof min !== 'string' || !parseSemver(electron) || !parseSemver(min) || compareSemver(min, electron) > 0) {
-    return reject('invalid', 'Electron-Angaben ungültig');
+    return reject('invalid', 'invalid Electron details');
   }
-  if (compareSemver(m.version, ctx.current) <= 0) return reject('old', 'nicht höher');
+  if (compareSemver(m.version, ctx.current) <= 0) return reject('old', 'not higher');
   if (ctx.bad.includes(m.version)) return reject('bad', 'gesperrt');
   return { ok: true, manifest: { format: m.format, product: 'rollout', channel: ctx.channel, version: m.version, published: m.published, app, runtime: { ...runtime, electron, min } } };
 }
 
 export interface ElectronPlan { use: string; download: boolean }
 
-/** Electron neu laden nur, wenn das laufende nicht reicht: gleiche Hauptversion und mindestens `min`. */
+/** Download Electron again only if the running one is not enough: same major version and at least `min`. */
 export function electronPlan(installed: readonly string[], currentRuntime: string, rt: { electron: string; min: string }): ElectronPlan {
   const cur = parseSemver(currentRuntime);
   const want = parseSemver(rt.electron);
@@ -159,7 +159,7 @@ export class FeedError extends Error {
 
 export interface DownloadOptions { maxBytes: number; signal: AbortSignal; onBytes: (n: number) => void }
 
-/** Netzzugriff. `manifest` liefert den Status und bei 200 den Inhalt, Netzfehler werfen. `download` wirft `FeedError`. */
+/** Network access. `manifest` returns the status and, on 200, the content; network errors throw. `download` throws `FeedError`. */
 export interface Feed {
   manifest(channel: UpdateChannel, signal: AbortSignal): Promise<{ status: number; body?: Buffer }>;
   download(url: string, dest: string, options: DownloadOptions): Promise<void>;
@@ -177,9 +177,9 @@ export interface SelfUpdateService {
   restart(): boolean;
   startPrevious(): boolean;
   dismissNotice(): void;
-  /** Kanal oder Schalter „Updates automatisch laden“ wurden geändert */
+  /** Channel or the "Download updates automatically" switch was changed */
   settingsChanged(): void;
-  /** Spiel oder Installation hat begonnen oder geendet */
+  /** A game or installation has started or ended */
   busyChanged(): void;
   onChange(listener: () => void): void;
 }
@@ -189,17 +189,17 @@ export interface SelfUpdaterOptions {
   version: string;
   keys: Record<string, string>;
   feed: Feed;
-  /** Nur mit aktivem Wächter (ROLLOUT_SUPERVISED=1) wird geprüft, geladen und eingespielt */
+  /** Only with an active watcher (ROLLOUT_SUPERVISED=1) is anything checked, downloaded and applied */
   supervised: boolean;
   arch?: string;
   settings: () => { autoUpdate: boolean; channel: UpdateChannel };
-  /** Läuft ein Spiel oder eine Installation? `state/run.pid` kommt von `rollout-run` und wird hier ergänzt. */
+  /** Is a game or installation running? `state/run.pid` comes from `rollout-run` and is supplemented here. */
   busy: () => boolean;
   exit: (code: number) => void;
   freeBytes?: (dir: string) => number;
   now?: () => number;
   timing?: { firstCheckMs: number; healthyMs: number; intervalMs: number };
-  /** Nur Tests: wird vor jedem Schritt des Bereitlegens aufgerufen */
+  /** Tests only: called before each step of staging */
   step?: (name: string) => void;
 }
 
@@ -236,7 +236,7 @@ export class SelfUpdater implements SelfUpdateService {
   private readonly tried = new Set<string>();
   private readonly listeners: (() => void)[] = [];
   private readonly active: boolean;
-  /** Kanal beim Start, `null` bis `start()` läuft: Der Hauptprozess legt den Dienst vor dem Backend an, die Einstellungen sind dann noch nicht lesbar. */
+  /** Channel at start, `null` until `start()` runs: the main process creates the service before the backend, so the settings are not readable yet. */
   private channel: UpdateChannel | null = null;
   private healthyDone = false;
   private readonly timing: { firstCheckMs: number; healthyMs: number; intervalMs: number };
@@ -284,7 +284,7 @@ export class SelfUpdater implements SelfUpdateService {
     return { ...base, blocked: this.isBusy(), previous: this.previousVersion(), notice: firstLine(this.dir('state/notice')) };
   }
 
-  /** Ein zuvor bereitgelegtes Update, das noch nicht eingespielt wurde. */
+  /** A previously staged update that has not been applied yet. */
   private restorePending(): void {
     const p = this.pending();
     if (parseSemver(p) && compareSemver(p, this.o.version) > 0 && exists(this.dir('versions', p, 'package.json'))) {
@@ -302,7 +302,7 @@ export class SelfUpdater implements SelfUpdateService {
     setInterval(() => void this.check(false), this.timing.intervalMs).unref();
   }
 
-  /** Nach dem ersten Zeichnen: Gilt die Version auf Probe als gesund, meldet es der Hauptprozess dem Wächter. */
+  /** After the first paint: if the version on trial counts as healthy, the main process reports it to the watcher. */
   uiReady(): void {
     if (!this.active || this.healthyDone) return;
     this.healthyDone = true;
@@ -347,7 +347,7 @@ export class SelfUpdater implements SelfUpdateService {
     try {
       const c = JSON.parse(readText(this.dir('state/check.json')) ?? '');
       if (c && c.channel === channel && typeof c.at === 'number' && Array.isArray(c.envelopes)) return c;
-    } catch { /* kein Zwischenspeicher */ }
+    } catch { /* no cache */ }
     return null;
   }
 
@@ -444,8 +444,8 @@ export class SelfUpdater implements SelfUpdateService {
           if (pct !== this.progress) { this.progress = pct; this.emit(); }
         }
       });
-      if (fs.statSync(file).size !== a.size) throw new StageError('Größe weicht ab');
-      if (await sha256Of(file) !== a.sha256) throw new StageError('Prüfsumme weicht ab');
+      if (fs.statSync(file).size !== a.size) throw new StageError('size differs');
+      if (await sha256Of(file) !== a.sha256) throw new StageError('checksum differs');
       return file;
     };
     const untar = async (file: string, to: string): Promise<void> => {
@@ -458,8 +458,8 @@ export class SelfUpdater implements SelfUpdateService {
     const appDir = path.join(staging, 'app');
     await untar(appFile, appDir);
     let pkg: { version?: unknown } = {};
-    try { pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')); } catch { /* unten abgelehnt */ }
-    if (pkg.version !== m.version) throw new StageError('package.json nennt eine andere Version');
+    try { pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')); } catch { /* rejected below */ }
+    if (pkg.version !== m.version) throw new StageError('package.json names a different version');
     for (const file of ['dist/main/main.js', 'dist/preload/preload.js', 'dist/renderer/index.html', 'bootstrap/rollout']) {
       if (!exists(path.join(appDir, file))) throw new StageError(`${file} fehlt`);
     }
@@ -469,10 +469,10 @@ export class SelfUpdater implements SelfUpdateService {
       const out = await run(path.join(electronDir, 'electron'), ['-p', 'process.versions.electron'], {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, timeout: 20_000, signal
       });
-      if (String(out.stdout).trim() !== m.runtime.electron) throw new StageError('Electron meldet eine andere Version');
+      if (String(out.stdout).trim() !== m.runtime.electron) throw new StageError('Electron reports a different version');
     }
 
-    // Festschreiben: erst alles an Ort und Stelle, zuletzt pending. Ohne pending bleibt alles wie vorher.
+    // Commit: everything in place first, pending last. Without pending everything stays as before.
     const versionDir = this.dir('versions', m.version);
     const electronTarget = this.dir('electron', plan.use);
     const created: string[] = [];
@@ -494,14 +494,14 @@ export class SelfUpdater implements SelfUpdateService {
     }
   }
 
-  /** „Jetzt neu starten“. Der Hauptprozess prüft hier erneut, ob etwas belegt ist. */
+  /** "Restart now". The main process checks again here whether anything is busy. */
   restart(): boolean {
     if (!this.active || this.status !== 'ready' || this.isBusy() || !this.pending()) { this.emit(); return false; }
     this.o.exit(75);
     return true;
   }
 
-  /** „Vorherige Version“: sperrt die laufende Version und legt die vorherige als pending ab. */
+  /** "Previous version": blocks the running version and stages the previous one as pending. */
   startPrevious(): boolean {
     const prev = this.previousVersion();
     if (!this.active || !prev || this.isBusy()) { this.emit(); return false; }
@@ -516,7 +516,7 @@ export class SelfUpdater implements SelfUpdateService {
     this.emit();
   }
 
-  /** Nach bestandener Probe: Starter erneuern, Symbol erneuern, alte Versionen und Electron-Ordner entfernen. Nur wenn nichts belegt ist. */
+  /** After a passed trial: renew starter, renew icon, remove old versions and Electron directories. Only if nothing is busy. */
   async housekeeping(): Promise<void> {
     if (!this.active || this.isBusy() || this.abort || firstLine(this.dir('state/trial'))) return;
     const current = linkVersion(this.dir('current'));
@@ -549,7 +549,7 @@ export class SelfUpdater implements SelfUpdateService {
       fs.copyFileSync(fresh, temp);
       fs.chmodSync(temp, 0o755);
       fs.renameSync(temp, installed);
-    } catch { /* bleibt bis zum nächsten Start liegen */ }
+    } catch { /* stays until the next start */ }
   }
 
   private renewIcon(version: string): void {
@@ -561,6 +561,6 @@ export class SelfUpdater implements SelfUpdateService {
         fs.writeFileSync(temp, fresh);
         fs.renameSync(temp, this.dir('icon.png'));
       }
-    } catch { /* Symbol ist kosmetisch */ }
+    } catch { /* icon is cosmetic */ }
   }
 }

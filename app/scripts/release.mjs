@@ -1,9 +1,9 @@
-// Release-Werkzeug (Konzept 6.3): baut die Archive und das signierte Manifest nach release-out/. Kein Upload.
-//   node scripts/release.mjs pack  [--key <pem>] [--key-id <id>] [--runtime <Electron-Ordner> | --runtime-from <rollout-update.json>] [--out <Ordner>]
-//   node scripts/release.mjs check [--electron <Ordner>] [--previous <rollout-<v>-app.tar.gz>]
-// pack liest die Version aus package.json (Vorabversion = Kanal beta), erwartet gebautes dist/ und fragt nach der Passphrase
-// (oder nimmt ROLLOUT_RELEASE_PASSPHRASE). check spielt das vorherige Release auf den Kandidaten und diesen auf eine
-// künstliche Version +1 ein (mit Testschlüssel, am besten am Ally, weil es echtes Electron braucht).
+// Release tool (concept 6.3): builds the archives and the signed manifest into release-out/. No upload.
+//   node scripts/release.mjs pack  [--key <pem>] [--key-id <id>] [--runtime <Electron directory> | --runtime-from <rollout-update.json>] [--out <directory>]
+//   node scripts/release.mjs check [--electron <directory>] [--previous <rollout-<v>-app.tar.gz>]
+// pack reads the version from package.json (prerelease = channel beta), expects a built dist/ and asks for the passphrase
+// (or takes ROLLOUT_RELEASE_PASSPHRASE). check applies the previous release to the candidate and this one to an
+// artificial version +1 (with a test key, best on the Ally because it needs a real Electron).
 import { execFileSync } from 'node:child_process';
 import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import fs from 'node:fs';
@@ -20,10 +20,10 @@ const sha256 = (file) => createHash('sha256').update(fs.readFileSync(file)).dige
 const treeSize = (dir) => fs.readdirSync(dir, { withFileTypes: true, recursive: true }).reduce((sum, e) => (e.isFile() ? sum + fs.statSync(path.join(e.parentPath ?? e.path, e.name)).size : sum), 0);
 const tar = (out, dir) => execFileSync('tar', ['--sort=name', '--owner=0', '--group=0', '--numeric-owner', '-czf', out, '-C', dir, '.']);
 
-/** Nächste künstliche Version: erhöht die letzte Zahl der Vorabkennung, sonst den Patch. */
+/** Next artificial version: increments the last number of the prerelease tag, otherwise the patch. */
 export function bumpVersion(version) {
   const m = /^(\d+\.\d+\.)(\d+)(?:-(.+))?$/.exec(version);
-  if (!m) throw new Error(`Version nicht lesbar: ${version}`);
+  if (!m) throw new Error(`Version not readable: ${version}`);
   if (!m[3]) return `${m[1]}${Number(m[2]) + 1}`;
   const parts = m[3].split('.');
   const last = parts.length - 1;
@@ -31,7 +31,7 @@ export function bumpVersion(version) {
   return `${m[1]}${m[2]}-${parts.join('.')}`;
 }
 
-/** App-Archiv: package.json (nur name, version, main), dist/, vendor/ (mywhoosh.sh samt Helfer und Lizenz) und bootstrap/rollout und bootstrap/rollout-run. `mutate(stageDir)` ändert den Inhalt vor dem Packen (Tests). */
+/** App archive: package.json (only name, version, main), dist/, vendor/ (mywhoosh.sh with helper and licence) and bootstrap/rollout and bootstrap/rollout-run. `mutate(stageDir)` changes the content before packing (tests). */
 export function packApp({ distDir, bootstrap, version, outFile, mutate }) {
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-pack-'));
   try {
@@ -50,7 +50,7 @@ export function packApp({ distDir, bootstrap, version, outFile, mutate }) {
   }
 }
 
-/** Electron neu gepackt, mit Lizenzen (der Ordner enthält sie). */
+/** Electron repacked, with licences (the directory contains them). */
 export function packElectron({ electronDir, electronVersion, releaseVersion, outFile }) {
   tar(outFile, electronDir);
   return { electron: electronVersion, min: electronVersion, url: `${BASE}/v${releaseVersion}/${path.basename(outFile)}`, size: fs.statSync(outFile).size, unpacked: treeSize(electronDir), sha256: sha256(outFile) };
@@ -62,7 +62,7 @@ export function electronVersionOf(dir) {
   return execFileSync(path.join(dir, 'electron'), ['-p', 'process.versions.electron'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8' }).trim();
 }
 
-/** Umschlag mit Signatur über die exakten Bytes von `signed`. */
+/** Envelope with a signature over the exact bytes of `signed`. */
 export function signManifest(manifest, privateKey, keyId) {
   const signed = JSON.stringify(manifest);
   return `${JSON.stringify({ keyId, signature: sign(null, Buffer.from(signed), privateKey).toString('base64'), signed }, null, 2)}\n`;
@@ -78,9 +78,9 @@ export function manifestFor({ version, app, runtime }) {
 
 async function askPassphrase() {
   if (process.env.ROLLOUT_RELEASE_PASSPHRASE !== undefined) return process.env.ROLLOUT_RELEASE_PASSPHRASE;
-  if (!process.stdin.isTTY) throw new Error('Passphrase fehlt: ROLLOUT_RELEASE_PASSPHRASE setzen oder im Terminal ausführen');
+  if (!process.stdin.isTTY) throw new Error('Passphrase missing: set ROLLOUT_RELEASE_PASSPHRASE or run in a terminal');
   const rl = readline.createInterface({ input: process.stdin, output: new Writable({ write: (_c, _e, cb) => cb() }), terminal: true });
-  process.stderr.write('Passphrase des Signaturschlüssels: ');
+  process.stderr.write('Passphrase of the signing key: ');
   const answer = await new Promise((resolve) => rl.question('', resolve));
   rl.close();
   process.stderr.write('\n');
@@ -99,9 +99,9 @@ function args(list) {
 export async function pack(opts) {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const version = pkg.version;
-  if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Ungültige Version in package.json: ${version}`);
+  if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Invalid version in package.json: ${version}`);
   const distDir = path.join(root, 'dist');
-  if (!fs.existsSync(path.join(distDir, 'main/main.js'))) throw new Error('dist/ fehlt, erst npm run build');
+  if (!fs.existsSync(path.join(distDir, 'main/main.js'))) throw new Error('dist/ is missing, run npm run build first');
   const keyFile = opts.key ?? path.join(os.homedir(), '.config/rollout-release/rollout-update-1.pem');
   const keyId = opts['key-id'] ?? 'rollout-update-1';
   const pem = fs.readFileSync(keyFile);
@@ -120,18 +120,18 @@ export async function pack(opts) {
     const earlier = JSON.parse(JSON.parse(fs.readFileSync(opts['runtime-from'], 'utf8')).signed);
     runtime = earlier.runtime;
   } else {
-    throw new Error('--runtime <Electron-Ordner> oder --runtime-from <früheres rollout-update.json> angeben');
+    throw new Error('Specify --runtime <Electron directory> or --runtime-from <earlier rollout-update.json>');
   }
   const manifest = manifestFor({ version, app, runtime });
   fs.writeFileSync(path.join(out, 'rollout-update.json'), signManifest(manifest, privateKey, keyId));
   console.log(`Release ${version} (${manifest.channel}) in ${out}`);
   for (const name of fs.readdirSync(out)) console.log(`  ${name}  ${(fs.statSync(path.join(out, name)).size / 1e6).toFixed(2)} MB`);
-  console.log(`Öffentlicher Schlüssel (${keyId}): ${publicKeyB64(privateKey)}`);
-  console.log('Nächste Schritte von Hand: Tag, gh release create --draft, Dateien hochladen, prüfen, veröffentlichen (Konzept 6.3). Es wurde nichts hochgeladen.');
+  console.log(`Public key (${keyId}): ${publicKeyB64(privateKey)}`);
+  console.log('Next steps by hand: tag, gh release create --draft, upload files, verify, publish (concept 6.3). Nothing was uploaded.');
   return { out, manifest };
 }
 
-// Ohne Top-Level-await: check lädt test/update-probe.mjs, das dieses Modul importiert, sonst warten beide aufeinander.
+// Without top-level await: check loads test/update-probe.mjs, which imports this module; otherwise both would wait for each other.
 async function cli() {
   const [command, ...rest] = process.argv.slice(2);
   const opts = args(rest);
@@ -141,11 +141,11 @@ async function cli() {
       const { runCheck } = await import('../test/update-probe.mjs');
       await runCheck(opts);
     } else {
-      console.error('Aufruf: node scripts/release.mjs pack|check (siehe Kopf der Datei)');
+      console.error('Usage: node scripts/release.mjs pack|check (see the head of the file)');
       process.exit(2);
     }
   } catch (error) {
-    console.error(`Fehler: ${error.message}`);
+    console.error(`Error: ${error.message}`);
     process.exit(1);
   }
 }
