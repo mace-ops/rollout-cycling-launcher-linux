@@ -1,4 +1,4 @@
-// Rohaufnahmen (site/shots-raw/<lang>/s<n>-<name>.png, 1600 × 1000) → Website (site/static/screens) und README (docs/media).
+// Rohaufnahmen (site/shots-raw/en/s<n>-<name>.png, 1600 × 1000, englische Oberfläche) → Website (site/static/screens/en) und README (docs/media).
 // Aufruf: node scripts/process-shots.mjs [Rohordner]. Aufnahme siehe site/README.md (app/test/shots.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,9 +9,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SITE = path.resolve(HERE, '..');
 const REPO = path.resolve(SITE, '..');
 const RAW = path.resolve(process.argv[2] ?? path.join(SITE, 'shots-raw'));
-const LANGS = ['en', 'de', 'es', 'fr', 'it', 'pt', 'nl', 'pl'];
+// Alle Sprachseiten und beide READMEs zeigen dieselben englischen Aufnahmen (nur die Bildtexte sind übersetzt).
+const LANGS = ['en'];
 const NAMES = ['home', 'pick', 'before-install', 'installing', 'done', 'bluetooth', 'starting', 'error', 'settings', 'advanced', 'light', 'steam'];
-const README_LANGS = ['en', 'de'];
+const README_LANGS = ['en'];
 const README_MAX = 300 * 1024;
 const mkdir = (p) => fs.mkdirSync(p, { recursive: true });
 

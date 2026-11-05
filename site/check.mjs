@@ -130,7 +130,7 @@ for (const { l, href } of allLinks.values()) {
   ok(fs.existsSync(target), `[${l}] toter Link: ${href}`);
 }
 // Screenshots: Größe und Format
-for (const l of LANGS) {
+for (const l of ['en']) {
   const dir = file('assets', 'screens', l);
   if (!ok(fs.existsSync(dir), `Screenshots fehlen: ${l}`)) continue;
   for (const f of fs.readdirSync(dir)) {

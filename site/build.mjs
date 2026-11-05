@@ -84,10 +84,12 @@ function render(template, lang, vars, loops = {}) {
 const T = (lang, key) => { used.add(key); return messages[lang][key] ?? die(`Schlüssel fehlt: ${key} (${lang})`); };
 
 // --- Bilder ----------------------------------------------------------------------------------------------------------------
-const screenPath = (lang, name, ext) => path.join(HERE, 'static', 'screens', lang, `${name}${ext}`);
+// Bilder gibt es nur englisch; die Sprachseiten setzen übersetzte Bildtexte darauf.
+const SHOT_LANG = 'en';
+const screenPath = (_lang, name, ext) => path.join(HERE, 'static', 'screens', SHOT_LANG, `${name}${ext}`);
 function picture(root, lang, name, alt, { eager = false, sizes, cls = '' } = {}) {
-  for (const ext of ['.jpg', '.webp', '-640.webp']) if (!fs.existsSync(screenPath(lang, name, ext))) die(`Screenshot fehlt: static/screens/${lang}/${name}${ext} (npm run shots)`);
-  const dir = `${root}assets/screens/${lang}/${name}`;
+  for (const ext of ['.jpg', '.webp', '-640.webp']) if (!fs.existsSync(screenPath(lang, name, ext))) die(`Screenshot fehlt: static/screens/${SHOT_LANG}/${name}${ext} (npm run shots)`);
+  const dir = `${root}assets/screens/${SHOT_LANG}/${name}`;
   return `<picture${cls ? ` class="${cls}"` : ''}><source type="image/webp" srcset="${dir}-640.webp 640w, ${dir}.webp 1280w" sizes="${sizes}"><img src="${dir}.jpg" alt="${esc(alt)}" width="1280" height="800" ${eager ? 'fetchpriority="high" decoding="async"' : 'loading="lazy" decoding="async"'}></picture>`;
 }
 
@@ -153,7 +155,7 @@ function jsonLd(lang, root) {
     applicationCategory: 'GameApplication', applicationSubCategory: 'Game launcher', operatingSystem: 'SteamOS, Bazzite', softwareVersion: VERSION,
     inLanguage: LANGS, isAccessibleForFree: true, license: 'https://opensource.org/licenses/MIT',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' }, ...(DOWNLOAD_LIVE ? { downloadUrl: DESKTOP_URL } : {}),
-    screenshot: `${BASE}assets/screens/${lang}/home.jpg`, image: `${BASE}assets/og/${lang}.jpg`,
+    screenshot: `${BASE}assets/screens/${SHOT_LANG}/home.jpg`, image: `${BASE}assets/og/${lang}.jpg`,
     featureList: FEATURES.map((f) => T(lang, `${f.id}.t`))
   };
   const faq = {

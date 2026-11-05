@@ -45,19 +45,17 @@ wie in `static/fonts/`); dafür muss auf dem Rechner ein funktionierendes Fontco
 
 ## Screenshots neu erzeugen
 
-Die Bilder kommen aus der echten App mit simulierten Daten (kein Konto, kein Spiel), nicht aus dem Mockup. Aufnahme je Sprache mit `app/test/shots.mjs` (nutzt den Rahmen der Klicktests,
+Die Bilder kommen aus der echten App mit simulierten Daten (kein Konto, kein Spiel), nicht aus dem Mockup. Alle Sprachseiten und beide READMEs zeigen dieselben englischen Aufnahmen, nur die Bildtexte sind übersetzt. Aufnahme mit `app/test/shots.mjs` (nutzt den Rahmen der Klicktests,
 1600 × 1000, Selektoren statt Beschriftungen):
 
 ```sh
 cd app && npm run build
-for l in en de es fr it pt nl pl; do
-  ROLLOUT_SIM_LANG=$l ROLLOUT_SHOTS=../site/shots-raw/$l ELECTRON_RUN_AS_NODE=1 npx electron test/shots.mjs
-done
+ROLLOUT_SIM_LANG=en ROLLOUT_SHOTS=../site/shots-raw/en ELECTRON_RUN_AS_NODE=1 npx electron test/shots.mjs
 cd ../site && node scripts/process-shots.mjs
 ```
 
-Am Ally `DISPLAY=:0` und `TMPDIR` auf btrfs setzen (siehe `app/README.md`). `process-shots.mjs` schreibt je Sprache `static/screens/<lang>/<name>.{webp,jpg}` und `<name>-640.webp` (1280 × 800 und 640 × 400)
-sowie für das README `docs/media/screens/{en,de}/<name>.jpg` (je unter 300 KB) und `docs/media/hero-carousel.gif` (960 px, 5 Ansichten). Namen: home, pick, before-install, installing, done,
+Am Ally `DISPLAY=:0` und `TMPDIR` auf btrfs setzen (siehe `app/README.md`). `process-shots.mjs` schreibt `static/screens/en/<name>.{webp,jpg}` und `<name>-640.webp` (1280 × 800 und 640 × 400)
+sowie für die READMEs `docs/media/screens/en/<name>.jpg` (je unter 300 KB) und `docs/media/hero-carousel.gif` (960 px, 5 Ansichten). Namen: home, pick, before-install, installing, done,
 bluetooth, starting, error, settings, advanced, light, steam. `shots-raw/` ist nicht im Repo.
 
 ## Veröffentlichen
