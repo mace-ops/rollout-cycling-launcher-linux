@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AppProblem } from '../shared/api';
 import type { DownloadOptions } from './selfupdate';
+import { startPadBridge, type PadBridge } from './gamepad-bridge';
 import { appIdFromAncestors, realXExec, watchZwiftWindow, xhostRestore, xhostSnapshot, type XExec } from './zwift-window';
 
 /** Pin aus `upstreams.json`: genau dieses Skript auf genau diesem Commit, nichts Neueres wird je automatisch ausgeführt. */
@@ -199,7 +200,7 @@ export interface RealZwiftOptions {
    * Fenstersichtbarkeit im Spielmodus (zwift-window.ts). Ohne diese Angabe berührt `start` den X-Server nie (Tests). `display` Vorgabe
    * `:0` (die gamescope-Xwayland), `exec` ersetzt xwininfo/xprop/xhost, `appId` ersetzt die Suche im Prozessbaum.
    */
-  windows?: { display?: string; exec?: XExec; appId?: string | null; intervalMs?: number; onNote?: (text: string) => void };
+  windows?: { display?: string; exec?: XExec; appId?: string | null; intervalMs?: number; onNote?: (text: string) => void; pad?: (display: string) => PadBridge | null };
 }
 
 export class RealZwift implements ZwiftService {
@@ -279,14 +280,24 @@ export class RealZwift implements ZwiftService {
     const signalGroup = (sig: NodeJS.Signals): void => {
       try { if (child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch { try { child.kill(sig); } catch { /* schon beendet */ } }
     };
+    // Controller: Solange das Zwift-Fenster zu sehen ist, gibt Rollout das Steam-Gamepad als Tastatur und Maus weiter (gamepad-bridge.ts).
+    let pad: PadBridge | null = null;
+    const display = w?.display ?? ':0';
+    const startPad = w?.pad ?? ((d: string) => ((this.o.env ?? process.env).ROLLOUT_ZWIFT_PAD === 'off' ? null : startPadBridge({ display: d, env: this.o.env, onNote: w?.onNote })));
+    const stopPad = (): void => { pad?.stop(); pad = null; };
     const watcher = w && exec
       ? watchZwiftWindow({
         exec, appId: w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId, intervalMs: w.intervalMs, onNote: w.onNote,
-        onVisible: (v) => onVisible?.(v)
+        onVisible: (v) => {
+          if (v && !pad) pad = startPad(display);
+          else if (!v) stopPad();
+          onVisible?.(v);
+        }
       })
       : null;
     const finish = async (code: number | null): Promise<number | null> => {
       if (killer) clearTimeout(killer);
+      stopPad();
       if (watcher) {
         const was = watcher.visible;
         watcher.stop();
