@@ -43,7 +43,7 @@
 <link rel="preload" href="../assets/fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../assets/site.css?v=49bb30a8">
 <script>document.documentElement.classList.add('js');try{var m=localStorage.getItem('theme');if(m==='light'||m==='dark')document.documentElement.dataset.theme=m}catch(e){}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Rollout","description":"Zwift i MyWhoosh na Steam Deck, SteamOS i Bazzite: Rollout instaluje, aktualizuje i uruchamia je z kontrolera. Pobierz, kliknij dwukrotnie, jedź.","url":"https://mace-ops.github.io/rollout-cycling-launcher-linux/pl/","applicationCategory":"GameApplication","applicationSubCategory":"Game launcher","operatingSystem":"SteamOS, Bazzite","softwareVersion":"0.9.0-beta.1","inLanguage":["en","de","es","fr","it","pt","nl","pl"],"isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"screenshot":"https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/screens/pl/home.jpg","image":"https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/og/pl.jpg","featureList":["Najpierw kontroler. Mysz opcjonalnie.","Jeden przycisk do instalacji.","Aktualizuje się sam. Bezpiecznie.","Prosto w Twojej bibliotece Steam.","Wiedz, że czujniki działają.","Błędy, które pomagają.","Głęboko, gdy trzeba."]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Rollout","description":"Zwift i MyWhoosh na Steam Deck, SteamOS i Bazzite: Rollout instaluje, aktualizuje i uruchamia je z kontrolera. Pobierz, kliknij dwukrotnie, jedź.","url":"https://mace-ops.github.io/rollout-cycling-launcher-linux/pl/","applicationCategory":"GameApplication","applicationSubCategory":"Game launcher","operatingSystem":"SteamOS, Bazzite","softwareVersion":"0.9.0-beta.1","inLanguage":["en","de","es","fr","it","pt","nl","pl"],"isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"screenshot":"https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/screens/en/home.jpg","image":"https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/og/pl.jpg","featureList":["Najpierw kontroler. Mysz opcjonalnie.","Jeden przycisk do instalacji.","Aktualizuje się sam. Bezpiecznie.","Prosto w Twojej bibliotece Steam.","Wiedz, że czujniki działają.","Błędy, które pomagają.","Głęboko, gdy trzeba."]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Czy Zwift działa na Steam Deck i Bazzite?","acceptedAnswer":{"@type":"Answer","text":"Na Bazzite tak: Zwift działa w kontenerze opartym na netbrain/zwift, który Rollout instaluje i uruchamia. Rollout przetestowano na ROG Ally z Bazzite; Steam Deck nie został jeszcze sprawdzony. Na SteamOS zwykle najpierw brakuje Podmana lub Dockera. Czujniki łączą się przez Zwift Companion na telefonie lub Direct Connect, nie bezpośrednio przez Bluetooth."}},{"@type":"Question","name":"Czy MyWhoosh działa z Bluetooth na SteamOS i Linuksie?","acceptedAnswer":{"@type":"Answer","text":"Tak. MyWhoosh działa z GE-Proton i rozmawia bezpośrednio przez Bluetooth z trenażerem i pasem na tętno. Parujesz je w grze, jak w Windows."}},{"@type":"Question","name":"Czy Zwift działa na ROG Ally?","acceptedAnswer":{"@type":"Answer","text":"Tak, w Bazzite. Zainstaluj Rollout w Trybie pulpitu, a potem uruchom Zwift z Rollout lub ze Steam w Trybie gry. Kontroler steruje grą."}},{"@type":"Question","name":"Czy potrzebuję terminala?","acceptedAnswer":{"@type":"Answer","text":"Nie. Pobierz Rollout.desktop, kliknij go dwukrotnie w Trybie pulpitu i potwierdź jeden raz. Potem Rollout pojawi się w menu aplikacji."}},{"@type":"Question","name":"Czy mogę używać kontrolera?","acceptedAnswer":{"@type":"Answer","text":"Tak. Rollout działa z kontrolerem, dotykiem i klawiaturą. W Trybie gry kontroler steruje też Zwiftem."}},{"@type":"Question","name":"Jak działają aktualizacje?","acceptedAnswer":{"@type":"Answer","text":"Rollout w tle szuka nowych wersji i instaluje je automatycznie, jeśli chcesz. Aktualizacje launchera są podpisane, a uszkodzona aktualizacja cofa się sama."}},{"@type":"Question","name":"Czy Rollout jest oficjalny? Czy moje konto może zostać zablokowane?","acceptedAnswer":{"@type":"Answer","text":"Nie. Rollout to niezależny projekt, niepowiązany z Zwift, Inc., MyWhoosh ani Valve. Ich warunki ograniczają niezatwierdzone narzędzia firm trzecich, a konta mogą zawiesić według własnego uznania. Przeczytaj warunki i zdecyduj sam."}},{"@type":"Question","name":"Jakie urządzenia i systemy są wspierane?","acceptedAnswer":{"@type":"Answer","text":"Rollout jest w becie. Przetestowano go na ROG Ally z Bazzite. SteamOS na Steam Deck to drugi cel, ale jeszcze niesprawdzony. Inne dystrybucje Linuksa na własne ryzyko."}}]}</script>
 </head>
 <body>
@@ -94,7 +94,7 @@
     <ul class="meta"><li>SteamOS</li><li>Bazzite</li><li>Steam Deck</li><li>ROG Ally</li></ul>
     <p class="smallnote">Beta: przetestowano na ROG Ally z Bazzite. Steam Deck jeszcze niesprawdzony.</p>
     <div class="frame rv">
-      <div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/home-640.webp 640w, ../assets/screens/pl/home.webp 1280w" sizes="(min-width:1160px) 1112px, calc(100vw - 32px)"><img src="../assets/screens/pl/home.jpg" alt="Ekran główny Rollout z MyWhoosh i Zwift obok siebie, każdy z przyciskiem Jedź" width="1280" height="800" fetchpriority="high" decoding="async"></picture></div>
+      <div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/home-640.webp 640w, ../assets/screens/en/home.webp 1280w" sizes="(min-width:1160px) 1112px, calc(100vw - 32px)"><img src="../assets/screens/en/home.jpg" alt="Ekran główny Rollout z MyWhoosh i Zwift obok siebie, każdy z przyciskiem Jedź" width="1280" height="800" fetchpriority="high" decoding="async"></picture></div>
     </div>
   </div>
 </section>
@@ -107,57 +107,57 @@
   <div class="track" id="track" aria-label="Zrzuty ekranu">
 
     <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="1 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/home-640.webp 640w, ../assets/screens/pl/home.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/home.jpg" alt="Ekran główny Rollout z MyWhoosh i Zwift obok siebie, każdy z przyciskiem Jedź" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/home-640.webp 640w, ../assets/screens/en/home.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/home.jpg" alt="Ekran główny Rollout z MyWhoosh i Zwift obok siebie, każdy z przyciskiem Jedź" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Ekran główny</b> <span>Obie aplikacje obok siebie, każda z jednym przyciskiem.</span></p>
     </div>
 
     <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="2 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/pick-640.webp 640w, ../assets/screens/pl/pick.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/pick.jpg" alt="Ekran główny Rollout z powiększoną kartą Zwift, bo ma fokus" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/pick-640.webp 640w, ../assets/screens/en/pick.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/pick.jpg" alt="Ekran główny Rollout z powiększoną kartą Zwift, bo ma fokus" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Wybierz aplikację</b> <span>Karta z fokusem rośnie. Z kontrolerem, dotykiem lub myszą.</span></p>
     </div>
 
     <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="3 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/before-install-640.webp 640w, ../assets/screens/pl/before-install.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/before-install.jpg" alt="Ekran Zainstaluj MyWhoosh z rozmiarem pobierania, potrzebnym miejscem, czasem i polem Dodaj do Steam" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/before-install-640.webp 640w, ../assets/screens/en/before-install.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/before-install.jpg" alt="Ekran Zainstaluj MyWhoosh z rozmiarem pobierania, potrzebnym miejscem, czasem i polem Dodaj do Steam" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Przed instalacją</b> <span>Rozmiar, miejsce i czas z góry. „Dodaj do Steam” jest już zaznaczone.</span></p>
     </div>
 
     <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="4 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/installing-640.webp 640w, ../assets/screens/pl/installing.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/installing.jpg" alt="Instalacja Zwift na poziomie 46 procent z etapami instalacji obok" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/installing-640.webp 640w, ../assets/screens/en/installing.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/installing.jpg" alt="Instalacja Zwift na poziomie 46 procent z etapami instalacji obok" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Instalacja</b> <span>Czytelne etapy i uczciwe oszacowanie czasu.</span></p>
     </div>
 
     <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="5 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/done-640.webp 640w, ../assets/screens/pl/done.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/done.jpg" alt="Ekran z informacją, że Zwift jest gotowy, z zielonym znaczkiem i przyciskiem Jedź" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/done-640.webp 640w, ../assets/screens/en/done.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/done.jpg" alt="Ekran z informacją, że Zwift jest gotowy, z zielonym znaczkiem i przyciskiem Jedź" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Gotowe</b> <span>Gotowe do jazdy. Nic więcej do ustawienia.</span></p>
     </div>
 
     <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="6 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/bluetooth-640.webp 640w, ../assets/screens/pl/bluetooth.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/bluetooth.jpg" alt="Ekran Bluetooth z trenażerem i pasem na tętno znalezionymi w pobliżu" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/bluetooth-640.webp 640w, ../assets/screens/en/bluetooth.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/bluetooth.jpg" alt="Ekran Bluetooth z trenażerem i pasem na tętno znalezionymi w pobliżu" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Sprawdzenie Bluetooth</b> <span>Znajdź trenażer i pas na tętno przed jazdą.</span></p>
     </div>
 
     <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="7 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/starting-640.webp 640w, ../assets/screens/pl/starting.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/starting.jpg" alt="Ekran uruchamiania MyWhoosh z paskiem postępu i przyciskiem Anuluj" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/starting-640.webp 640w, ../assets/screens/en/starting.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/starting.jpg" alt="Ekran uruchamiania MyWhoosh z paskiem postępu i przyciskiem Anuluj" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Uruchamianie</b> <span>Rollout sprawdza Bluetooth i uruchamia grę.</span></p>
     </div>
 
     <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="8 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/error-640.webp 640w, ../assets/screens/pl/error.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/error.jpg" alt="Ekran błędu z informacją, że nie znaleziono trenażera, z dwoma krokami i przyciskami Szukaj ponownie, Uruchom mimo to i Uzyskaj pomoc" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/error-640.webp 640w, ../assets/screens/en/error.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/error.jpg" alt="Ekran błędu z informacją, że nie znaleziono trenażera, z dwoma krokami i przyciskami Szukaj ponownie, Uruchom mimo to i Uzyskaj pomoc" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Gdy coś nie działa</b> <span>Proste kroki i jeden przycisk, by spróbować ponownie.</span></p>
     </div>
 
     <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="9 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/settings-640.webp 640w, ../assets/screens/pl/settings.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/settings.jpg" alt="Ustawienia z językiem, rozmiarem interfejsu, wyglądem, automatycznymi aktualizacjami i przełącznikami Steam" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/settings-640.webp 640w, ../assets/screens/en/settings.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/settings.jpg" alt="Ustawienia z językiem, rozmiarem interfejsu, wyglądem, automatycznymi aktualizacjami i przełącznikami Steam" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Ustawienia</b> <span>Język, aktualizacje i Steam na jednej krótkiej liście.</span></p>
     </div>
 
     <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="10 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/advanced-640.webp 640w, ../assets/screens/pl/advanced.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/advanced.jpg" alt="Zaawansowane ustawienia MyWhoosh z wersją Proton, wyjściem grafiki i zalecanymi wartościami" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/advanced-640.webp 640w, ../assets/screens/en/advanced.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/advanced.jpg" alt="Zaawansowane ustawienia MyWhoosh z wersją Proton, wyjściem grafiki i zalecanymi wartościami" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Zaawansowane</b> <span>Wersja Proton, grafika i więcej, każda opcja z zalecaną wartością.</span></p>
     </div>
 
     <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="11 / 11">
-      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/light-640.webp 640w, ../assets/screens/pl/light.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/pl/light.jpg" alt="Ustawienia w jasnym motywie" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/light-640.webp 640w, ../assets/screens/en/light.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="../assets/screens/en/light.jpg" alt="Ustawienia w jasnym motywie" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       <p class="cap"><b>Jasny motyw</b> <span>Podąża za motywem systemu.</span></p>
     </div>
 
@@ -177,7 +177,7 @@
     <p class="lead rv">Każda aplikacja dostaje konfigurację, która najlepiej działa na Linuksie. Rollout wybiera ją za Ciebie.</p>
     <div class="duo">
       <article class="appcard rv" data-tone="mywhoosh">
-        <div class="shot"><picture><source type="image/webp" srcset="../assets/screens/pl/starting-640.webp 640w, ../assets/screens/pl/starting.webp 1280w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="../assets/screens/pl/starting.jpg" alt="Ekran uruchamiania MyWhoosh z paskiem postępu i przyciskiem Anuluj" width="1280" height="800" loading="lazy" decoding="async"></picture></div>
+        <div class="shot"><picture><source type="image/webp" srcset="../assets/screens/en/starting-640.webp 640w, ../assets/screens/en/starting.webp 1280w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="../assets/screens/en/starting.jpg" alt="Ekran uruchamiania MyWhoosh z paskiem postępu i przyciskiem Anuluj" width="1280" height="800" loading="lazy" decoding="async"></picture></div>
         <div class="body">
           <h3 class="display">MyWhoosh</h3>
           <span class="pill"><span class="dot"></span>Bezpośredni Bluetooth</span>
@@ -188,7 +188,7 @@
         </div>
       </article>
       <article class="appcard rv" data-tone="zwift">
-        <div class="shot"><picture><source type="image/webp" srcset="../assets/screens/pl/installing-640.webp 640w, ../assets/screens/pl/installing.webp 1280w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="../assets/screens/pl/installing.jpg" alt="Instalacja Zwift na poziomie 46 procent z etapami instalacji obok" width="1280" height="800" loading="lazy" decoding="async"></picture></div>
+        <div class="shot"><picture><source type="image/webp" srcset="../assets/screens/en/installing-640.webp 640w, ../assets/screens/en/installing.webp 1280w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="../assets/screens/en/installing.jpg" alt="Instalacja Zwift na poziomie 46 procent z etapami instalacji obok" width="1280" height="800" loading="lazy" decoding="async"></picture></div>
         <div class="body">
           <h3 class="display">Zwift</h3>
           <span class="pill"><span class="dot"></span>Companion lub Direct Connect</span>
@@ -215,7 +215,7 @@
           <h3>Najpierw kontroler. Mysz opcjonalnie.</h3>
           <p>Każdy ekran działa z kontrolerem, dotykiem i klawiaturą. Menu i listy są własne w Rollout, więc działają w Trybie gry, gdzie natywne okna zawodzą.</p>
           <div class="chips"><span><i class="kc">✚</i><i class="kc">L</i>fokus</span><span><i class="kc">A</i>wybierz</span><span><i class="kc">B</i>wstecz</span><span><i class="kc">R</i>przewiń</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/home-640.webp 640w, ../assets/screens/pl/home.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/home.jpg" alt="Ekran główny Rollout z MyWhoosh i Zwift obok siebie, każdy z przyciskiem Jedź" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/home-640.webp 640w, ../assets/screens/en/home.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/home.jpg" alt="Ekran główny Rollout z MyWhoosh i Zwift obok siebie, każdy z przyciskiem Jedź" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
         <article class="fitem" data-f="1">
@@ -223,7 +223,7 @@
           <h3>Jeden przycisk do instalacji.</h3>
           <p>Bez obowiązkowych pytań, bez terminala, bez sudo. Rollout pokazuje z góry rozmiar i czas, potem czytelne etapy z postępem.</p>
           <div class="chips"><span>Bez sudo</span><span>Czytelne etapy</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/installing-640.webp 640w, ../assets/screens/pl/installing.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/installing.jpg" alt="Instalacja Zwift na poziomie 46 procent z etapami instalacji obok" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/installing-640.webp 640w, ../assets/screens/en/installing.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/installing.jpg" alt="Instalacja Zwift na poziomie 46 procent z etapami instalacji obok" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
         <article class="fitem" data-f="2">
@@ -231,7 +231,7 @@
           <h3>Aktualizuje się sam. Bezpiecznie.</h3>
           <p>Rollout może aktualizować się sam w tle. Każda aktualizacja launchera jest podpisana i uruchamiana próbnie; jeśli się nie uda, Rollout sam wraca do ostatniej dobrej wersji.</p>
           <div class="chips"><span>Ed25519</span><span>SHA-256</span><span>Automatyczny powrót</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/settings-640.webp 640w, ../assets/screens/pl/settings.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/settings.jpg" alt="Ustawienia z językiem, rozmiarem interfejsu, wyglądem, automatycznymi aktualizacjami i przełącznikami Steam" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/settings-640.webp 640w, ../assets/screens/en/settings.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/settings.jpg" alt="Ustawienia z językiem, rozmiarem interfejsu, wyglądem, automatycznymi aktualizacjami i przełącznikami Steam" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
         <article class="fitem" data-f="3">
@@ -239,7 +239,7 @@
           <h3>Prosto w Twojej bibliotece Steam.</h3>
           <p>Jeden przełącznik dodaje Rollout i Twoje aplikacje do Steam, z grafikami. Zaczynaj jazdy prosto z Trybu gry; czas gry zostaje po aktualizacjach.</p>
           <div class="chips"><span>Tryb gry</span><span>Grafiki biblioteki</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/steam-640.webp 640w, ../assets/screens/pl/steam.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/steam.jpg" alt="Okno z informacją, że Steam musi się krótko zrestartować, z przyciskami Zrób to później i Zrestartuj teraz" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/steam-640.webp 640w, ../assets/screens/en/steam.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/steam.jpg" alt="Okno z informacją, że Steam musi się krótko zrestartować, z przyciskami Zrób to później i Zrestartuj teraz" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
         <article class="fitem" data-f="4">
@@ -247,7 +247,7 @@
           <h3>Wiedz, że czujniki działają.</h3>
           <p>W MyWhoosh sprawdzenie Bluetooth pokazuje, które trenażery i pasy na tętno nadają, zanim wepniesz buty, i restartuje zawieszony adapter.</p>
           <div class="chips"><span>FTMS</span><span>Cycling Power</span><span>Heart Rate</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/bluetooth-640.webp 640w, ../assets/screens/pl/bluetooth.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/bluetooth.jpg" alt="Ekran Bluetooth z trenażerem i pasem na tętno znalezionymi w pobliżu" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/bluetooth-640.webp 640w, ../assets/screens/en/bluetooth.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/bluetooth.jpg" alt="Ekran Bluetooth z trenażerem i pasem na tętno znalezionymi w pobliżu" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
         <article class="fitem" data-f="5">
@@ -255,7 +255,7 @@
           <h3>Błędy, które pomagają.</h3>
           <p>Gdy coś pójdzie źle, Rollout prostymi słowami mówi, co zrobić dalej, z jednym przyciskiem, by spróbować ponownie. Szczegóły tylko, jeśli ich chcesz.</p>
           <div class="chips"><span>Prosty język</span><span>Uruchom mimo to</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/error-640.webp 640w, ../assets/screens/pl/error.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/error.jpg" alt="Ekran błędu z informacją, że nie znaleziono trenażera, z dwoma krokami i przyciskami Szukaj ponownie, Uruchom mimo to i Uzyskaj pomoc" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/error-640.webp 640w, ../assets/screens/en/error.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/error.jpg" alt="Ekran błędu z informacją, że nie znaleziono trenażera, z dwoma krokami i przyciskami Szukaj ponownie, Uruchom mimo to i Uzyskaj pomoc" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
         <article class="fitem" data-f="6">
@@ -263,12 +263,12 @@
           <h3>Głęboko, gdy trzeba.</h3>
           <p>Za „Zaawansowane”: wersja Proton, wyjście grafiki, adapter Bluetooth, kanał aktualizacji, logi i diagnostyka. Każda opcja pokazuje zalecaną wartość.</p>
           <div class="chips"><span>GE-Proton</span><span>Logi</span><span>Diagnostyka</span></div>
-          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/pl/advanced-640.webp 640w, ../assets/screens/pl/advanced.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/pl/advanced.jpg" alt="Zaawansowane ustawienia MyWhoosh z wersją Proton, wyjściem grafiki i zalecanymi wartościami" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="../assets/screens/en/advanced-640.webp 640w, ../assets/screens/en/advanced.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="../assets/screens/en/advanced.jpg" alt="Zaawansowane ustawienia MyWhoosh z wersją Proton, wyjściem grafiki i zalecanymi wartościami" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
         </article>
 
       </div>
       <div class="fstage" aria-hidden="true">
-        <div class="frame"><div class="screen"><picture class="on"><source type="image/webp" srcset="../assets/screens/pl/home-640.webp 640w, ../assets/screens/pl/home.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/home.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/pl/installing-640.webp 640w, ../assets/screens/pl/installing.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/installing.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/pl/settings-640.webp 640w, ../assets/screens/pl/settings.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/settings.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/pl/steam-640.webp 640w, ../assets/screens/pl/steam.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/steam.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/pl/bluetooth-640.webp 640w, ../assets/screens/pl/bluetooth.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/bluetooth.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/pl/error-640.webp 640w, ../assets/screens/pl/error.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/error.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/pl/advanced-640.webp 640w, ../assets/screens/pl/advanced.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/pl/advanced.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        <div class="frame"><div class="screen"><picture class="on"><source type="image/webp" srcset="../assets/screens/en/home-640.webp 640w, ../assets/screens/en/home.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/home.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/en/installing-640.webp 640w, ../assets/screens/en/installing.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/installing.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/en/settings-640.webp 640w, ../assets/screens/en/settings.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/settings.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/en/steam-640.webp 640w, ../assets/screens/en/steam.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/steam.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/en/bluetooth-640.webp 640w, ../assets/screens/en/bluetooth.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/bluetooth.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/en/error-640.webp 640w, ../assets/screens/en/error.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/error.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="../assets/screens/en/advanced-640.webp 640w, ../assets/screens/en/advanced.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="../assets/screens/en/advanced.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
       </div>
     </div>
     <div class="extras">
