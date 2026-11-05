@@ -62,6 +62,6 @@ bluetooth, starting, error, settings, advanced, light, steam. `shots-raw/` ist n
 
 ## Veröffentlichen
 
-1. Voraussetzung: `Rollout.desktop` ist Asset des neuesten Releases (`releases/latest/download/Rollout.desktop`), sonst sind die Download-Knöpfe tot. `deploy.sh` prüft das vorab.
+1. Download-Knöpfe: Solange `config.json` `"downloadLive": false` hat, sind sie ausgegraut (Hinweis „Download folgt“, kein `downloadUrl` im JSON-LD). Auf `true` stellen, sobald `Rollout.desktop` Asset des neuesten Releases ist (`releases/latest/download/Rollout.desktop`), sonst sind die Download-Knöpfe tot. `deploy.sh` prüft das vorab.
 2. `site/deploy.sh` baut, prüft, committet den Inhalt von `dist/` in einen Worktree des Branches `gh-pages` (mit `.nojekyll`) und fragt vor dem Push nach. `--no-push` lässt den Push aus, `--yes` überspringt die Frage.
 3. Einmalig: GitHub Pages auf „Deploy from branch“, Branch `gh-pages`, Ordner `/` stellen (Einstellungen oder `gh api repos/mace-ops/rollout-cycling-launcher-linux/pages`).

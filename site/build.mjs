@@ -30,6 +30,8 @@ const FEATURES = [
   { id: 'f6', shot: 'advanced', chips: [{ lit: 'GE-Proton' }, { key: 'f6.c1' }, { key: 'f6.c2' }] }
 ];
 const FAQ_COUNT = 8;
+// Solange Rollout.desktop kein Release-Asset ist: config.json { "downloadLive": false } graut die Download-Knöpfe aus und lässt downloadUrl weg.
+const DOWNLOAD_LIVE = JSON.parse(fs.readFileSync(new URL('./config.json', import.meta.url), 'utf8')).downloadLive === true;
 
 const log = (...a) => console.log('[build]', ...a);
 const die = (msg) => { throw new Error(msg); };
@@ -150,7 +152,7 @@ function jsonLd(lang, root) {
     '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'Rollout', description: T(lang, 'meta.description'), url: pageUrl(lang),
     applicationCategory: 'GameApplication', applicationSubCategory: 'Game launcher', operatingSystem: 'SteamOS, Bazzite', softwareVersion: VERSION,
     inLanguage: LANGS, isAccessibleForFree: true, license: 'https://opensource.org/licenses/MIT',
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' }, downloadUrl: DESKTOP_URL,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' }, ...(DOWNLOAD_LIVE ? { downloadUrl: DESKTOP_URL } : {}),
     screenshot: `${BASE}assets/screens/${lang}/home.jpg`, image: `${BASE}assets/og/${lang}.jpg`,
     featureList: FEATURES.map((f) => T(lang, `${f.id}.t`))
   };
@@ -192,7 +194,9 @@ function buildPage(template, lang, buildId) {
   const faq = Array.from({ length: FAQ_COUNT }, (_v, i) => ({ id: String(i + 1) }));
   const vars = {
     lang, root, url: pageUrl(lang), home: './', hreflang, ogLocale: LOCALE[lang], ogAlternates, ogimage: `${BASE}assets/og/${lang}.jpg`, buildId,
-    ldApp: ld.app, ldFaq: ld.faq, langCode: lang.toUpperCase(), langLinks, hint, version: VERSION, desktopUrl: DESKTOP_URL,
+    ldApp: ld.app, ldFaq: ld.faq, langCode: lang.toUpperCase(), langLinks, hint, version: VERSION,
+    dlClass: DOWNLOAD_LIVE ? '' : ' disabled', dlAttrs: DOWNLOAD_LIVE ? `href="${DESKTOP_URL}" download` : 'role="link" aria-disabled="true"',
+    dlSoon: DOWNLOAD_LIVE ? (T(lang, 'dl.soon'), '') : `<p class="soon">${esc(T(lang, 'dl.soon'))}</p>`,
     heroShot: picture(root, lang, 'home', alt('home'), { eager: true, sizes: sizesHero }),
     appShotMywhoosh: picture(root, lang, 'starting', alt('starting'), { sizes: sizesApp }),
     appShotZwift: picture(root, lang, 'installing', alt('installing'), { sizes: sizesApp }),

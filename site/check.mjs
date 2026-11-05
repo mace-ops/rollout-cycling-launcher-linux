@@ -10,6 +10,7 @@ const DIST = path.join(HERE, 'dist');
 const BASE = 'https://mace-ops.github.io/rollout-cycling-launcher-linux/';
 const LANGS = ['en', 'de', 'es', 'fr', 'it', 'pt', 'nl', 'pl'];
 const LOCALE = { en: 'en_US', de: 'de_DE', es: 'es_ES', fr: 'fr_FR', it: 'it_IT', pt: 'pt_BR', nl: 'nl_NL', pl: 'pl_PL' };
+const LIVE = JSON.parse(fs.readFileSync(path.join(HERE, 'config.json'), 'utf8')).downloadLive === true;
 const url = (l) => (l === 'en' ? BASE : `${BASE}${l}/`);
 const problems = [];
 const bad = (msg) => problems.push(msg);
@@ -72,7 +73,7 @@ for (const [l, html] of Object.entries(pages)) {
   if (app) {
     const v = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'app', 'package.json'), 'utf8')).version;
     ok(app.softwareVersion === v, `${P} softwareVersion ${app.softwareVersion} ≠ package.json ${v}`);
-    ok(app.offers?.price === '0' && app.operatingSystem && app.downloadUrl?.endsWith('/releases/latest/download/Rollout.desktop') && app.screenshot && app.featureList?.length === 7, `${P} SoftwareApplication unvollständig`);
+    ok(app.offers?.price === '0' && app.operatingSystem && (LIVE ? app.downloadUrl?.endsWith('/releases/latest/download/Rollout.desktop') : app.downloadUrl === undefined) && app.screenshot && app.featureList?.length === 7, `${P} SoftwareApplication unvollständig`);
   } else bad(`${P} SoftwareApplication fehlt`);
   if (faq) {
     const visible = [...html.matchAll(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map((m) => [unescape(m[1]), unescape(m[2])]);
@@ -102,7 +103,8 @@ for (const [l, html] of Object.entries(pages)) {
   ok(!/\b(curl|wget|sudo \w|bash -c|sh -c|chmod \+x|\| ?sh)\b/.test(plain.replace(/no sudo|kein sudo|sin sudo|sans sudo|senza sudo|sem sudo|geen sudo|bez sudo|Kein sudo|No sudo|Sin sudo|Sans sudo|Senza sudo|Sem sudo|Geen sudo|Bez sudo/gi, '')), `${P} CLI-Befehl im sichtbaren Text`);
   ok(/Zwift, Inc\./.test(plain) && /MyWhoosh/.test(plain) && /Valve/.test(plain), `${P} Marken-Hinweis fehlt`);
   const dl = [...html.matchAll(/href="([^"]*Rollout\.desktop)"/g)].map((m) => m[1]);
-  ok(dl.length === 2 && dl.every((d) => d === 'https://github.com/mace-ops/rollout-cycling-launcher-linux/releases/latest/download/Rollout.desktop'), `${P} zwei Download-Knöpfe mit Rollout.desktop erwartet`);
+  if (LIVE) ok(dl.length === 2 && dl.every((d) => d === 'https://github.com/mace-ops/rollout-cycling-launcher-linux/releases/latest/download/Rollout.desktop'), `${P} zwei Download-Knöpfe mit Rollout.desktop erwartet`);
+  else ok(dl.length === 0 && (html.match(/aria-disabled="true"/g) ?? []).length === 2 && html.includes('class="soon"'), `${P} Download-Knöpfe sollen ausgegraut sein (downloadLive=false)`);
   // interne Links und Anker
   for (const m of html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>/g)) {
     const href = m[1];

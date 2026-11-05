@@ -84,10 +84,13 @@ The screenshots show the real app with simulated data (no account, no game runni
 ## Install
 
 <p align="center">
-  <a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/releases/latest/download/Rollout.desktop"><img alt="Download for SteamOS" src="https://img.shields.io/badge/Download%20for-SteamOS-3D6BFF?style=for-the-badge" height="44"></a>
+  <a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/releases"><img alt="Download for SteamOS" src="https://img.shields.io/badge/SteamOS%20download-coming%20soon-6B6F7A?style=for-the-badge" height="44"></a>
   &nbsp;
-  <a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/releases/latest/download/Rollout.desktop"><img alt="Download for Bazzite" src="https://img.shields.io/badge/Download%20for-Bazzite-FF5A1F?style=for-the-badge" height="44"></a>
+  <a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/releases"><img alt="Download for Bazzite" src="https://img.shields.io/badge/Bazzite%20download-coming%20soon-6B6F7A?style=for-the-badge" height="44"></a>
 </p>
+
+> [!IMPORTANT]
+> The `Rollout.desktop` download is not available yet. The buttons above lead to the releases page until it is published.
 
 1. Switch to **Desktop Mode** (SteamOS: Steam button → Power → Switch to Desktop; on a PC with Bazzite you are already there).
 2. Download `Rollout.desktop` and **double-click** it in *Downloads*.
