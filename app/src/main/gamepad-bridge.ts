@@ -185,12 +185,14 @@ export function startPadBridge(opts: PadBridgeOptions): PadBridge {
   try { pads = findPadEvents(fs.readFileSync(opts.devicesFile ?? '/proc/bus/input/devices', 'utf8')).filter((p) => { try { fs.accessSync(p, fs.constants.R_OK); return true; } catch { return false; } }); } catch { /* unten */ }
   if (!pads.length) { note('Controller-Weitergabe: kein lesbares Steam-Gamepad gefunden'); return { stop: () => {} }; }
   const children: ChildProcess[] = [];
+  let seen = 0;
   const xdo = run('xdotool', ['-'], { env: { ...(opts.env ?? process.env), DISPLAY: opts.display }, stdio: ['pipe', 'ignore', 'ignore'] });
   let alive = true;
   xdo.on('error', () => { alive = false; note('Controller-Weitergabe: xdotool fehlt oder startet nicht'); });
-  xdo.on('close', () => { alive = false; });
+  xdo.on('close', (code) => { alive = false; note(`xdotool beendet (Code ${code ?? '?'})`); });
   xdo.stdin?.on('error', () => { alive = false; });
-  const mapper = new PadMapper((line) => { if (alive) xdo.stdin?.write(`${line}\n`); });
+  let sent = 0;
+  const mapper = new PadMapper((line) => { if (alive) { xdo.stdin?.write(`${line}\n`); if (sent++ < 5) note(`xdotool: ${line}`); } });
   for (const device of pads) {
     const cat = run('cat', [device], { stdio: ['ignore', 'pipe', 'ignore'] });
     children.push(cat);
@@ -198,7 +200,10 @@ export function startPadBridge(opts: PadBridgeOptions): PadBridge {
     cat.stdout?.on('data', (data: Buffer) => {
       const parsed = parseEvents(Buffer.concat([rest, data]));
       rest = parsed.rest;
-      for (const e of parsed.events) mapper.feed(e.type, e.code, e.value);
+      for (const e of parsed.events) {
+        if (seen++ < 5 && e.type !== 0) note(`Ereignis ${device}: Typ ${e.type} Code ${e.code} Wert ${e.value}`);
+        mapper.feed(e.type, e.code, e.value);
+      }
     });
     cat.on('error', () => {});
   }
