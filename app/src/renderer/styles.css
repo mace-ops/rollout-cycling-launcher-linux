@@ -198,6 +198,8 @@ button, select, input { -webkit-tap-highlight-color:transparent; }
 html, body { overflow-x:hidden; }
 /* Im Gaming Mode kommt Touch als Maus an: Ziehen scrollt (siehe main.ts), Text wird nie markiert. */
 body { user-select:none; -webkit-user-select:none; touch-action:pan-y; }
+/* Touch kommt als Maus an: Zeiger verstecken, bis sich eine echte Maus ohne gedrückte Taste bewegt. */
+html.touching, html.touching * { cursor:none !important; }
 input, select { user-select:auto; -webkit-user-select:auto; }
 .logo { width:30px; height:30px; flex:none; display:block; }
 

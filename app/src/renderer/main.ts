@@ -300,11 +300,13 @@ viewEl.addEventListener('change', (event) => {
 const DRAG_FROM = 8;
 let drag: { y: number; el: HTMLElement; start: number; moved: boolean } | null = null;
 window.addEventListener('pointerdown', (event) => {
+  document.documentElement.classList.add('touching');
   if (event.button !== 0 || (event.target as Element).closest('input,select,textarea')) return;
   const el = (event.target as Element).closest<HTMLElement>('.picker') ?? (document.scrollingElement as HTMLElement);
   drag = { y: event.clientY, el, start: el.scrollTop, moved: false };
 });
 window.addEventListener('pointermove', (event) => {
+  if (event.buttons === 0) document.documentElement.classList.remove('touching');
   if (!drag) return;
   const dy = event.clientY - drag.y;
   if (!drag.moved && Math.abs(dy) < DRAG_FROM) return;
