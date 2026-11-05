@@ -69,6 +69,7 @@ button:disabled { cursor:not-allowed; }
 .top .btn { min-height:60px; padding:10px 24px; font-size:19px; }
 .live { --pulse:var(--ok); width:9px; height:9px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 0 var(--pulse); animation:live 2.4s ease-out infinite; flex:none; }
 .row-btn .live { display:inline-block; vertical-align:middle; margin-left:6px; }
+.row-btn .rowtext { align-items:flex-start; text-align:left; }
 .live.warn { --pulse:var(--warn); background:var(--warn); }
 @keyframes live { 0% { box-shadow:0 0 0 0 var(--pulse); opacity:1; } 70% { box-shadow:0 0 0 8px transparent; } 100% { box-shadow:0 0 0 0 transparent; } }
 
