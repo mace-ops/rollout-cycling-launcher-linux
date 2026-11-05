@@ -15,10 +15,11 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-zwift-test-'));
 process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
 // Nie die echte config.toml des Prüfrechners.
 process.env.ROLLOUT_CONFIG_HOME = path.join(work, 'cfg-default');
-for (const name of ['zwift', 'sim', 'config']) {
+for (const name of ['zwift', 'zwift-window', 'sim', 'config']) {
   await build({ entryPoints: [path.join(root, `src/main/${name}.ts`)], bundle: true, platform: 'node', format: 'esm', outfile: path.join(work, `${name}.mjs`), logLevel: 'error' });
 }
 const zwift = await import(path.join(work, 'zwift.mjs'));
+const zwin = await import(path.join(work, 'zwift-window.mjs'));
 const sim = await import(path.join(work, 'sim.mjs'));
 const config = await import(path.join(work, 'config.mjs'));
 
@@ -493,6 +494,166 @@ test('Z22 chooseZwiftMode: echt, sobald rollout-run da ist und der Pin gilt; aus
   assert.equal(mode('unsinn', true), 'sim');
   const real = JSON.parse(fs.readFileSync(path.join(root, 'upstreams.json'), 'utf8')).zwift;
   assert.equal(mode(undefined, true, real), 'real', 'der echte Pin aus upstreams.json');
+});
+
+// --- Sichtbarkeit im Spielmodus (Z24 bis Z28): nie ein echter X-Server, die Werkzeuge sind eine Funktion --------------------------
+
+const TREE = (...windows) => `\nxwininfo: Window id: 0x3d9 (the root window) (has no name)\n\n  Root window id: 0x3d9 (the root window) (has no name)\n  Parent window id: 0x0 (none)\n     ${windows.length} children:\n${windows.join('\n')}\n`;
+const WIN = (id, name, cls, size) => `     ${id} "${name}": ("${cls}" "${cls}")  ${size}+4+30  +4+30`;
+const CHILD = (id) => `        ${id} (has no name): ()  1912x1046+0+0  +4+30`;
+const focusOut = (id) => (id === null ? 'GAMESCOPE_FOCUSED_WINDOW:  not found.\n' : `GAMESCOPE_FOCUSED_WINDOW(CARDINAL) = ${id}\n`);
+
+test('Z24 AppID aus dem Prozessbaum: reaper SteamLaunch AppId=<N> als Vorfahre; sonst null', () => {
+  const proc = path.join(work, 'proc1');
+  const put = (pid, ppid, comm, argv) => {
+    fs.mkdirSync(path.join(proc, String(pid)), { recursive: true });
+    fs.writeFileSync(path.join(proc, String(pid), 'stat'), `${pid} (${comm}) S ${ppid} 1 1 0 -1 0\n`);
+    fs.writeFileSync(path.join(proc, String(pid), 'cmdline'), argv.join('\0') + '\0');
+  };
+  put(1, 0, 'init', ['/sbin/init']);
+  put(100, 1, 'steam', ['/usr/bin/steam']);
+  put(200, 100, 'reaper', ['/home/u/.steam/ubuntu12_32/reaper', 'SteamLaunch', 'AppId=4070058561', '--', '/x/rollout/bin/rollout']);
+  put(300, 200, 'bash (x) y', ['bash', '/x/rollout/bin/rollout']); // Name mit Klammern und Leerzeichen
+  put(400, 300, 'electron', ['electron', '.']);
+  assert.equal(zwin.appIdFromAncestors(400, proc), '4070058561');
+  assert.equal(zwin.appIdFromAncestors(200, proc), '4070058561');
+  assert.equal(zwin.appIdFromAncestors(100, proc), null, 'Steam selbst ist kein Eintrag');
+  put(201, 100, 'reaper', ['reaper', 'SteamLaunch', 'AppId=99999999999', '--', 'x']); // zu groß für eine AppID
+  put(401, 201, 'x', ['x']);
+  assert.equal(zwin.appIdFromAncestors(401, proc), null);
+  assert.equal(zwin.appIdFromAncestors(999, proc), null, 'unbekannter Prozess');
+});
+
+test('Z25 Fenstererkennung: Spielfenster der obersten Ebene, Hilfsfenster und Fremdes zählen nicht; Fokus aus GAMESCOPE_FOCUSED_WINDOW', () => {
+  const tree = TREE(
+    WIN('0x4200006', 'Default IME', 'zwiftapp.exe', '1x1'),
+    WIN('0x3e00004', '', 'explorer.exe', '1912x1046'),
+    WIN('0x4200005', 'Zwift', 'zwiftapp.exe', '1912x1046'), CHILD('0x4200009'),
+    WIN('0x4200010', 'Zwift Launcher', 'ZwiftApp.exe', '800x600'));
+  assert.deepEqual(zwin.findZwiftWindow(tree), { id: 0x4200005, hex: '0x4200005', width: 1912, height: 1046 }, 'das größte Fenster');
+  assert.equal(zwin.findZwiftWindow(TREE(WIN('0x1', 'Rollout', 'rollout', '1280x800'))), null);
+  assert.equal(zwin.findZwiftWindow(TREE(WIN('0x2', 'x', 'zwiftapp.exe', '1x1'))), null);
+  assert.equal(zwin.findZwiftWindow(''), null);
+  assert.equal(zwin.parseFocusedWindow(focusOut(67108869)), 67108869);
+  assert.equal(zwin.parseFocusedWindow(focusOut(null)), null);
+});
+
+/** X-Attrappe: `state.tree` und `state.focus` sind veränderbar, alle Aufrufe landen in `calls`. */
+function fakeX(state) {
+  const calls = [];
+  const exec = async (file, args) => {
+    calls.push([file, ...args].join(' '));
+    if (state.down) throw new Error('cannot open display');
+    if (file === 'xwininfo') return state.tree;
+    if (file === 'xprop' && args[0] === '-root') return focusOut(state.focus);
+    if (file === 'xprop' && args[0] === '-id') { state.tagged = args.at(-1); return ''; }
+    if (file === 'xhost') {
+      if (args[0] === '-local:') { state.local = false; return 'access control enabled\n'; }
+      return `access control enabled, only authorized clients can connect\n${state.local ? 'LOCAL:\n' : ''}SI:localuser:mace\n`;
+    }
+    throw new Error(`unerwartet: ${file}`);
+  };
+  return { exec, calls };
+}
+const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (!cond()) { if (Date.now() > end) throw new Error('Zeitüberschreitung'); await new Promise((r) => setTimeout(r, 5)); } };
+
+test('Z26 Beobachter: Fenster kennzeichnen (einmal je Fenster), „sichtbar“ erst bei Fokus, Verlust und neues Fenster werden erkannt', async () => {
+  const state = { tree: TREE(WIN('0x3e00004', '', 'explorer.exe', '160x20')), focus: 6291459 };
+  const { exec, calls } = fakeX(state);
+  const events = [];
+  const w = zwin.watchZwiftWindow({ exec, appId: '4070058561', onVisible: (v) => events.push(v), intervalMs: 10 });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.deepEqual(events, [], 'kein Fenster: nichts gemeldet');
+  assert.equal(calls.filter((c) => c.startsWith('xprop -id')).length, 0, 'nichts gekennzeichnet');
+
+  state.tree = TREE(WIN('0x4200006', 'IME', 'zwiftapp.exe', '1x1'), WIN('0x4200005', 'Zwift', 'zwiftapp.exe', '1912x1046'));
+  await until(() => state.tagged);
+  assert.equal(state.tagged, '4070058561');
+  assert.ok(calls.includes('xprop -id 0x4200005 -f STEAM_GAME 32c -set STEAM_GAME 4070058561'), 'genau der Aufruf aus Test T3');
+  await new Promise((r) => setTimeout(r, 60));
+  assert.deepEqual(events, [], 'gekennzeichnet, aber Rollout hat noch den Fokus: nicht sichtbar');
+
+  state.focus = 0x4200005;
+  await until(() => events.length === 1);
+  assert.deepEqual(events, [true]);
+  assert.equal(w.visible, true);
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(calls.filter((c) => c.startsWith('xprop -id')).length, 1, 'je Fenster nur einmal gesetzt');
+
+  state.focus = 6291459; // Steam-Overlay oder Rücksprung
+  await until(() => events.length === 2);
+  assert.deepEqual(events, [true, false]);
+
+  state.tree = TREE(WIN('0x4200099', 'Zwift', 'zwiftapp.exe', '1920x1080')); // Launcher wird durch das Spiel ersetzt
+  state.focus = 0x4200099;
+  await until(() => events.length === 3);
+  assert.deepEqual(events, [true, false, true]);
+  assert.equal(calls.filter((c) => c.startsWith('xprop -id')).length, 2, 'das neue Fenster wird erneut gekennzeichnet');
+
+  state.down = true; // X-Server kurz weg: Beobachter bleibt am Leben
+  await new Promise((r) => setTimeout(r, 40));
+  state.down = false;
+  state.tree = TREE();
+  await until(() => events.length === 4);
+  assert.deepEqual(events, [true, false, true, false]);
+
+  w.stop();
+  const n = calls.length;
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(calls.length, n, 'nach stop() keine Abfragen mehr');
+});
+
+test('Z27 Beobachter ohne AppID (nicht aus Steam gestartet): nichts gesetzt, nichts gemeldet, ein Hinweis', async () => {
+  const state = { tree: TREE(WIN('0x4200005', 'Zwift', 'zwiftapp.exe', '1912x1046')), focus: 0x4200005 };
+  const { exec, calls } = fakeX(state);
+  const notes = []; const events = [];
+  const w = zwin.watchZwiftWindow({ exec, appId: null, onVisible: (v) => events.push(v), onNote: (t) => notes.push(t), intervalMs: 5 });
+  await new Promise((r) => setTimeout(r, 50));
+  w.stop();
+  assert.deepEqual(calls, []);
+  assert.deepEqual(events, []);
+  assert.equal(notes.length, 1);
+});
+
+test('Z28 Start mit RealZwift und Fenster: sichtbar im Snapshot, bei Ende zurückgesetzt; xhost +local: wird nur zurückgenommen, wenn es vorher fehlte', async () => {
+  for (const hadLocal of [false, true]) {
+    const home = runtimeHome({ image: true });
+    const state = { tree: TREE(), focus: 6291459, local: hadLocal };
+    const { exec, calls } = fakeX(state);
+    const z = new zwift.RealZwift({
+      home, pin: pin(), download: downloader(), windows: { exec, appId: '4070058561', intervalMs: 10 },
+      env: { ...cleanEnv(), ROLLOUT_CONFIG_HOME: path.join(home, 'cfg'), ROLLOUT_ZWIFT_TAG: '1.2.3', PATH: `${path.join(home, 'fakebin')}:${process.env.PATH}`, ...stubUpstream(home, 'echo "[*] Launching Zwift"\nsleep 30 &\nwait') }
+    });
+    await z.installScript(new AbortController().signal);
+    const { backend, snaps } = backendWith(z, { env: { ROLLOUT_ZWIFT_RUNNING_MS: '60000' } });
+    await backend.getSnapshot();
+    await backend.launch('zwift');
+    state.local = true; // zwift.sh hat `xhost +local:` aufgerufen
+    state.tree = TREE(WIN('0x4200005', 'Zwift', 'zwiftapp.exe', '1912x1046'));
+    await until(() => state.tagged);
+    assert.notEqual(snaps.at(-1).launch.visible, true, 'noch nicht im Fokus');
+    state.focus = 0x4200005;
+    await settle(backend, (s) => s.launch?.visible === true);
+    await backend.stopLaunch();
+    const after = await backend.getSnapshot();
+    assert.equal(after.launch, null);
+    assert.equal(snaps.some((s) => s.launch?.visible === false), true, 'beim Beenden zurückgesetzt');
+    const revoked = calls.includes('xhost -local:');
+    assert.equal(revoked, !hadLocal, hadLocal ? 'bestehender xhost-Eintrag bleibt' : 'von zwift.sh geöffneter Zugriff wird geschlossen');
+    assert.equal(state.local, hadLocal);
+    const n = calls.length;
+    await new Promise((r) => setTimeout(r, 60));
+    assert.equal(calls.length, n, 'nach dem Ende keine Abfragen mehr');
+  }
+});
+
+test('Z29 ohne Angabe `windows` berührt RealZwift.start keinen X-Server (xwininfo, xprop und xhost im PATH wären Fallen)', async () => {
+  const home = runtimeHome({ image: true });
+  for (const tool of ['xwininfo', 'xprop', 'xhost']) fs.writeFileSync(path.join(home, 'fakebin', tool), `#!/bin/sh\necho "$0" >> "${path.join(home, 'x-called')}"\n`, { mode: 0o755 });
+  const { lines, run } = collect(realZwift(home, stubUpstream(home, STUB_OK)));
+  assert.equal(await run.done, 0);
+  assert.equal(lines.length, 3);
+  assert.equal(fs.existsSync(path.join(home, 'x-called')), false);
 });
 
 test('Z13 echtes Netz (nur mit ROLLOUT_ZWIFT_NET=1): das gepinnte zwift.sh von GitHub hat die Prüfsumme aus upstreams.json', { skip: process.env.ROLLOUT_ZWIFT_NET !== '1' }, async () => {

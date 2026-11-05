@@ -13,6 +13,7 @@
 //   ROLLOUT_ZWIFT=real|fake      Zwift echt (zwift.sh laden, Image ziehen, Zustand aus der Container-Laufzeit) oder als Attrappe, siehe zwift.ts;
 //                                ohne die Variable gilt Zwift als echt, sobald bin/rollout-run da ist (chooseZwiftMode in zwift.ts); ROLLOUT_ZWIFT=sim erzwingt die Simulation.
 //                                Mit dem Dienst starten, beenden und entfernen auch Zwift echt (rollout-run zwift, podman rmi über rollout-run --zwift-remove).
+//   ROLLOUT_ZWIFT_WINDOWS=off    Zwift-Fenster im Spielmodus nicht erkennen und nicht für gamescope kennzeichnen (zwift-window.ts); ROLLOUT_ZWIFT_DISPLAY=<:N> wählt den X-Server (Vorgabe :0)
 //   ROLLOUT_ZWIFT_RUNNING_MS=<ms> Zeit vom Start des Containers bis „Läuft“ (Vorgabe 20000; Zwift meldet das nicht selbst)
 import type {
   AppId, AppProblem, InstallOptions, Launch, LaunchOptions, Overrides, RolloutApi, Snapshot, SteamResult, UpdateChannel
@@ -253,6 +254,10 @@ export class SimBackend implements Backend {
       if (this.zwiftRun !== run) return;
       if (isStartLine(line)) this.zwiftStarting();
       else if (isRunningLine(line)) this.zwiftRunning();
+    }, (visible) => {
+      if (this.zwiftRun !== run || this.state.launch?.app !== 'zwift') return;
+      this.state.launch.visible = visible;
+      this.changed();
     });
     this.zwiftRun = run;
     this.zwiftTimers = [setTimeout(() => this.zwiftStarting(), ZWIFT_START_FALLBACK_MS)];
@@ -289,6 +294,7 @@ export class SimBackend implements Backend {
     const launch = this.state.launch;
     const stopped = this.zwiftStopping;
     this.zwiftStopping = false;
+    if (launch) launch.visible = false;
     if (!launch || stopped || code === 0) this.state.launch = null;
     else if (code !== null && RUN_PROBLEM[code]) Object.assign(launch, { phase: 'failed', problem: RUN_PROBLEM[code] });
     else if (Date.now() - this.launchStartedAt < ZWIFT_CRASH_WINDOW_MS) launch.phase = 'crash';

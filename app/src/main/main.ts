@@ -83,7 +83,8 @@ if (!app.requestSingleInstanceLock()) {
     const home = steam.rolloutHome();
     const mode = chooseZwiftMode({ mode: process.env.ROLLOUT_ZWIFT, runnerExists: fs.existsSync(path.join(home, 'bin/rollout-run')), pin: upstreams.zwift });
     if (mode === 'fake') return new FakeZwift(process.env.ROLLOUT_SIM_ZWIFT ?? '');
-    if (mode === 'real') return new RealZwift({ home, pin: upstreams.zwift, download: realFeed.download });
+    // Fenstersichtbarkeit im Spielmodus (zwift-window.ts): auf :0 das Zwift-Fenster erkennen und für gamescope kennzeichnen; ROLLOUT_ZWIFT_WINDOWS=off schaltet das ab.
+    if (mode === 'real') return new RealZwift({ home, pin: upstreams.zwift, download: realFeed.download, windows: process.env.ROLLOUT_ZWIFT_WINDOWS === 'off' ? undefined : { display: process.env.ROLLOUT_ZWIFT_DISPLAY || ':0' } });
     return null;
   };
 

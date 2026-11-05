@@ -46,6 +46,8 @@ export interface Launch {
   progress: number;
   /** Grund bei `phase === 'failed'`, sonst leer */
   problem: AppProblem;
+  /** Nur Zwift im Spielmodus: Das Spielfenster ist im Fokus, also zu sehen (sonst fehlt das Feld oder ist `false`) */
+  visible?: boolean;
 }
 
 export interface Sensor {

@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AppProblem } from '../shared/api';
 import type { DownloadOptions } from './selfupdate';
+import { appIdFromAncestors, realXExec, watchZwiftWindow, xhostRestore, xhostSnapshot, type XExec } from './zwift-window';
 
 /** Pin aus `upstreams.json`: genau dieses Skript auf genau diesem Commit, nichts Neueres wird je automatisch ausgeführt. */
 export interface ZwiftPin {
@@ -170,8 +171,11 @@ export interface ZwiftService {
   installScript(signal: AbortSignal): Promise<void>;
   /** Zieht das eingestellte Image (`rollout-run --zwift-pull`). Nur nach Bestätigung durch den Nutzer aufrufen. `onLine` bekommt die Ausgabe zeilenweise. */
   pullImage(onLine: (line: string) => void, signal: AbortSignal): Promise<void>;
-  /** Startet das Spiel (`rollout-run zwift`). `onLine` bekommt die Ausgabe zeilenweise, ohne Farbcodes. */
-  start(onLine: (line: string) => void): ZwiftRun;
+  /**
+   * Startet das Spiel (`rollout-run zwift`). `onLine` bekommt die Ausgabe zeilenweise, ohne Farbcodes. `onVisible` meldet, ob das
+   * Zwift-Fenster im Spielmodus (gamescope) im Fokus ist, also wirklich zu sehen (Weg A, siehe zwift-window.ts).
+   */
+  start(onLine: (line: string) => void, onVisible?: (visible: boolean) => void): ZwiftRun;
   /** Entfernt das Image (`rollout-run --zwift-remove`, also `podman rmi`) und die gemerkte Zustimmung. Nur nach Rückfrage aufrufen. */
   removeImage(signal: AbortSignal): Promise<void>;
   /** Voreinstellung für den Image-Tag */
@@ -191,6 +195,11 @@ export interface RealZwiftOptions {
   statusTimeoutMs?: number;
   /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 35000 (der Starter wartet höchstens 20 s auf `podman stop`) */
   stopGraceMs?: number;
+  /**
+   * Fenstersichtbarkeit im Spielmodus (zwift-window.ts). Ohne diese Angabe berührt `start` den X-Server nie (Tests). `display` Vorgabe
+   * `:0` (die gamescope-Xwayland), `exec` ersetzt xwininfo/xprop/xhost, `appId` ersetzt die Suche im Prozessbaum.
+   */
+  windows?: { display?: string; exec?: XExec; appId?: string | null; intervalMs?: number; onNote?: (text: string) => void };
 }
 
 export class RealZwift implements ZwiftService {
@@ -247,8 +256,12 @@ export class RealZwift implements ZwiftService {
     if (code !== 0) throw new ZwiftError(code !== null && EXIT_PROBLEM[code] ? EXIT_PROBLEM[code] : 'pull', `rollout-run --zwift-pull endete mit ${code ?? 'Fehler'}`);
   }
 
-  start(onLine: (line: string) => void): ZwiftRun {
+  start(onLine: (line: string) => void, onVisible?: (visible: boolean) => void): ZwiftRun {
     if (!fs.existsSync(this.runner)) return { done: Promise.resolve(127), stop: () => {} };
+    const w = this.o.windows;
+    const exec = w ? (w.exec ?? realXExec(w.display ?? ':0', this.o.env ?? process.env)) : null;
+    // Vor dem Start merken, ob `xhost` schon `LOCAL:` kennt: zwift.sh öffnet es und schließt es nie.
+    const hadLocal = exec ? xhostSnapshot(exec) : null;
     // Eigene Prozessgruppe, damit der KILL nach der Frist alles trifft, was am Starter hängt.
     const child = this.spawnRunner('zwift', true);
     feedLines(child.stdout, onLine);
@@ -257,9 +270,28 @@ export class RealZwift implements ZwiftService {
     const signalGroup = (sig: NodeJS.Signals): void => {
       try { if (child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch { try { child.kill(sig); } catch { /* schon beendet */ } }
     };
+    const watcher = w && exec
+      ? watchZwiftWindow({
+        exec, appId: w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId, intervalMs: w.intervalMs, onNote: w.onNote,
+        onVisible: (v) => onVisible?.(v)
+      })
+      : null;
+    const finish = async (code: number | null): Promise<number | null> => {
+      if (killer) clearTimeout(killer);
+      if (watcher) {
+        const was = watcher.visible;
+        watcher.stop();
+        if (was) onVisible?.(false);
+      }
+      if (exec && hadLocal) {
+        const restored = await xhostRestore(exec, await hadLocal);
+        if (restored) w?.onNote?.('xhost -local: zurückgenommen');
+      }
+      return code;
+    };
     const done = new Promise<number | null>((resolve) => {
-      child.on('error', () => resolve(127));
-      child.on('close', (code) => { if (killer) clearTimeout(killer); resolve(code); });
+      child.on('error', () => { void finish(127).then(resolve); });
+      child.on('close', (code) => { void finish(code).then(resolve); });
     });
     return {
       done,
@@ -338,7 +370,7 @@ export class FakeZwift implements ZwiftService {
     this.image = true;
   }
 
-  start(onLine: (line: string) => void): ZwiftRun {
+  start(onLine: (line: string) => void, onVisible?: (visible: boolean) => void): ZwiftRun {
     let finish: (code: number | null) => void = () => {};
     const done = new Promise<number | null>((resolve) => { finish = resolve; });
     const timers: NodeJS.Timeout[] = [];
@@ -350,9 +382,10 @@ export class FakeZwift implements ZwiftService {
       at(2, () => onLine('Looking for container tool'));
       at(3, () => onLine('Launching Zwift'));
       if (this.mode === 'runcrash') at(4, () => finish(1));
+      else at(5, () => onVisible?.(true));
     }
     // Beenden dauert wie beim echten Container einen Moment: sichtbar als Phase „stopping“.
-    return { done, stop: () => { if (stopped) return; stopped = true; timers.forEach(clearTimeout); timers.length = 0; at(4, () => finish(143)); } };
+    return { done, stop: () => { if (stopped) return; stopped = true; timers.forEach(clearTimeout); timers.length = 0; onVisible?.(false); at(4, () => finish(143)); } };
   }
 
   async removeImage(): Promise<void> {
