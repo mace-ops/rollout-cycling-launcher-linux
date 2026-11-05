@@ -29,6 +29,7 @@ const sw = (on: boolean, act: string, label: string, arg = '', disabled = false)
 
 export function cardStatus(id: AppId, snap: Snapshot): string {
   const info = snap.apps[id];
+  if (snap.launch?.app === id && snap.launch.phase === 'stopping') return t('status.stopping');
   if (snap.job?.app === id) return t(snap.job.kind === 'update' ? 'status.updating' : 'status.installing', { pct: snap.job.progress });
   if (info.installed && info.updateAvailable) return t('status.update');
   return info.installed ? t('status.ready') : t('status.notInstalled', { gb: download(id, false) });
@@ -47,7 +48,8 @@ function library(snap: Snapshot): string {
   const cards = APP_IDS.map((id) => {
     const info = snap.apps[id];
     const busy = snap.job?.app === id;
-    const blocked = !!snap.job && !busy && !info.installed;
+    const stopping = snap.launch?.app === id && snap.launch.phase === 'stopping';
+    const blocked = (!!snap.job && !busy && !info.installed) || stopping;
     const hasUpdate = info.installed && info.updateAvailable && !busy;
     const label = busy ? t('btn.progress') : hasUpdate ? t('btn.update') : info.installed ? t('btn.ride') : t('btn.install');
     const arrow = info.installed && !hasUpdate && !busy ? ICON.go : '';
@@ -56,7 +58,7 @@ function library(snap: Snapshot): string {
       <div class="cardbody">
         <h2 class="cardname">${APP_NAMES[id]}</h2>
         <div class="status">
-          <span class="pill ${hasUpdate ? 'warn' : info.installed ? 'ok' : ''}"><span class="dot"></span><span id="status-${id}">${cardStatus(id, snap)}</span></span>
+          <span class="pill ${hasUpdate || stopping ? 'warn' : info.installed ? 'ok' : ''}"><span class="dot"></span><span id="status-${id}">${cardStatus(id, snap)}</span></span>
           ${info.problem ? `<span class="pill warn" title="${esc(problemText(info.problem))}"><span class="dot"></span>${t('pill.problem')}</span>` : ''}
           ${info.installed && info.steam ? `<span class="pill">${t('pill.steam')}</span>` : ''}
           ${info.installed && isCustom(snap.overrides[id]) ? `<span class="pill warn">${t('pill.custom')}</span>` : ''}

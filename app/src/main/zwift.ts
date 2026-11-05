@@ -145,6 +145,12 @@ export const RUN_PROBLEM: Record<number, Exclude<AppProblem, ''>> = { 10: 'runti
 /** Erkennt in der Ausgabe von `zwift.sh` die Zeile, ab der der Container startet (Phase „Spiel startet“). Farbcodes sind schon entfernt. */
 export const isStartLine = (line: string): boolean => /\bLaunching Zwift\b/.test(line);
 
+/**
+ * Meldung des Containers (netbrains Eintrittsskript), wenn ZwiftApp.exe gestartet ist: „[podman|✓] Zwift started using wine“. Am Ally kam sie
+ * etwa 5 s nach dem Start des Containers. Sie ersetzt die Wartezeit bis „Läuft“; fehlt sie, gilt weiter die Zeit (ROLLOUT_ZWIFT_RUNNING_MS).
+ */
+export const isRunningLine = (line: string): boolean => /Zwift started using wine/.test(line);
+
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 /** Teilt einen Ausgabestrom in Zeilen (auch bei `\r`), entfernt Farbcodes und kürzt auf 300 Zeichen. */
 function feedLines(stream: NodeJS.ReadableStream, onLine: (line: string) => void): void {
@@ -336,6 +342,7 @@ export class FakeZwift implements ZwiftService {
     let finish: (code: number | null) => void = () => {};
     const done = new Promise<number | null>((resolve) => { finish = resolve; });
     const timers: NodeJS.Timeout[] = [];
+    let stopped = false;
     const at = (n: number, fn: () => void): void => { timers.push(setTimeout(fn, n * this.stepMs)); };
     if (this.mode === 'runfail') at(1, () => finish(12));
     else {
@@ -344,7 +351,8 @@ export class FakeZwift implements ZwiftService {
       at(3, () => onLine('Launching Zwift'));
       if (this.mode === 'runcrash') at(4, () => finish(1));
     }
-    return { done, stop: () => { timers.forEach(clearTimeout); finish(143); } };
+    // Beenden dauert wie beim echten Container einen Moment: sichtbar als Phase „stopping“.
+    return { done, stop: () => { if (stopped) return; stopped = true; timers.forEach(clearTimeout); timers.length = 0; at(4, () => finish(143)); } };
   }
 
   async removeImage(): Promise<void> {

@@ -36,7 +36,7 @@ function structKey(): string {
   const { progress: _progress, ...selfUpdate } = snap.selfUpdate;
   return JSON.stringify([
     ui.screen, ui.steamModal, ui.steamRollout, ui.picker, ui.confirmRemove, ui.confirmQuit, ui.confirmRestart, ui.confirmPrevious, ui.confirmImage, snap.zwiftTag, snap.updateChannel, selfUpdate, snap.apps, snap.job && [snap.job.app, snap.job.kind],
-    snap.launch && [screenForPhase(snap.launch.phase), snap.launch.problem], snap.bluetooth, snap.autoUpdate, snap.rolloutSteam, snap.overrides, snap.language, snap.theme, snap.scale
+    snap.launch && [screenForPhase(snap.launch.phase), snap.launch.problem, snap.launch.phase === 'stopping'], snap.bluetooth, snap.autoUpdate, snap.rolloutSteam, snap.overrides, snap.language, snap.theme, snap.scale
   ]);
 }
 

@@ -34,8 +34,11 @@ export interface Job {
   hd: boolean;
 }
 
-/** `failed`: der Start kam nicht zustande, `Launch.problem` nennt den Grund (nur bei echtem Zwift). */
-export type LaunchPhase = 'updates' | 'bluetooth' | 'starting' | 'running' | 'bterror' | 'crash' | 'failed';
+/**
+ * `failed`: der Start kam nicht zustande, `Launch.problem` nennt den Grund (nur bei echtem Zwift).
+ * `stopping`: Zwift wird beendet (der Container braucht dafür bis zu etwa 12 s), ein neuer Start ist so lange gesperrt.
+ */
+export type LaunchPhase = 'updates' | 'bluetooth' | 'starting' | 'running' | 'bterror' | 'crash' | 'failed' | 'stopping';
 
 export interface Launch {
   app: AppId;

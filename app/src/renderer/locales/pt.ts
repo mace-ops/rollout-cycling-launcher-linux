@@ -17,6 +17,7 @@ export const pt: Messages = {
   'status.ready': 'Pronto',
   'status.update': 'Atualização disponível',
   'status.installing': 'Instalando · {pct} %',
+  'status.stopping': 'Fechando …',
   'status.updating': 'Atualizando · {pct} %',
   'pill.steam': 'No Steam',
   'pill.custom': 'Configurações próprias',

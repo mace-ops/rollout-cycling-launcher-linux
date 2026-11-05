@@ -293,6 +293,8 @@ test('Z14 RealZwift.start: Ausgabe zeilenweise ohne Farbcodes, die Startzeile wi
   assert.deepEqual(lines, ['[*] Preparing to launch Zwift', 'env tool=podman image=docker.io/netbrain/zwift version=1.2.3 fg=1 noupdate=1', '[*] Launching Zwift']);
   assert.deepEqual(lines.map(zwift.isStartLine), [false, false, true]);
   assert.equal(zwift.isStartLine('[*] Preparing to launch Zwift'), false);
+  assert.equal(zwift.isRunningLine('[podman|✓] Zwift started using wine'), true);
+  assert.equal(zwift.isRunningLine('[podman|*] Starting Zwift using wine'), false);
   assert.equal(containerLog(home).filter((l) => / (pull|run|rmi) /.test(l)).length, 0, 'nur geprüft, nichts gezogen oder gestartet');
 });
 
@@ -372,11 +374,33 @@ test('Z18 Start über SimBackend mit RealZwift: Phasen aus der Ausgabe (Vorberei
   const progress = snaps.filter((s) => s.launch).map((s) => s.launch.progress);
   assert.deepEqual([...progress].sort((a, b) => a - b), progress, 'Fortschritt fällt nie');
   await backend.launch('zwift'); // zweiter Start läuft nicht an
-  await backend.stopLaunch();
+  const stopping = backend.stopLaunch();
+  assert.equal(snaps.at(-1).launch.phase, 'stopping', 'Beenden ist sichtbar, solange der Container stoppt');
+  await backend.launch('zwift'); // und ein Start in dieser Zeit wird abgewiesen
+  await stopping;
   const after = await backend.getSnapshot();
   assert.equal(after.launch, null);
   assert.equal(fs.existsSync(path.join(home, 'state/run.pid')), false);
   assert.equal(after.apps.zwift.installed, true);
+});
+
+test('Z23 „Läuft“ aus der Meldung des Containers statt nach der Wartezeit; ohne Startzeile geht es über „Zwift startet“', async () => {
+  const phasesFor = async (body) => {
+    const home = runtimeHome({ image: true });
+    const z = realZwift(home, stubUpstream(home, body));
+    await z.installScript(new AbortController().signal);
+    const { backend, snaps } = backendWith(z, { env: { ROLLOUT_ZWIFT_RUNNING_MS: '60000' } });
+    await backend.getSnapshot();
+    const t0 = Date.now();
+    await backend.launch('zwift');
+    await launchOf(backend, (s) => s.launch?.phase === 'running', 5000);
+    assert.ok(Date.now() - t0 < 5000, 'weit vor den 60 s der Wartezeit');
+    const seen = [...new Set(snaps.filter((s) => s.launch).map((s) => s.launch.phase))];
+    await backend.stopLaunch();
+    return seen;
+  };
+  assert.deepEqual(await phasesFor('echo "[*] Launching Zwift"\nsleep 0.2\necho "[podman|✓] Zwift started using wine"\nsleep 30 &\nwait'), ['updates', 'starting', 'running']);
+  assert.deepEqual(await phasesFor('echo "[podman|✓] Zwift started using wine"\nsleep 30 &\nwait'), ['updates', 'starting', 'running']);
 });
 
 test('Z19 Start endet: Exit 0 = Spiel beendet; Fehler kurz nach dem Start = Absturz; Exit 10 bis 12 und 127 = Start gescheitert mit Grund', async () => {

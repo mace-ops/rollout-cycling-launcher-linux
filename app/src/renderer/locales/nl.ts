@@ -17,6 +17,7 @@ export const nl: Messages = {
   'status.ready': 'Klaar',
   'status.update': 'Update beschikbaar',
   'status.installing': 'Installeren · {pct} %',
+  'status.stopping': 'Wordt afgesloten …',
   'status.updating': 'Bijwerken · {pct} %',
   'pill.steam': 'In Steam',
   'pill.custom': 'Eigen instellingen',

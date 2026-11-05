@@ -58,7 +58,10 @@ await session('zwift-attrappe', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fa
   await t.expect((async () => !(await t.has('Bluetooth')))(), 'Zwift prüft kein Bluetooth');
   await t.click('Quit game');
   await t.expect(t.waitFor('Settings'), 'zurück in der Übersicht');
+  await t.expect(t.waitFor('Closing …', 3000), 'Karte zeigt „Closing …“, solange Zwift beendet wird');
+  await t.expect((async () => !(await t.eval(`document.querySelector('article[data-tone=zwift] .btn.primary').disabled === false`)))(), 'Knopf „Ride“ in dieser Zeit gesperrt');
   await t.expect(t.waitUntil(async () => (await t.snapshot()).launch === null), 'Start beendet');
+  await t.expect(t.waitFor('Ready'), 'Karte wieder „Ready“');
 });
 
 // Probleme beim Installieren: Grund als Satz in der Installieren-Ansicht, Pille an der Karte, neuer Versuch möglich.

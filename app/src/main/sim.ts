@@ -21,7 +21,7 @@ import type { BluetoothService } from './bluetooth';
 import type { Settings, SettingsStore } from './config';
 import type { SelfUpdateService } from './selfupdate';
 import type { SteamInfo, SteamStatus } from './steam';
-import { RUN_PROBLEM, ZwiftError, isStartLine, type ZwiftRun, type ZwiftService } from './zwift';
+import { RUN_PROBLEM, ZwiftError, isRunningLine, isStartLine, type ZwiftRun, type ZwiftService } from './zwift';
 
 const TICK_MS = 120;
 const LAUNCH_STEPS = 30;
@@ -249,7 +249,11 @@ export class SimBackend implements Backend {
     this.phaseStartedAt = this.launchStartedAt;
     this.state.launch = { app: 'zwift', phase: 'updates', progress: 5, problem: '' };
     this.zwiftStopping = false;
-    const run: ZwiftRun = zwift.start((line) => { if (this.zwiftRun === run && isStartLine(line)) this.zwiftStarting(); });
+    const run: ZwiftRun = zwift.start((line) => {
+      if (this.zwiftRun !== run) return;
+      if (isStartLine(line)) this.zwiftStarting();
+      else if (isRunningLine(line)) this.zwiftRunning();
+    });
     this.zwiftRun = run;
     this.zwiftTimers = [setTimeout(() => this.zwiftStarting(), ZWIFT_START_FALLBACK_MS)];
     void run.done.then((code) => this.zwiftEnded(run, code));
@@ -262,9 +266,17 @@ export class SimBackend implements Backend {
     launch.phase = 'starting';
     this.phaseStartedAt = Date.now();
     const ms = Number(this.env.ROLLOUT_ZWIFT_RUNNING_MS) || ZWIFT_RUNNING_MS;
-    this.zwiftTimers.push(setTimeout(() => {
-      if (this.zwiftRun && this.state.launch?.phase === 'starting') { this.state.launch.phase = 'running'; this.state.launch.progress = 100; this.changed(); }
-    }, ms));
+    this.zwiftTimers.push(setTimeout(() => this.zwiftRunning(), ms));
+    this.changed();
+  }
+
+  /** „Läuft“: Meldung des Containers, spätestens nach ZWIFT_RUNNING_MS. Kam die Startzeile nicht, geht es über „Zwift startet“. */
+  private zwiftRunning(): void {
+    if (this.state.launch?.phase === 'updates') this.zwiftStarting();
+    const launch = this.state.launch;
+    if (!this.zwiftRun || launch?.phase !== 'starting') return;
+    launch.phase = 'running';
+    launch.progress = 100;
     this.changed();
   }
 
@@ -297,6 +309,7 @@ export class SimBackend implements Backend {
     if (run) {
       // Das Spiel beenden und abwarten: Erst danach ist run.pid weg und ein neuer Start möglich.
       this.zwiftStopping = true;
+      if (this.state.launch) { this.state.launch.phase = 'stopping'; this.changed(); }
       run.stop();
       await run.done;
       return;

@@ -19,6 +19,7 @@ export const en = {
   'status.ready': 'Ready',
   'status.update': 'Update available',
   'status.installing': 'Installing · {pct} %',
+  'status.stopping': 'Closing …',
   'status.updating': 'Updating · {pct} %',
   'pill.steam': 'In Steam',
   'pill.custom': 'Custom settings',
