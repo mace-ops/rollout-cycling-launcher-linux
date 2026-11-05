@@ -121,9 +121,9 @@ export async function session(name, env, steps, opts = {}) {
       snapshot: async () => JSON.parse((await evalJs('window.rollout.getSnapshot().then((s) => JSON.stringify(s))')) ?? 'null'),
       /** Nach einem Neustart durch den Wächter: neues Fenster am selben Debug-Port suchen. */
       reattach: async (ms = 40000) => { try { conn.ws.close(); } catch { /* schon zu */ } await attach(ms); await t.waitFor('Rollout', 15000); },
-      shot: async (label) => {
+      shot: async (label, wait = 700) => {
         if (!shots) return;
-        await sleep(700);
+        await sleep(wait);
         const { result } = await send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(path.join(shots, `${name}-${label}.png`), Buffer.from(result.data, 'base64'));
       },

@@ -1,0 +1,16 @@
+{
+  "name": "rollout-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Statische Website von Rollout (GitHub Pages)",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs && node check.mjs",
+    "serve": "npx --yes serve dist",
+    "shots": "node scripts/process-shots.mjs"
+  },
+  "devDependencies": {
+    "sharp": "0.35.5"
+  }
+}

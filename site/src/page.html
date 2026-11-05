@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="{{v:lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t:meta.title}}</title>
+<meta name="description" content="{{t:meta.description}}">
+<link rel="canonical" href="{{v:url}}">
+{{v:hreflang}}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rollout">
+<meta property="og:title" content="{{t:meta.title}}">
+<meta property="og:description" content="{{t:og.description}}">
+<meta property="og:url" content="{{v:url}}">
+<meta property="og:image" content="{{v:ogimage}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{t:og.alt}}">
+<meta property="og:locale" content="{{v:ogLocale}}">
+{{v:ogAlternates}}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{t:meta.title}}">
+<meta name="twitter:description" content="{{t:og.description}}">
+<meta name="twitter:image" content="{{v:ogimage}}">
+<meta name="theme-color" content="#0B0C10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FAFAF8" media="(prefers-color-scheme: light)">
+<link rel="icon" href="{{v:root}}assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="{{v:root}}assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{v:root}}assets/fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{v:root}}assets/site.css?v={{v:buildId}}">
+<script>document.documentElement.classList.add('js');try{var m=localStorage.getItem('theme');if(m==='light'||m==='dark')document.documentElement.dataset.theme=m}catch(e){}</script>
+<script type="application/ld+json">{{v:ldApp}}</script>
+<script type="application/ld+json">{{v:ldFaq}}</script>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<a class="skip" href="#main">{{t:ui.skip}}</a>
+{{v:hint}}
+
+<header id="top">
+  <div class="wrap nav">
+    <a class="brand" href="{{v:home}}" aria-label="Rollout"><svg class="logo" viewBox="130 130 764 764" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="currentColor" stroke-width="32"/><path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="currentColor" stroke-width="32"/><path d="M713.1 303L759.5 254.8" stroke="var(--accent)" stroke-width="40"/></svg>Rollout</a>
+    <nav aria-label="{{t:ui.main}}">
+      <a href="#action">{{t:nav.action}}</a>
+      <a href="#features">{{t:nav.features}}</a>
+      <a href="#download">{{t:nav.download}}</a>
+      <a href="#faq">{{t:nav.faq}}</a>
+    </nav>
+    <div class="right">
+      <details class="langmenu">
+        <summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 3.9 5.7 3.9 9s-1.3 6.3-3.9 9c-2.6-2.7-3.9-5.7-3.9-9S9.4 5.7 12 3z"/></svg><span>{{v:langCode}}</span><span class="sr">{{t:ui.lang}}</span></summary>
+        <ul>
+{{v:langLinks}}
+        </ul>
+      </details>
+      <button class="btn iconbtn" id="theme" type="button" aria-label="{{t:ui.theme}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="btn gh" href="https://github.com/mace-ops/rollout-cycling-launcher-linux" aria-label="{{t:ui.github}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a>
+      <a class="btn primary dlbtn" href="#download">{{t:nav.download}}</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" aria-labelledby="h1">
+  <div class="wrap">
+    <span class="pill badge"><span class="dot"></span>{{t:hero.badge}}</span>
+    <h1 id="h1" class="display">{{t:hero.title}}</h1>
+    <p class="lead">{{t:hero.sub}}</p>
+    <div class="ctas">
+      <a class="btn primary" href="#download"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>{{t:hero.cta}}</span></a>
+      <a class="btn" href="#action"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg><span>{{t:hero.cta2}}</span></a>
+    </div>
+    <ul class="meta"><li>SteamOS</li><li>Bazzite</li><li>Steam Deck</li><li>ROG Ally</li></ul>
+    <p class="smallnote">{{t:hero.note}}</p>
+    <div class="frame rv">
+      <div class="screen">{{v:heroShot}}</div>
+    </div>
+  </div>
+</section>
+
+<section id="action" class="action" aria-roledescription="carousel" aria-labelledby="act-h" data-of="{{t:ui.slideOf}}" data-prev="{{t:ui.prev}}" data-next="{{t:ui.next}}">
+  <div class="wrap center">
+    <span class="eyebrow">{{t:act.eyebrow}}</span>
+    <h2 id="act-h" class="display">{{t:act.title}}</h2>
+  </div>
+  <div class="track" id="track" aria-label="{{t:ui.slides}}">
+<!--each:slides-->
+    <div class="slide" data-tone="{{v:tone}}" role="group" aria-roledescription="slide" aria-label="{{v:#}} / {{v:total}}">
+      <div class="frame"><div class="screen">{{v:img}}</div></div>
+      <p class="cap"><b>{{t:shot.$.t}}</b> <span>{{t:shot.$.d}}</span></p>
+    </div>
+<!--/each-->
+  </div>
+  <div class="cbar" id="cbar" hidden>
+    <button class="btn cbtn" id="prev" type="button" aria-label="{{t:ui.prev}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+    <div class="ccap" aria-live="polite"><div class="num" id="cnum"></div><h3 id="ctitle"></h3><p id="cdesc"></p></div>
+    <button class="btn cbtn" id="next" type="button" aria-label="{{t:ui.next}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+  </div>
+  <div class="dots" id="dots" hidden></div>
+</section>
+
+<section id="apps" class="tight" aria-labelledby="apps-h">
+  <div class="wrap">
+    <span class="eyebrow">{{t:apps.eyebrow}}</span>
+    <h2 id="apps-h" class="display rv">{{t:apps.title}}</h2>
+    <p class="lead rv">{{t:apps.sub}}</p>
+    <div class="duo">
+      <article class="appcard rv" data-tone="mywhoosh">
+        <div class="shot">{{v:appShotMywhoosh}}</div>
+        <div class="body">
+          <h3 class="display">MyWhoosh</h3>
+          <span class="pill"><span class="dot"></span>{{t:apps.mw.pill}}</span>
+          <ul>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>{{t:apps.mw.1}}</span></li>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>{{t:apps.mw.2}}</span></li>
+          </ul>
+        </div>
+      </article>
+      <article class="appcard rv" data-tone="zwift">
+        <div class="shot">{{v:appShotZwift}}</div>
+        <div class="body">
+          <h3 class="display">Zwift</h3>
+          <span class="pill"><span class="dot"></span>{{t:apps.zw.pill}}</span>
+          <ul>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>{{t:apps.zw.1}}</span></li>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>{{t:apps.zw.2}}</span></li>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>{{t:apps.zw.3}}</span></li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="tight" aria-labelledby="feat-h">
+  <div class="wrap">
+    <span class="eyebrow">{{t:feat.eyebrow}}</span>
+    <h2 id="feat-h" class="display rv">{{t:feat.title}}</h2>
+    <div class="showcase">
+      <div class="flist" id="flist">
+<!--each:features-->
+        <article class="fitem{{v:on}}" data-f="{{v:i}}">
+          <span class="n">{{v:##}}</span>
+          <h3>{{t:$.t}}</h3>
+          <p>{{t:$.d}}</p>
+          <div class="chips">{{v:chips}}</div>
+          <div class="frame inline"><div class="screen">{{v:inlineImg}}</div></div>
+        </article>
+<!--/each-->
+      </div>
+      <div class="fstage" aria-hidden="true">
+        <div class="frame"><div class="screen">{{v:stageImgs}}</div></div>
+      </div>
+    </div>
+    <div class="extras">
+      <div class="ex rv"><div class="big">8</div><b>{{t:ex1.t}}</b><span>{{t:ex1.d}}</span></div>
+      <div class="ex rv"><div class="big">0</div><b>{{t:ex2.t}}</b><span>{{t:ex2.d}}</span></div>
+      <div class="ex rv"><div class="big">48&thinsp;px</div><b>{{t:ex3.t}}</b><span>{{t:ex3.d}}</span></div>
+      <div class="ex rv"><div class="big">~/</div><b>{{t:ex4.t}}</b><span>{{t:ex4.d}}</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="download" aria-labelledby="dl-h">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow">{{t:dl.eyebrow}}</span>
+      <h2 id="dl-h" class="display rv">{{t:dl.title}}</h2>
+      <p class="lead">{{t:dl.sub}}</p>
+      <p class="beta">{{t:dl.beta}}</p>
+    </div>
+    <div class="dlgrid">
+      <article class="osc rv" data-os="steamos">
+        <div class="top">
+          <div class="oslogo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="4"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg></div>
+          <div><h3>SteamOS</h3><div class="dev">{{t:dl.steamos.dev}}</div></div>
+        </div>
+        <div class="mid">
+          <a class="btn primary" href="{{v:desktopUrl}}" download><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>{{t:dl.btn.steamos}}</span></a>
+          <div class="fileinfo"><span>Rollout.desktop</span><span>·</span><span>v{{v:version}}</span></div>
+          <div class="fileinfo"><span>{{t:dl.file}}</span></div>
+        </div>
+        <ol class="steps"><li>{{t:dl.s1}}</li><li>{{t:dl.s2}}</li><li>{{t:dl.s3}}</li></ol>
+        <p class="osnote">{{t:dl.steamos.note}}</p>
+      </article>
+      <article class="osc rv" data-os="bazzite">
+        <div class="top">
+          <div class="oslogo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h8a4 4 0 0 1 0 8H5zM5 12h9a4 4 0 0 1 0 8H5z"/></svg></div>
+          <div><h3>Bazzite</h3><div class="dev">{{t:dl.bazzite.dev}}</div></div>
+        </div>
+        <div class="mid">
+          <a class="btn primary" href="{{v:desktopUrl}}" download><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>{{t:dl.btn.bazzite}}</span></a>
+          <div class="fileinfo"><span>Rollout.desktop</span><span>·</span><span>v{{v:version}}</span></div>
+          <div class="fileinfo"><span>{{t:dl.file}}</span></div>
+        </div>
+        <ol class="steps"><li>{{t:dl.b1}}</li><li>{{t:dl.s2}}</li><li>{{t:dl.s3}}</li></ol>
+        <p class="osnote">{{t:dl.bazzite.note}}</p>
+      </article>
+    </div>
+    <ul class="req">
+      <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>{{t:dl.r1}}</li>
+      <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>{{t:dl.r2}}</li>
+      <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>{{t:dl.r3}}</li>
+    </ul>
+    <p class="other">{{h:dl.other}}</p>
+  </div>
+</section>
+
+<section id="how" aria-labelledby="how-h">
+  <div class="wrap">
+    <span class="eyebrow">{{t:how.eyebrow}}</span>
+    <h2 id="how-h" class="display rv">{{t:how.title}}</h2>
+    <p class="lead">{{t:how.sub}}</p>
+    <div class="how">
+      <article class="tile rv"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 7v6c0 4 3.5 7 8 8 4.5-1 8-4 8-8V7z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>{{t:how.1t}}</h3><p>{{t:how.1d}}</p></article>
+      <article class="tile rv"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg></div><h3>{{t:how.2t}}</h3><p>{{t:how.2d}}</p></article>
+      <article class="tile rv"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16v.5"/></svg></div><h3>{{t:how.3t}}</h3><p>{{t:how.3d}}</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="tight" aria-labelledby="faq-h">
+  <div class="wrap">
+    <div class="center"><span class="eyebrow">FAQ</span><h2 id="faq-h" class="display">{{t:faq.title}}</h2></div>
+    <div class="faq">
+<!--each:faq-->
+      <details><summary>{{t:faq.$.q}}</summary><p>{{t:faq.$.a}}</p></details>
+<!--/each-->
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-h">
+  <div class="wrap">
+    <div class="photos">
+      <div class="photo rv">{{v:photoMywhoosh}}</div>
+      <div class="photo rv">{{v:photoZwift}}</div>
+    </div>
+    <h2 id="final-h" class="display">{{t:final.title}}</h2>
+    <p class="lead">{{t:final.sub}}</p>
+    <a class="btn primary" href="#download"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>{{t:hero.cta}}</span></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="{{v:home}}"><svg class="logo" viewBox="130 130 764 764" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="currentColor" stroke-width="32"/><path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="currentColor" stroke-width="32"/><path d="M713.1 303L759.5 254.8" stroke="var(--accent)" stroke-width="40"/></svg>Rollout</a>
+      <p class="disclaimer">{{t:foot.disc}}</p>
+      <p class="disclaimer">{{t:foot.privacy}}</p>
+    </div>
+    <div><p class="fh">{{t:foot.project}}</p><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux">GitHub</a><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/releases">{{t:foot.releases}}</a><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/issues">{{t:foot.issues}}</a><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/blob/main/LICENSE">{{t:foot.license}}</a></div>
+    <div><p class="fh">{{t:foot.thanks}}</p><a href="https://github.com/netbrain/zwift">netbrain/zwift</a><a href="https://github.com/Parapeth962/mywhoosh-linux-installer">mywhoosh-linux-installer</a><a href="https://github.com/Dj0ulo/mywhoosh-linux">Dj0ulo/mywhoosh-linux</a></div>
+  </div>
+</footer>
+
+<a href="#top" class="totop" id="totop" aria-label="{{t:ui.top}}" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></a>
+<script src="{{v:root}}assets/bg.js?v={{v:buildId}}" defer></script>
+<script src="{{v:root}}assets/site.js?v={{v:buildId}}" defer></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t:nf.title}} – Rollout</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="{{v:base}}assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="{{v:base}}assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{v:base}}assets/site.css?v={{v:buildId}}">
+</head>
+<body>
+<main id="main" class="wrap" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:20px">
+{{v:blocks}}
+</main>
+<script>
+(function(){var seg=location.pathname.replace('{{v:basePath}}','').split('/')[0],all=document.querySelectorAll('[data-nf]'),hit=null;
+all.forEach(function(e){if(e.dataset.nf===seg)hit=e});
+if(hit){all.forEach(function(e){e.hidden=e!==hit});document.documentElement.lang=seg;document.title=hit.querySelector('h1').textContent+' – Rollout'}})();
+</script>
+</body>
+</html>
