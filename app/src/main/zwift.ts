@@ -213,24 +213,33 @@ export class RealZwift implements ZwiftService {
     this.defaultTag = this.pin.tag;
   }
 
-  private spawnRunner(arg: string, detached = false) {
-    return spawn(this.runner, [arg], { env: { ...(this.o.env ?? process.env), ROLLOUT_HOME: this.o.home }, stdio: ['ignore', 'pipe', 'pipe'], detached });
+  private spawnRunner(arg: string, detached = false, extraEnv: NodeJS.ProcessEnv = {}) {
+    return spawn(this.runner, [arg], { env: { ...(this.o.env ?? process.env), ROLLOUT_HOME: this.o.home, ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'], detached });
   }
 
   async status(): Promise<ZwiftStatus> {
     const script = scriptReady(this.o.home, this.pin);
     const none: ZwiftStatus = { script, runtime: '', image: false, consent: false, ref: '', problem: '' };
     if (!fs.existsSync(this.runner)) return { ...none, problem: 'error' };
-    const child = this.spawnRunner('--zwift-status');
-    let out = '';
-    child.stdout.on('data', (d: Buffer) => { out += d.toString(); });
-    child.stderr.resume();
-    const timer = setTimeout(() => child.kill('SIGKILL'), this.o.statusTimeoutMs ?? 60_000);
-    const code = await new Promise<number | null>((resolve) => {
-      child.on('error', () => resolve(null));
-      child.on('close', (c) => resolve(c));
-    });
-    clearTimeout(timer);
+    const ask = async (extraEnv: NodeJS.ProcessEnv): Promise<{ code: number | null; out: string }> => {
+      const child = this.spawnRunner('--zwift-status', false, extraEnv);
+      let text = '';
+      child.stdout.on('data', (d: Buffer) => { text += d.toString(); });
+      child.stderr.resume();
+      const timer = setTimeout(() => child.kill('SIGKILL'), this.o.statusTimeoutMs ?? 60_000);
+      const result = await new Promise<number | null>((resolve) => {
+        child.on('error', () => resolve(null));
+        child.on('close', (c) => resolve(c));
+      });
+      clearTimeout(timer);
+      return { code: result, out: text };
+    };
+    let { code, out } = await ask({});
+    // Noch kein Tag in config.toml (vor der ersten Installation): den Zustand für das gepinnte Image abfragen, damit die Laufzeit
+    // und ein schon vorhandenes Image erkannt werden. Gezogen wird dabei nichts.
+    if (code === 11 && (this.o.env ?? process.env).ROLLOUT_ZWIFT_TAG === undefined) {
+      ({ code, out } = await ask({ ROLLOUT_ZWIFT_TAG: this.pin.tag }));
+    }
     if (code !== 0) return { ...none, problem: code === 10 ? 'runtime' : code === 11 ? 'tag' : 'error' };
     const kv = Object.fromEntries(out.split('\n').map((l) => l.split(/=(.*)/s).slice(0, 2)).filter((p) => p.length === 2));
     return { script, runtime: kv.runtime ?? '', image: kv.image === 'present', consent: kv.consent === 'yes', ref: kv.ref ?? '', problem: '' };

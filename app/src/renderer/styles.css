@@ -55,6 +55,11 @@ button:disabled { cursor:not-allowed; }
 .btn.danger { color:var(--err); }
 .linkbtn { background:none; border:0; padding:10px 4px; color:var(--muted); text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:4px; min-height:48px; }
 .linkbtn:hover { color:var(--text); }
+.linkbtn.inline { padding:0 2px; min-height:0; font:inherit; }
+.rt { display:inline-flex; align-items:center; gap:6px; }
+.rt .icon { width:16px; height:16px; }
+.rt.ok .icon { color:var(--ok); }
+.rt.warn .icon { color:var(--warn); }
 
 .home { position:relative; height:100dvh; min-height:640px; display:flex; gap:10px; padding:10px; }
 .top { position:absolute; z-index:3; top:26px; left:42px; right:42px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; pointer-events:none; }

@@ -146,7 +146,7 @@ for (const sh of shells) {
     const home = makeHome();
     const r = run(sh, home, ['--bootstrap-selftest'], { RUN_MODE: 'exit 0' });
     assert.equal(r.status, 0);
-    assert.equal(r.stdout.trim(), 'rollout-bootstrap 4 run');
+    assert.equal(r.stdout.trim(), 'rollout-bootstrap 5 run');
     assert.equal(calls(home).length, 0);
     assert.equal(pidFile(home), null);
   });

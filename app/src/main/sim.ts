@@ -105,7 +105,8 @@ export class SimBackend implements Backend {
       systemLocale,
       overrides: freshOverrides(),
       finished: null,
-      zwiftTag: ''
+      zwiftTag: '',
+      zwiftRuntime: null
     };
     this.syncZwiftTag();
     this.crash = env.ROLLOUT_SIM_CRASH === '1';
@@ -150,10 +151,17 @@ export class SimBackend implements Backend {
   private async refreshZwift(force = false): Promise<void> {
     // Während Installation, Entfernen und Spiel fragt niemand die Laufzeit: Der Zustand gehört dann dem laufenden Vorgang.
     if (!this.zwift || this.realJob || this.zwiftRemoving || this.zwiftRun || (!force && Date.now() - this.zwiftCheckedAt < ZWIFT_STATUS_TTL_MS)) return;
-    const status = await this.zwift.status();
+    let status = await this.zwift.status();
+    // Das Image ist schon da (zum Beispiel von Hand gezogen), nur das kleine, geprüfte Startskript fehlt: still nachladen, statt
+    // „Installieren“ zu zeigen. Scheitert das (kein Netz), bleibt es bei „nicht installiert“ und der nächste Check versucht es wieder.
+    if (status.image && !status.script) {
+      try { await this.zwift.installScript(new AbortController().signal); status = await this.zwift.status(); } catch { /* nächster Check */ }
+    }
     this.zwiftCheckedAt = Date.now();
     if (this.realJob || this.zwiftRemoving || this.zwiftRun) return;
     this.syncZwiftTag();
+    // Leer heißt „fehlt“ nur, wenn die Laufzeit wirklich fehlt (Exit 10); bei anderen Fehlern ist sie unbekannt.
+    this.state.zwiftRuntime = status.runtime || (status.problem === 'runtime' ? '' : null);
     const info = this.state.apps.zwift;
     info.installed = status.script && status.image;
     // „Kein Tag“ ist vor der ersten Installation normal und kein Fehler.
@@ -310,6 +318,9 @@ export class SimBackend implements Backend {
     launch.progress = Math.max(launch.progress, Math.round(from + span * (1 - Math.exp(-seconds / tau))));
   }
 
+  /** Läuft ein echtes Spiel, das beim Beenden von Rollout mit beendet werden muss? */
+  hasRunningGame(): boolean { return this.zwiftRun !== null; }
+
   async stopLaunch(): Promise<void> {
     const run = this.zwiftRun;
     if (run) {
@@ -441,6 +452,9 @@ export class SimBackend implements Backend {
     await this.refreshZwift(true);
     this.changed();
   }
+
+  /** Das Öffnen im Browser übernimmt der Hauptprozess (main.ts); hier nur für die Schnittstelle. */
+  async openZwiftProject(): Promise<void> { /* nichts */ }
 
   async createReport(): Promise<void> {
     // Die echte Hilfedatei entsteht später im Adapter.

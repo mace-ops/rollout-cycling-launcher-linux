@@ -19,7 +19,7 @@ await session('frisch', { ROLLOUT_SIM_STATE: 'fresh' }, async (t) => {
   await t.click('Back');
   await t.expect(t.waitFor('Settings'), 'zurück zur Übersicht');
   await t.expect(t.clickSel('article[data-tone=zwift] .btn.primary'), 'Zwift-Karte angeklickt');
-  await t.expect(t.waitFor('Zwift may therefore ban your account'), 'Zwift-Hinweis');
+  await t.expect(t.waitFor('Not officially supported by Zwift'), 'Zwift-Hinweis');
   await t.shot('3-zwift');
   await t.click('Install');
   await t.expect(t.waitFor('is being installed'), 'Fortschritt-Ansicht');
@@ -38,7 +38,7 @@ await session('frisch', { ROLLOUT_SIM_STATE: 'fresh' }, async (t) => {
 // Vor dem Herunterladen fragt ein Dialog mit Tag und Größe; Starten läuft über den Dienst (Phasen aus der Ausgabe).
 await session('zwift-attrappe', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_ZWIFT_RUNNING_MS: '1500' }, async (t) => {
   await t.expect(t.clickSel('article[data-tone=zwift] .btn.primary'), 'Zwift-Karte angeklickt');
-  await t.expect(t.waitFor('Zwift may therefore ban your account'), 'Zwift-Hinweis');
+  await t.expect(t.waitFor('Not officially supported by Zwift'), 'Zwift-Hinweis');
   await t.click('Install');
   await t.expect(t.waitFor('Download the Zwift image?'), 'Zustimmungsdialog');
   await t.expect(t.has('version 1.0.0, about 6 GB'), 'Dialog nennt Tag und Größe');

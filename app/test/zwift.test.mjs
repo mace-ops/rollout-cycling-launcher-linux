@@ -175,6 +175,10 @@ test('Z8 RealZwift.status: fehlende Laufzeit und fehlender Tag werden unterschie
   assert.equal((await realZwift(home, { ROLLOUT_ZWIFT_TAG: '' }).status()).problem, 'tag');
   const bare = makeHome();
   assert.equal((await realZwift(bare).status()).problem, 'error');
+  // Kein Tag eingestellt (Umgebung ohne die Variable, keine config.toml): Zustand für das gepinnte Image, Laufzeit bekannt.
+  const noTag = realZwift(home, {});
+  delete noTag.o.env.ROLLOUT_ZWIFT_TAG;
+  assert.deepEqual(await noTag.status(), { script: false, runtime: 'podman', image: true, consent: false, ref: 'docker.io/netbrain/zwift:1.2.3', problem: '' });
 });
 
 test('Z9 RealZwift.pullImage: zieht über rollout-run, meldet Zeilen, merkt die Zustimmung; Fehler tragen ihren Code', async () => {
@@ -250,6 +254,14 @@ test('Z11 Zustand kommt aus der Laufzeit: Skript und Image da = installiert; Ima
   await new Promise((r) => setTimeout(r, 5200)); // Zwischenspeicher des Zustands läuft ab (5 s)
   const snap = await backend.getSnapshot();
   assert.equal(snap.apps.zwift.installed, false);
+});
+
+test('Z11b Image da, Skript fehlt: Rollout lädt das Skript still nach und zeigt Zwift als installiert', async () => {
+  const home = runtimeHome({ image: true });
+  const z = realZwift(home);
+  const { backend } = backendWith(z);
+  assert.equal((await backend.getSnapshot()).apps.zwift.installed, true);
+  assert.equal((await z.status()).script, true);
 });
 
 test('Z12 Fehlerfälle erscheinen als Problem in der Karte, nichts bleibt hängen; MyWhoosh bleibt unberührt', async () => {

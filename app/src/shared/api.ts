@@ -124,6 +124,8 @@ export interface Snapshot {
   finished: Finished | null;
   /** Tag des Zwift-Images, das die Installation zieht (Zustimmungsdialog); leer, solange Zwift nur simuliert wird */
   zwiftTag: string;
+  /** Gefundene Container-Laufzeit für Zwift: `podman`, `docker`, leer = keine nutzbare, `null` = unbekannt (noch nicht geprüft oder Zwift simuliert) */
+  zwiftRuntime: string | null;
 }
 
 export interface InstallOptions {
@@ -162,6 +164,8 @@ export interface RolloutApi {
   setRolloutInSteam(on: boolean, restart: boolean): Promise<SteamResult>;
   remove(app: AppId): Promise<void>;
   createReport(): Promise<void>;
+  /** Öffnet die Seite von netbrain/zwift im Browser */
+  openZwiftProject(): Promise<void>;
   setOverrides(app: AppId, patch: Partial<Overrides>): Promise<void>;
   resetOverrides(): Promise<void>;
   quit(): void;
@@ -172,7 +176,7 @@ export interface RolloutApi {
 export const COMMANDS = [
   'getSnapshot', 'install', 'startUpdate', 'launch', 'stopLaunch', 'scanBluetooth', 'setSteam',
   'setAutoUpdate', 'setUpdateChannel', 'checkSelfUpdate', 'downloadSelfUpdate', 'cancelSelfUpdate', 'restartForUpdate',
-  'startPreviousVersion', 'dismissUpdateNotice', 'uiReady', 'setLanguage', 'setTheme', 'setScale', 'setRolloutInSteam', 'remove', 'createReport', 'setOverrides', 'resetOverrides'
+  'startPreviousVersion', 'dismissUpdateNotice', 'uiReady', 'setLanguage', 'setTheme', 'setScale', 'setRolloutInSteam', 'remove', 'createReport', 'openZwiftProject', 'setOverrides', 'resetOverrides'
 ] as const;
 export type Command = (typeof COMMANDS)[number];
 
@@ -180,8 +184,8 @@ export type Command = (typeof COMMANDS)[number];
  * Beispielwerte, bis die Adapter echte Größen liefern. Zwift: Docker Hub liefert für 1.124.0 etwa 6 GB, entpackt belegt das Image am Ally
  * (Podman 5.8.2, Stand 2026-11-05) 20,4 GB.
  */
-export const download = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 15 : 4) : 6);
-export const space = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 20 : 8) : 21);
+export const download = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 15 : 4) : 6.2);
+export const space = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 20 : 8) : 20.4);
 
 export const RECOMMENDED_PROTON = 'GE-Proton11-9';
 export const PROTON_VERSIONS = ['GE-Proton11-12', 'GE-Proton11-11', 'GE-Proton11-8'] as const;

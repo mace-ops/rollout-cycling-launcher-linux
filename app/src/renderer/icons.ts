@@ -13,6 +13,7 @@ export const ICON = {
   next: svg('<path d="m9 18 6-6-6-6"/>'),
   go: svg('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>'),
+  cross: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.2 2.2M17.6 17.6l2.2 2.2M2 12h3M19 12h3M4.2 19.8l2.2-2.2M17.6 6.4l2.2-2.2"/>'),
   update: svg('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/>'),

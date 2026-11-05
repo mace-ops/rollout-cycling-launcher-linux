@@ -1,5 +1,5 @@
 #!/bin/sh
-# rollout-bootstrap: 4
+# rollout-bootstrap: 5
 # Startet ein Spiel (Konzept 5.2), vom Launcher und von Steam gleich aufgerufen: rollout-run <mywhoosh|zwift> [Argumente].
 # Weitere Aufrufe: rollout-run --container-check (nennt die nutzbare Container-Laufzeit, sonst Meldung und Exit 10),
 # rollout-run --zwift-pull (zieht das eingestellte Zwift-Image und merkt sich die Zustimmung, nur nach Bestätigung durch den Nutzer) und
@@ -127,6 +127,9 @@ zwift_prepare() {
   fi
   # DONT_UPDATE: Das Image ist festgelegt, zwift.sh zieht und prüft nichts selbst. ZWIFT_FG: Container im Vordergrund, damit Steam das Ende sieht.
   export CONTAINER_TOOL=$rt IMAGE=$zw_image VERSION=$zw_tag DONT_UPDATE=1 ZWIFT_FG=1
+  # Host-Netz: Die Zwift Companion App findet das Spiel per Broadcast im WLAN und kommt im Bridge-Netz nicht hinein (am Ally belegt: mit host
+  # verbindet sich Zwift zum Telefon, mit bridge nicht). Wer etwas anderes will, setzt NETWORKING selbst.
+  export NETWORKING=${NETWORKING:-host}
   # zwift.sh bricht mit „USER: unbound variable“ ab, wenn USER fehlt (am Ally beim Probelauf mit leerer Umgebung aufgefallen).
   [ -n "${USER:-}" ] || { USER=$(id -un 2>/dev/null) || USER=; export USER; }
   # Name des Containers wie in zwift.sh (--name zwift-${ZWIFT_RIDER:-$USER}); beim Beenden stoppt der Starter ihn damit (siehe forward).

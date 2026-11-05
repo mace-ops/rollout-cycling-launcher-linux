@@ -182,6 +182,7 @@ const ACTIONS: Record<string, Action> = {
     else Object.assign(ui, { screen: 'setup', setupApp: id, hd: false, setupSteam: true });
   },
   hd() { ui.hd = !ui.hd; },
+  project() { void api.openZwiftProject(); },
   install() {
     // Echtes Zwift lädt ein mehrere GB großes Image: erst fragen, mit Tag und Größe.
     if (ui.setupApp === 'zwift' && snap.zwiftTag) { ui.confirmImage = true; return; }

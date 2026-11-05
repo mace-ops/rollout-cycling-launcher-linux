@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { APP_IDS, COMMANDS, type AppId, type Command, type Snapshot, type UpdateChannel } from '../shared/api';
@@ -119,6 +119,8 @@ if (!app.requestSingleInstanceLock()) {
     setLanguage: (code) => typeof code === 'string' && /^[a-z]{2,3}(-[A-Za-z]{2,4})?$|^auto$/.test(code) && backend.setLanguage(code),
     remove: (id) => isApp(id) && backend.remove(id),
     createReport: () => backend.createReport(),
+    // Feste Adresse, nie vom Renderer bestimmt.
+    openZwiftProject: () => shell.openExternal('https://github.com/netbrain/zwift'),
     setOverrides: (id, patch) => isApp(id) && backend.setOverrides(id, cleanPatch(patch)),
     resetOverrides: () => backend.resetOverrides()
   };
@@ -147,6 +149,22 @@ if (!app.requestSingleInstanceLock()) {
   };
 
   ipcMain.on('rollout-quit', () => app.quit());
+
+  // Beendet Steam Rollout (Spiel beenden, Fenster zu, Signal), muss das laufende Spiel mit enden: Der Container hängt nicht an Rollouts
+  // Prozessbaum und liefe sonst weiter. Der Starter bekommt sein TERM sofort; danach wird abgewartet, bis das Spiel weg ist.
+  let leaving = false;
+  const leave = (): void => {
+    if (leaving) return;
+    if (!backend?.hasRunningGame()) { app.quit(); return; }
+    leaving = true;
+    void backend.stopLaunch().catch(() => {}).finally(() => app.exit(0));
+  };
+  app.on('before-quit', (event) => {
+    if (leaving || !backend?.hasRunningGame()) return;
+    event.preventDefault();
+    leave();
+  });
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.on(signal, leave);
 
   app.whenReady().then(async () => {
     // Nur für Tests: erzeugt die Steam-Bilder in einen Ordner, schreibt einen Bericht und beendet sich.

@@ -26,6 +26,7 @@ const api: RolloutApi = {
   setRolloutInSteam: (on, restart) => call('setRolloutInSteam', on, restart),
   remove: (app) => call('remove', app),
   createReport: () => call('createReport'),
+  openZwiftProject: () => call('openZwiftProject'),
   setOverrides: (app, patch) => call('setOverrides', app, patch),
   resetOverrides: () => call('resetOverrides'),
   quit: () => ipcRenderer.send('rollout-quit'),

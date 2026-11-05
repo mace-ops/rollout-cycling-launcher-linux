@@ -34,7 +34,9 @@ export const en = {
   'setup.needs': 'Needs',
   'setup.takes': 'Takes about',
   'setup.steam': 'Add to Steam',
-  'setup.zwiftNote': 'Rollout is not approved by Zwift. Zwift may therefore ban your account.',
+  'setup.zwiftNote': 'Zwift runs through the {link} project in a Podman container. Not officially supported by Zwift.',
+  'setup.runtimeOk': '{name} found',
+  'setup.runtimeMissing': 'Podman is required but not installed',
   'setup.hdOn': 'Better graphics ({gb} GB)',
   'setup.hdOff': 'Use normal graphics ({gb} GB)',
 

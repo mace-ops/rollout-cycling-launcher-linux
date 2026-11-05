@@ -85,6 +85,15 @@ function library(snap: Snapshot): string {
   </div>`;
 }
 
+/** Dezenter Hinweis im Zwift-Installer: Herkunft mit Link und Stand der Container-Laufzeit (✓ gefunden, ✗ fehlt, nichts bei „unbekannt“). */
+function zwiftNote(runtime: string | null): string {
+  const link = `<button class="linkbtn inline" data-act="project">netbrain/zwift</button>`;
+  const state = runtime === null ? '' : runtime
+    ? `<span class="rt ok">${ICON.check}${t('setup.runtimeOk', { name: runtime === 'docker' ? 'Docker' : 'Podman' })}</span>`
+    : `<span class="rt warn">${ICON.cross}${t('setup.runtimeMissing')}</span>`;
+  return `<p class="muted small">${t('setup.zwiftNote').replace('{link}', link)}</p>${state ? `<p class="muted small">${state}</p>` : ''}`;
+}
+
 function setup(ui: Ui, snap: Snapshot): string {
   const id = ui.setupApp;
   const problem = snap.apps[id].problem;
@@ -96,14 +105,14 @@ function setup(ui: Ui, snap: Snapshot): string {
         <div class="stats">
           <div class="stat"><span>${t('setup.download')} </span><b>${t('common.gb', { n: download(id, ui.hd) })}</b></div>
           <div class="stat"><span>${t('setup.needs')} </span><b>${t('common.gb', { n: space(id, ui.hd) })}</b></div>
-          <div class="stat"><span>${t('setup.takes')} </span><b>${t('common.min', { n: ui.hd ? 45 : 15 })}</b></div>
+          ${id === 'zwift' ? '' : `<div class="stat"><span>${t('setup.takes')} </span><b>${t('common.min', { n: ui.hd ? 45 : 15 })}</b></div>`}
         </div>
       </div>
       <div>
         <div class="panel stack">
           ${problem ? `<p class="note warn" role="alert">${problemText(problem)}</p>` : ''}
           <label class="check"><input type="checkbox" data-change="setupSteam" ${ui.setupSteam ? 'checked' : ''}><span>${t('setup.steam')}</span></label>
-          ${id === 'zwift' ? `<p class="muted small">${t('setup.zwiftNote')}</p>` : ''}
+          ${id === 'zwift' ? zwiftNote(snap.zwiftRuntime) : ''}
         </div>
         <div class="actions">
           ${id === 'mywhoosh' ? `<button class="linkbtn" data-act="hd">${ui.hd ? t('setup.hdOff', { gb: download('mywhoosh', false) }) : t('setup.hdOn', { gb: download('mywhoosh', true) })}</button>` : ''}

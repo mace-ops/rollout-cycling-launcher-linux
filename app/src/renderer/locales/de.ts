@@ -34,7 +34,9 @@ export const de: Messages = {
   'setup.needs': 'Braucht',
   'setup.takes': 'Dauert etwa',
   'setup.steam': 'Zu Steam hinzufügen',
-  'setup.zwiftNote': 'Rollout ist nicht von Zwift genehmigt. Zwift kann dein Konto deshalb sperren.',
+  'setup.zwiftNote': 'Zwift läuft über das Projekt {link} in einem Podman-Container. Von Zwift nicht offiziell unterstützt.',
+  'setup.runtimeOk': '{name} gefunden',
+  'setup.runtimeMissing': 'Podman wird benötigt, ist aber nicht installiert',
   'setup.hdOn': 'Bessere Grafik ({gb} GB)',
   'setup.hdOff': 'Normale Grafik nehmen ({gb} GB)',
 
