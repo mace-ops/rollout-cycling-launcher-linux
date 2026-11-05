@@ -265,7 +265,7 @@ function appMenu(ui: Ui, snap: Snapshot): string {
     <h1 class="mb-32">${APP_NAMES[id]}</h1>
     <div class="panel stack">
       <div class="row"><span>${t('settings.steamRow', { app: APP_NAMES[id] })}</span>${sw(info.steam, 'steam', t('settings.steamRow', { app: APP_NAMES[id] }), id)}</div>
-      ${id === 'mywhoosh' ? `<button class="btn row-btn" data-act="go" data-arg="bluetooth"><span class="rowtext"><span>${t('bt.title')}</span><span class="muted small"><span class="live ${btProblem ? 'warn' : ''}"></span> ${btProblem ? t('home.btCheck') : t('home.btReady')}</span></span>${ICON.next}</button>` : ''}
+      ${id === 'mywhoosh' ? `<button class="btn row-btn" data-act="go" data-arg="bluetooth"><span class="rowtext"><span>${t('bt.title')}</span><span class="muted small">${btProblem ? t('home.btCheck') : t('home.btReady')} <span class="live ${btProblem ? 'warn' : ''}"></span></span></span>${ICON.next}</button>` : ''}
       ${id === 'zwift' ? zwiftNote(snap.zwiftRuntime) : ''}
       <button class="btn row-btn" data-act="appAdvanced" data-arg="${id}">${t('settings.advanced')}${ICON.next}</button>
       <hr class="divider">
