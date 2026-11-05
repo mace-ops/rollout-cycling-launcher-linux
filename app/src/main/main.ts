@@ -84,7 +84,7 @@ if (!app.requestSingleInstanceLock()) {
     const mode = chooseZwiftMode({ mode: process.env.ROLLOUT_ZWIFT, runnerExists: fs.existsSync(path.join(home, 'bin/rollout-run')), pin: upstreams.zwift });
     if (mode === 'fake') return new FakeZwift(process.env.ROLLOUT_SIM_ZWIFT ?? '');
     // Fenstersichtbarkeit im Spielmodus (zwift-window.ts): auf :0 das Zwift-Fenster erkennen und für gamescope kennzeichnen; ROLLOUT_ZWIFT_WINDOWS=off schaltet das ab.
-    if (mode === 'real') return new RealZwift({ home, pin: upstreams.zwift, download: realFeed.download, windows: process.env.ROLLOUT_ZWIFT_WINDOWS === 'off' ? undefined : { display: process.env.ROLLOUT_ZWIFT_DISPLAY || ':0', onNote: (text) => {
+    if (mode === 'real') return new RealZwift({ home, pin: upstreams.zwift, download: realFeed.download, windows: process.env.ROLLOUT_ZWIFT_WINDOWS === 'off' ? undefined : { display: process.env.ROLLOUT_ZWIFT_DISPLAY || process.env.DISPLAY || ':0', onNote: (text) => {
       // Protokoll für Fenster und Controller: <Rollout-Ordner>/state/zwift-window.log
       try { fs.appendFileSync(path.join(home, 'state/zwift-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* Protokoll ist Zugabe */ }
     } } });

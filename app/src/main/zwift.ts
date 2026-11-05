@@ -200,7 +200,7 @@ export interface RealZwiftOptions {
    * Fenstersichtbarkeit im Spielmodus (zwift-window.ts). Ohne diese Angabe berührt `start` den X-Server nie (Tests). `display` Vorgabe
    * `:0` (die gamescope-Xwayland), `exec` ersetzt xwininfo/xprop/xhost, `appId` ersetzt die Suche im Prozessbaum.
    */
-  windows?: { display?: string; exec?: XExec; appId?: string | null; intervalMs?: number; onNote?: (text: string) => void; pad?: (display: string) => PadBridge | null };
+  windows?: { display?: string; focusDisplay?: string; exec?: XExec; focusExec?: XExec; appId?: string | null; intervalMs?: number; onNote?: (text: string) => void; pad?: (display: string) => PadBridge | null };
 }
 
 export class RealZwift implements ZwiftService {
@@ -288,7 +288,7 @@ export class RealZwift implements ZwiftService {
     w?.onNote?.(`Start: Fensterüberwachung ${w ? 'an' : 'aus'}, Anzeige ${display}, AppID ${w ? (w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId) : '-'}`);
     const watcher = w && exec
       ? watchZwiftWindow({
-        exec, appId: w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId, intervalMs: w.intervalMs, onNote: w.onNote,
+        exec, focusExec: w.focusExec ?? (w.exec ? undefined : realXExec(w.focusDisplay ?? ':0', this.o.env ?? process.env)), appId: w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId, intervalMs: w.intervalMs, onNote: w.onNote,
         onVisible: (v) => {
           if (v && !pad) pad = startPad(display);
           else if (!v) stopPad();

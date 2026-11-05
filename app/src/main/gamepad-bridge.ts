@@ -20,6 +20,8 @@ const TRIGGER_ON = 0.4;
 const MOUSE_SPEED = 1400;
 const REPEAT_FIRST_MS = 400;
 const REPEAT_MS = 110;
+/** Zwift fragt Tasten und Maus je Bild ab: ein Druck, der sofort wieder losgelassen wird, geht verloren (am Ally belegt). */
+const HOLD_MS = 70;
 
 type Dir = 'Up' | 'Down' | 'Left' | 'Right';
 
@@ -38,8 +40,20 @@ export class PadMapper {
   private left = false;
   private right = false;
   private clock = 0;
+  private readonly releases: { at: number; line: string }[] = [];
 
   constructor(private readonly send: (line: string) => void) {}
+
+  /** Taste drücken und nach `HOLD_MS` loslassen. */
+  private key(name: string): void {
+    this.send(`keydown ${name}`);
+    this.releases.push({ at: this.clock + HOLD_MS, line: `keyup ${name}` });
+  }
+
+  private click(button: string): void {
+    this.send(`mousedown ${button}`);
+    this.releases.push({ at: this.clock + HOLD_MS, line: `mouseup ${button}` });
+  }
 
   private syncDirs(): void {
     const want = new Set<Dir>([...this.stickDirs, ...this.hatDirs]);
@@ -47,7 +61,7 @@ export class PadMapper {
     for (const d of want) {
       if (this.dirs.has(d)) continue;
       this.dirs.set(d, { since: this.clock, last: this.clock });
-      this.send(`key ${d}`);
+      this.key(d);
     }
   }
 
@@ -75,13 +89,14 @@ export class PadMapper {
         const key = code === BTN.LB ? '4' : '5';
         if (!down) { this.scroll.delete(key); return; }
         this.scroll.set(key, { since: this.clock, last: this.clock });
-        this.send(`click ${key}`);
+        this.click(key);
         return;
       }
       if (!down) return;
-      const line = code === BTN.A ? 'key Return' : code === BTN.B || code === BTN.START ? 'key Escape' : code === BTN.X ? 'key Tab'
-        : code === BTN.Y ? 'key shift+Tab' : code === BTN.SELECT ? 'key BackSpace' : code === BTN.R3 ? 'click 1' : '';
-      if (line) this.send(line);
+      if (code === BTN.R3) { this.click('1'); return; }
+      const name = code === BTN.A ? 'Return' : code === BTN.B || code === BTN.START ? 'Escape' : code === BTN.X ? 'Tab'
+        : code === BTN.Y ? 'shift+Tab' : code === BTN.SELECT ? 'BackSpace' : '';
+      if (name) this.key(name);
       return;
     }
     if (type !== EV_ABS) return;
@@ -111,11 +126,12 @@ export class PadMapper {
   /** Zeit voranschreiben (Millisekunden seit dem letzten Aufruf): Tastenwiederholung und Zeigerbewegung. */
   tick(dtMs: number): void {
     this.clock += dtMs;
+    while (this.releases.length && this.releases[0].at <= this.clock) this.send((this.releases.shift() as { line: string }).line);
     for (const [dir, s] of this.dirs) {
-      if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.send(`key ${dir}`); }
+      if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.key(dir); }
     }
     for (const [key, s] of this.scroll) {
-      if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.send(`click ${key}`); }
+      if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.click(key); }
     }
     const axis = (v: number): number => {
       const m = Math.abs(v);
@@ -136,6 +152,7 @@ export class PadMapper {
 
   /** Alles loslassen (Fenster nicht mehr sichtbar). */
   release(): void {
+    for (const r of this.releases.splice(0)) this.send(r.line);
     this.setButton('left', false);
     this.setButton('right', false);
     this.dirs.clear(); this.stickDirs.clear(); this.hatDirs.clear(); this.scroll.clear();

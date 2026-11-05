@@ -14,28 +14,35 @@ const A = 0x130, B = 0x131, X = 0x133, Y = 0x134, LB = 0x136, START = 0x13b, R3 
 const ABS = { X: 0, Y: 1, Z: 2, RX: 3, RZ: 5, HAT0X: 0x10, HAT0Y: 0x11 };
 const make = () => { const lines = []; const m = new pad.PadMapper((l) => lines.push(l)); return { m, lines }; };
 
-test('P1: Tasten', () => {
+test('P1: Tasten werden gedrückt gehalten und nach 70 ms losgelassen', () => {
   const { m, lines } = make();
   m.feed(EV_KEY, A, 1); m.feed(EV_KEY, A, 0);
+  assert.deepEqual(lines, ['keydown Return']);
+  m.tick(50); assert.equal(lines.length, 1);
+  m.tick(30); assert.deepEqual(lines, ['keydown Return', 'keyup Return']);
+  lines.length = 0;
   m.feed(EV_KEY, B, 1); m.feed(EV_KEY, X, 1); m.feed(EV_KEY, Y, 1); m.feed(EV_KEY, START, 1); m.feed(EV_KEY, R3, 1);
-  assert.deepEqual(lines, ['key Return', 'key Escape', 'key Tab', 'key shift+Tab', 'key Escape', 'click 1']);
+  assert.deepEqual(lines, ['keydown Escape', 'keydown Tab', 'keydown shift+Tab', 'keydown Escape', 'mousedown 1']);
+  m.tick(100);
+  assert.deepEqual(lines.slice(5), ['keyup Escape', 'keyup Tab', 'keyup shift+Tab', 'keyup Escape', 'mouseup 1']);
 });
 
 test('P2: Steuerkreuz und linker Stick drücken einmal, wiederholen nach 400 ms', () => {
   const { m, lines } = make();
+  const downs = (k) => lines.filter((l) => l === `keydown ${k}`).length;
   m.feed(EV_ABS, ABS.HAT0Y, 1);
-  assert.deepEqual(lines, ['key Down']);
-  m.tick(300); assert.equal(lines.length, 1);
-  m.tick(150); assert.equal(lines.length, 2);
+  assert.deepEqual(lines, ['keydown Down']);
+  m.tick(300); assert.equal(downs('Down'), 1);
+  m.tick(150); assert.equal(downs('Down'), 2);
   m.feed(EV_ABS, ABS.HAT0Y, 0); m.tick(500);
-  assert.equal(lines.length, 2, 'losgelassen: keine Wiederholung');
+  assert.equal(downs('Down'), 2, 'losgelassen: keine Wiederholung');
   m.feed(EV_ABS, ABS.X, -30000);
-  assert.equal(lines.at(-1), 'key Left');
+  assert.equal(downs('Left'), 1);
   m.feed(EV_ABS, ABS.X, -30000); // gleiche Richtung bleibt: nicht erneut
-  assert.equal(lines.filter((l) => l === 'key Left').length, 1);
+  assert.equal(downs('Left'), 1);
   m.feed(EV_ABS, ABS.X, 5000);
   m.tick(1000);
-  assert.equal(lines.filter((l) => l === 'key Left').length, 1);
+  assert.equal(downs('Left'), 1);
 });
 
 test('P3: rechter Stick bewegt den Zeiger, Totzone bleibt still', () => {
@@ -62,9 +69,9 @@ test('P5: Schultertaste scrollt und wiederholt', () => {
   const { m, lines } = make();
   m.feed(EV_KEY, LB, 1);
   m.tick(450);
-  assert.deepEqual(lines, ['click 4', 'click 4']);
+  assert.equal(lines.filter((l) => l === 'mousedown 4').length, 2);
   m.feed(EV_KEY, LB, 0); m.tick(1000);
-  assert.equal(lines.length, 2);
+  assert.equal(lines.filter((l) => l === 'mousedown 4').length, 2);
 });
 
 test('P6: Ereignisse aus Rohdaten, auch in Stücken', () => {

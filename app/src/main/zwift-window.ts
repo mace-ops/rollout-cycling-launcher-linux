@@ -79,6 +79,8 @@ export function parseFocusedWindow(out: string): number | null {
 
 export interface WindowWatcherOptions {
   exec: XExec;
+  /** Liest `GAMESCOPE_FOCUSED_WINDOW`: Die Eigenschaft liegt am Wurzelfenster des primären gamescope-X-Servers (`:0`), die Spielfenster dagegen am X-Server des Spiels (bei Rollout meist `:1`). Vorgabe: `exec`. */
+  focusExec?: XExec;
   /** AppID des Rollout-Eintrags; `null` = nicht aus Steam gestartet, dann wird nichts gesetzt und nichts gemeldet */
   appId: string | null;
   /** Wird bei jedem Wechsel zwischen sichtbar und nicht sichtbar gerufen (am Anfang: nicht sichtbar) */
@@ -102,6 +104,7 @@ export interface WindowWatcher {
  */
 export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
   const { exec, appId } = opts;
+  const focusExec = opts.focusExec ?? exec;
   let stopped = false;
   let visible = false;
   let tagged = 0;
@@ -118,7 +121,7 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
       tagged = win.id;
       note(`STEAM_GAME=${appId} an Fenster ${win.hex} gesetzt`);
     }
-    setVisible(parseFocusedWindow(await exec('xprop', ['-root', 'GAMESCOPE_FOCUSED_WINDOW'])) === win.id);
+    setVisible(parseFocusedWindow(await focusExec('xprop', ['-root', 'GAMESCOPE_FOCUSED_WINDOW'])) === win.id);
   };
 
   const loop = async (): Promise<void> => {
