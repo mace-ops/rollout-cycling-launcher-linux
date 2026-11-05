@@ -112,6 +112,10 @@ Auswahlfelder öffnen eine eigene Liste in der App statt des nativen Menüs, wei
 Maus, Touch, Tastatur und Controller: Pfeile, Steuerkreuz und linker Stick wechseln den Fokus, Enter oder A löst aus, Esc oder B geht zurück, der rechte Stick scrollt.
 Im Desktop-Modus unter Steam erreicht das Gamepad Chromium nicht (Gate G4, E1), im Gaming Mode funktioniert es.
 
+## Lizenz
+
+Rollout steht unter der MIT-Lizenz, siehe [LICENSE](../LICENSE). Fremde Komponenten (Electron, Schriften Archivo und Figtree) behalten ihre Lizenz, siehe [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md). Zwift und MyWhoosh sind Marken und Spiele der Hersteller, Rollout ist nicht mit ihnen verbunden und nicht von ihnen genehmigt.
+
 ## Marke
 
 `src/renderer/assets/brand/`: `logo.svg`, `logo-currentcolor.svg`, `wordmark.svg` (Text in Archivo, die Schrift muss geladen sein), `logo.png`.
