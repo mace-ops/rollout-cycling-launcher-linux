@@ -296,6 +296,27 @@ viewEl.addEventListener('change', (event) => {
   render();
 });
 
+// Touch kommt im Gaming Mode als Maus an (gamescope/Steam Input): Ziehen scrollt die Seite oder die offene Liste.
+const DRAG_FROM = 8;
+let drag: { y: number; el: HTMLElement; start: number; moved: boolean } | null = null;
+window.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || (event.target as Element).closest('input,select,textarea')) return;
+  const el = (event.target as Element).closest<HTMLElement>('.picker') ?? (document.scrollingElement as HTMLElement);
+  drag = { y: event.clientY, el, start: el.scrollTop, moved: false };
+});
+window.addEventListener('pointermove', (event) => {
+  if (!drag) return;
+  const dy = event.clientY - drag.y;
+  if (!drag.moved && Math.abs(dy) < DRAG_FROM) return;
+  drag.moved = true;
+  drag.el.scrollTop = drag.start - dy;
+});
+const endDrag = (): void => { if (drag?.moved) setTimeout(() => { drag = null; }, 0); else drag = null; };
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
+// Nach einem Zieh-Scroll kein Klick auf den Knopf unter dem Finger.
+window.addEventListener('click', (event) => { if (drag?.moved) { event.stopPropagation(); event.preventDefault(); } }, true);
+
 /** Esc und die B-Taste: erst den Dialog schließen, sonst eine Ebene zurück. */
 function back(): void {
   if (ui.steamModal || ui.steamRollout !== null || ui.confirmRemove || ui.picker || ui.confirmQuit || ui.confirmRestart || ui.confirmPrevious || ui.confirmImage) {

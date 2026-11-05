@@ -196,6 +196,9 @@ option { background:var(--opt); color:var(--text); }
 .h1-sm { font-size:clamp(30px,3.4vw,48px); }
 button, select, input { -webkit-tap-highlight-color:transparent; }
 html, body { overflow-x:hidden; }
+/* Im Gaming Mode kommt Touch als Maus an: Ziehen scrollt (siehe main.ts), Text wird nie markiert. */
+body { user-select:none; -webkit-user-select:none; touch-action:pan-y; }
+input, select { user-select:auto; -webkit-user-select:auto; }
 .logo { width:30px; height:30px; flex:none; display:block; }
 
 /* Schmale, zurückhaltende Scrollbalken. In Auswahllisten entfallen sie ganz, dort scrollt man mit Steuerkreuz, Stick oder Touch. */
