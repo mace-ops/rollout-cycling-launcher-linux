@@ -10,17 +10,27 @@
 //   ROLLOUT_SIM_THEME=light      Aussehen fest wählen (dark oder light)
 //   ROLLOUT_CONFIG_HOME=<Ordner> Ort der config.toml, im Test ein Wegwerf-Ordner
 //   ROLLOUT_SIM_SELFUPDATE=<Zustand> Launcher-Update fest wählen, siehe selfupdate-fake.ts (kein Teil dieser Datei)
+//   ROLLOUT_ZWIFT=real|fake      Zwift echt (zwift.sh laden, Image ziehen, Zustand aus der Container-Laufzeit) oder als Attrappe, siehe zwift.ts;
+//                                ohne die Variable bleibt Zwift hier simuliert. Starten und Entfernen von Zwift sind auch dann noch simuliert beziehungsweise gesperrt.
 import type {
-  AppId, InstallOptions, LaunchOptions, Overrides, RolloutApi, Snapshot, SteamResult, UpdateChannel
+  AppId, AppProblem, InstallOptions, LaunchOptions, Overrides, RolloutApi, Snapshot, SteamResult, UpdateChannel
 } from '../shared/api';
 import type { BluetoothService } from './bluetooth';
 import type { Settings, SettingsStore } from './config';
 import type { SelfUpdateService } from './selfupdate';
 import type { SteamInfo, SteamStatus } from './steam';
+import { ZwiftError, type ZwiftService } from './zwift';
 
 const TICK_MS = 120;
 const LAUNCH_STEPS = 30;
 const SCAN_SECONDS = 15;
+/** Beim echten Zwift-Zustand fragt die Oberfläche höchstens so oft nach der Container-Laufzeit. */
+const ZWIFT_STATUS_TTL_MS = 5000;
+/** Fortschritt beim Laden von zwift.sh und bei jeder fertigen Image-Schicht (Schätzung: die Gesamtzahl der Schichten ist unbekannt). */
+const ZWIFT_SCRIPT_PERCENT = 5;
+const ZWIFT_LAYER_PERCENT = 6;
+const ZWIFT_MAX_PERCENT = 95;
+const LAYER_DONE = /Copying blob .* done|Pull complete|Already exists|already exists/i;
 
 const freshOverrides = (): Record<AppId, Overrides> => ({
   mywhoosh: { mode: 'rec', version: 'GE-Proton11-12', graphics: 'auto' },
@@ -61,15 +71,16 @@ export class SimBackend implements Backend {
     private readonly store: SettingsStore,
     private readonly bt: BluetoothService,
     private readonly updates: SelfUpdateService,
-    env: NodeJS.ProcessEnv = process.env
+    env: NodeJS.ProcessEnv = process.env,
+    private readonly zwift: ZwiftService | null = null
   ) {
     const saved = store.load();
     const fresh = env.ROLLOUT_SIM_STATE === 'fresh';
     const update = env.ROLLOUT_SIM_UPDATE === '1';
     this.state = {
       apps: {
-        mywhoosh: { installed: !fresh, steam: !fresh, updateAvailable: !fresh && update },
-        zwift: { installed: false, steam: false, updateAvailable: false }
+        mywhoosh: { installed: !fresh, steam: !fresh, updateAvailable: !fresh && update, problem: '' },
+        zwift: { installed: false, steam: false, updateAvailable: false, problem: '' }
       },
       job: null,
       launch: null,
@@ -92,6 +103,7 @@ export class SimBackend implements Backend {
   private readonly crash: boolean;
 
   async getSnapshot(): Promise<Snapshot> {
+    await this.refreshZwift();
     this.refreshSteam();
     this.state.bluetooth.state = await this.bt.adapter();
     return this.view();
@@ -100,6 +112,71 @@ export class SimBackend implements Backend {
   private view(): Snapshot {
     this.state.selfUpdate = this.updates.snapshot();
     return structuredClone(this.state);
+  }
+
+  private realJob = false;
+  private zwiftCheckedAt = 0;
+  /** Fehler der letzten Installation und Befund der letzten Prüfung; die Karte zeigt zuerst den Installationsfehler. */
+  private zwiftInstallProblem: AppProblem = '';
+  private zwiftStatusProblem: AppProblem = '';
+
+  /**
+   * Zwift gilt als installiert, wenn das gepinnte `zwift.sh` da ist und das eingestellte Image lokal liegt. Der Zustand kommt
+   * aus der Container-Laufzeit, nicht aus dem Gedächtnis dieser Sitzung; während einer Installation bleibt er unberührt.
+   */
+  private async refreshZwift(force = false): Promise<void> {
+    if (!this.zwift || this.realJob || (!force && Date.now() - this.zwiftCheckedAt < ZWIFT_STATUS_TTL_MS)) return;
+    const status = await this.zwift.status();
+    this.zwiftCheckedAt = Date.now();
+    if (this.realJob) return;
+    const info = this.state.apps.zwift;
+    info.installed = status.script && status.image;
+    // „Kein Tag“ ist vor der ersten Installation normal und kein Fehler.
+    this.zwiftStatusProblem = info.installed || status.problem === 'tag' ? '' : status.problem;
+    if (info.installed) this.zwiftInstallProblem = '';
+    else info.steam = false;
+    info.problem = this.zwiftInstallProblem || this.zwiftStatusProblem;
+  }
+
+  private async installZwift(zwift: ZwiftService, steam: boolean): Promise<void> {
+    const info = this.state.apps.zwift;
+    this.zwiftInstallProblem = '';
+    info.problem = this.zwiftStatusProblem;
+    this.realJob = true;
+    this.state.job = { app: 'zwift', kind: 'install', progress: 0, steam, hd: false };
+    this.changed();
+    const signal = new AbortController().signal;
+    try {
+      await zwift.installScript(signal);
+      this.setJobProgress(ZWIFT_SCRIPT_PERCENT);
+      // Die Bestätigung im Installieren-Dialog gilt für genau diese Version des Images: Ohne eigenen Eintrag trägt Rollout den Pin ein.
+      const saved = this.store.load();
+      if (!saved.zwiftTag) this.store.save({ ...saved, zwiftTag: zwift.defaultTag });
+      let layers = 0;
+      await zwift.pullImage((line) => {
+        if (LAYER_DONE.test(line)) { layers += 1; this.setJobProgress(Math.min(ZWIFT_MAX_PERCENT, ZWIFT_SCRIPT_PERCENT + layers * ZWIFT_LAYER_PERCENT)); }
+      }, signal);
+      const status = await zwift.status();
+      if (!(status.script && status.image)) throw new ZwiftError('pull', 'Image nach dem Ziehen nicht gefunden');
+      info.installed = true;
+      info.steam = steam;
+      info.updateAvailable = false;
+      this.state.finished = { seq: (this.seq += 1), app: 'zwift', kind: 'install' };
+    } catch (e) {
+      // Über das Feld `problem` statt `instanceof`: Dienst und Backend können aus verschiedenen Bündeln stammen (Tests).
+      const code = (e as { problem?: string }).problem;
+      this.zwiftInstallProblem = code === 'abort' ? '' : (code as AppProblem | undefined) || 'error';
+      info.problem = this.zwiftInstallProblem || this.zwiftStatusProblem;
+    } finally {
+      this.realJob = false;
+      this.zwiftCheckedAt = 0;
+      this.state.job = null;
+      this.changed();
+    }
+  }
+
+  private setJobProgress(percent: number): void {
+    if (this.state.job) { this.state.job.progress = percent; this.changed(); }
   }
 
   /** Spiel oder Installation läuft: Launcher-Updates werden dann weder geladen noch eingespielt. */
@@ -114,6 +191,7 @@ export class SimBackend implements Backend {
 
   async install(app: AppId, options: InstallOptions): Promise<void> {
     if (this.state.job || this.state.apps[app].installed) return;
+    if (app === 'zwift' && this.zwift) { void this.installZwift(this.zwift, options.steam); return; }
     this.state.job = { app, kind: 'install', progress: 0, steam: options.steam, hd: options.hd };
     this.changed();
   }
@@ -228,7 +306,9 @@ export class SimBackend implements Backend {
 
   async remove(app: AppId): Promise<void> {
     if (this.state.job?.app === app || this.state.launch?.app === app) return;
-    this.state.apps[app] = { installed: false, steam: false, updateAvailable: false };
+    // Das echte Zwift-Image zu entfernen (podman rmi, Konzept 5.3) ist noch nicht gebaut: nichts vorspiegeln.
+    if (app === 'zwift' && this.zwift) return;
+    this.state.apps[app] = { installed: false, steam: false, updateAvailable: false, problem: '' };
     this.state.overrides[app] = freshOverrides()[app];
     this.changed();
   }
@@ -268,7 +348,7 @@ export class SimBackend implements Backend {
 
   private tick(): void {
     const { job, launch } = this.state;
-    if (job) {
+    if (job && !this.realJob) {
       job.progress = Math.min(100, job.progress + 1);
       if (job.progress >= 100) {
         const info = this.state.apps[job.app];

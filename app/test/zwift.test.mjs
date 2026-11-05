@@ -1,0 +1,293 @@
+// Prüft den Zwift-Adapter (src/main/zwift.ts) und seine Anbindung an SimBackend (Z1 bis Z12) in Wegwerf-Ordnern.
+// Kein echtes Steam, kein echter Container, kein Netz: der Download ist eine Funktion, podman und docker sind Attrappen im PATH
+// (wie in run.test.mjs). Nur Z13 geht ins Netz und läuft nur mit ROLLOUT_ZWIFT_NET=1.
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { build } from 'esbuild';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-zwift-test-'));
+process.on('exit', () => fs.rmSync(work, { recursive: true, force: true }));
+// Nie die echte config.toml des Prüfrechners.
+process.env.ROLLOUT_CONFIG_HOME = path.join(work, 'cfg-default');
+for (const name of ['zwift', 'sim', 'config']) {
+  await build({ entryPoints: [path.join(root, `src/main/${name}.ts`)], bundle: true, platform: 'node', format: 'esm', outfile: path.join(work, `${name}.mjs`), logLevel: 'error' });
+}
+const zwift = await import(path.join(work, 'zwift.mjs'));
+const sim = await import(path.join(work, 'sim.mjs'));
+const config = await import(path.join(work, 'config.mjs'));
+
+const BODY = '#!/usr/bin/env bash\necho "zwift.sh Attrappe"\n';
+const sha = (text) => createHash('sha256').update(text).digest('hex');
+const COMMIT = 'a'.repeat(40);
+const pin = (over = {}) => ({ repo: 'netbrain/zwift', commit: COMMIT, path: 'src/zwift.sh', sha256: sha(BODY), image: 'docker.io/netbrain/zwift', tag: '1.2.3', ...over });
+
+let counter = 0;
+const makeHome = () => { counter += 1; const home = path.join(work, `h${counter}`); fs.mkdirSync(home, { recursive: true }); return home; };
+/** Download-Attrappe: schreibt `body`, zählt Aufrufe und merkt sich die URL. */
+function downloader(body = BODY) {
+  const calls = [];
+  const fn = async (url, dest, options) => { calls.push({ url, options }); fs.writeFileSync(dest, body); };
+  fn.calls = calls;
+  return fn;
+}
+const leftovers = (home) => (fs.existsSync(path.join(home, 'zwift')) ? fs.readdirSync(path.join(home, 'zwift')) : []);
+const expectError = async (promise, problem) => {
+  await assert.rejects(promise, (e) => e instanceof zwift.ZwiftError && e.problem === problem, `erwartet ZwiftError(${problem})`);
+};
+
+test('Z1 Download: gepinntes Skript liegt atomar unter zwift/<commit>/zwift.sh, ausführbar, ohne Reste; ein zweiter Lauf lädt nichts', async () => {
+  const home = makeHome();
+  const dl = downloader();
+  assert.equal(await zwift.installScript({ home, pin: pin(), download: dl }), true);
+  const file = path.join(home, 'zwift', COMMIT, 'zwift.sh');
+  assert.equal(fs.readFileSync(file, 'utf8'), BODY);
+  assert.equal(fs.statSync(file).mode & 0o777, 0o755);
+  assert.deepEqual(leftovers(home), [COMMIT]);
+  assert.equal(dl.calls.length, 1);
+  assert.equal(dl.calls[0].url, `https://raw.githubusercontent.com/netbrain/zwift/${COMMIT}/src/zwift.sh`);
+  assert.ok(dl.calls[0].options.maxBytes <= 1024 * 1024, 'Größenbegrenzung gesetzt');
+  assert.equal(zwift.scriptReady(home, pin()), true);
+  assert.equal(await zwift.installScript({ home, pin: pin(), download: dl }), false);
+  assert.equal(dl.calls.length, 1, 'zweiter Lauf lädt nicht erneut');
+});
+
+test('Z2 falsche Prüfsumme: nichts wird abgelegt, ein vorhandenes gutes Skript bleibt, keine Reste', async () => {
+  const home = makeHome();
+  await expectError(zwift.installScript({ home, pin: pin(), download: downloader('#!/bin/sh\nrm -rf ~\n') }), 'verify');
+  assert.deepEqual(leftovers(home), [], 'weder Ziel noch Staging');
+  assert.equal(zwift.scriptReady(home, pin()), false);
+  // Gutes Skript liegt, ein Austausch mit falschem Inhalt (anderer Pin-Hash) lässt es unberührt.
+  await zwift.installScript({ home, pin: pin(), download: downloader() });
+  await expectError(zwift.installScript({ home, pin: pin({ sha256: 'f'.repeat(64) }), download: downloader() }), 'verify');
+  assert.equal(fs.readFileSync(path.join(home, 'zwift', COMMIT, 'zwift.sh'), 'utf8'), BODY);
+  assert.deepEqual(leftovers(home), [COMMIT]);
+});
+
+test('Z3 Netzfehler und Abbruch: eigener Fehlercode, keine Reste, das Ziel entsteht nicht', async () => {
+  const home = makeHome();
+  const failing = async () => { throw Object.assign(new Error('Verbindung'), { kind: 'net' }); };
+  await expectError(zwift.installScript({ home, pin: pin(), download: failing }), 'net');
+  const aborting = async () => { throw Object.assign(new Error('abgebrochen'), { kind: 'abort' }); };
+  await expectError(zwift.installScript({ home, pin: pin(), download: aborting }), 'abort');
+  const silent = async () => {}; // schreibt nichts
+  await expectError(zwift.installScript({ home, pin: pin(), download: silent }), 'net');
+  assert.deepEqual(leftovers(home), []);
+});
+
+test('Z4 zu große oder leere Datei wird abgelehnt', async () => {
+  const home = makeHome();
+  await expectError(zwift.installScript({ home, pin: pin(), download: downloader('x'.repeat(zwift.MAX_SCRIPT_BYTES + 1)) }), 'verify');
+  await expectError(zwift.installScript({ home, pin: pin(), download: downloader('') }), 'verify');
+  assert.deepEqual(leftovers(home), []);
+});
+
+test('Z5 verändertes Skript wird ersetzt, Skripte früherer Pins verschwinden, Fremdes bleibt', async () => {
+  const home = makeHome();
+  const oldCommit = 'b'.repeat(40);
+  fs.mkdirSync(path.join(home, 'zwift', oldCommit), { recursive: true });
+  fs.writeFileSync(path.join(home, 'zwift', oldCommit, 'zwift.sh'), 'alt');
+  fs.mkdirSync(path.join(home, 'zwift', 'eigenes'));
+  fs.mkdirSync(path.join(home, 'zwift', COMMIT));
+  fs.writeFileSync(path.join(home, 'zwift', COMMIT, 'zwift.sh'), 'verändert', { mode: 0o755 });
+  fs.mkdirSync(path.join(home, 'zwift', '.staging-alt'));
+  assert.equal(zwift.scriptReady(home, pin()), false, 'Hash passt nicht');
+  assert.equal(await zwift.installScript({ home, pin: pin(), download: downloader() }), true);
+  assert.equal(fs.readFileSync(path.join(home, 'zwift', COMMIT, 'zwift.sh'), 'utf8'), BODY);
+  assert.deepEqual(leftovers(home).sort(), [COMMIT, 'eigenes'].sort());
+  // Nicht ausführbar zählt nicht als bereit.
+  fs.chmodSync(path.join(home, 'zwift', COMMIT, 'zwift.sh'), 0o644);
+  assert.equal(zwift.scriptReady(home, pin()), false);
+  // Ein Symlink statt einer Datei auch nicht.
+  fs.rmSync(path.join(home, 'zwift', COMMIT, 'zwift.sh'));
+  fs.writeFileSync(path.join(home, 'ziel.sh'), BODY, { mode: 0o755 });
+  fs.symlinkSync(path.join(home, 'ziel.sh'), path.join(home, 'zwift', COMMIT, 'zwift.sh'));
+  assert.equal(zwift.scriptReady(home, pin()), false);
+});
+
+test('Z6 der Pin wird streng geprüft (er geht in URL und Pfad ein)', () => {
+  assert.deepEqual(zwift.checkPin(pin()), pin());
+  const bad = [
+    { commit: '../../etc' }, { commit: 'A'.repeat(40) }, { commit: 'a'.repeat(39) }, { repo: 'netbrain' }, { repo: 'a/b/c' }, { repo: '../x/y' },
+    { path: '../zwift.sh' }, { path: '/abs/zwift.sh' }, { path: 'src//zwift.sh' }, { sha256: 'abc' }, { sha256: 'G'.repeat(64) },
+    { image: '../x' }, { image: 'UPPER/x' }, { tag: 'latest!' }, { tag: '-x' }, { tag: '' }
+  ];
+  for (const over of bad) assert.throws(() => zwift.checkPin(pin(over)), (e) => e.problem === 'verify', JSON.stringify(over));
+  assert.throws(() => zwift.checkPin(null));
+  assert.throws(() => zwift.checkPin({ ...pin(), repo: 7 }));
+  // Der echte Pin aus upstreams.json besteht die Prüfung.
+  const real = JSON.parse(fs.readFileSync(path.join(root, 'upstreams.json'), 'utf8')).zwift;
+  assert.deepEqual(zwift.checkPin(real), real);
+  assert.notEqual(real.tag, 'latest');
+});
+
+// --- RealZwift mit dem echten rollout-run und Container-Attrappen -----------------------------------------------------------
+const FAKE_TOOL = `#!/bin/sh
+echo "\${0##*/} $*" >> "$ROLLOUT_HOME/containers.log"
+case $1 in
+  info) [ -n "\${FAKE_INFO_FAIL:-}" ] && { echo "$FAKE_INFO_FAIL" >&2; exit 125; }; exit 0 ;;
+  image) [ -f "$ROLLOUT_HOME/image-present" ] || exit 1; exit 0 ;;
+  pull) [ -n "\${FAKE_PULL_FAIL:-}" ] && exit 1; echo "Copying blob aaa done"; echo "Copying blob bbb done" >&2; : > "$ROLLOUT_HOME/image-present"; exit 0 ;;
+esac
+exit 0
+`;
+function runtimeHome({ image = false } = {}) {
+  const home = makeHome();
+  fs.mkdirSync(path.join(home, 'bin'));
+  fs.copyFileSync(path.join(root, 'scripts/bin-rollout-run.sh'), path.join(home, 'bin/rollout-run'));
+  fs.chmodSync(path.join(home, 'bin/rollout-run'), 0o755);
+  fs.mkdirSync(path.join(home, 'fakebin'));
+  for (const tool of ['podman', 'docker']) fs.writeFileSync(path.join(home, 'fakebin', tool), FAKE_TOOL, { mode: 0o755 });
+  if (image) fs.writeFileSync(path.join(home, 'image-present'), '');
+  return home;
+}
+const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ROLLOUT_|FAKE_|CONTAINER_TOOL$|IMAGE$|VERSION$)/.test(k)));
+const realZwift = (home, extra = {}, download = downloader()) => new zwift.RealZwift({
+  home, pin: pin(), download, env: { ...cleanEnv(), ROLLOUT_CONFIG_HOME: path.join(home, 'cfg'), ROLLOUT_ZWIFT_TAG: '1.2.3', PATH: `${path.join(home, 'fakebin')}:${process.env.PATH}`, ...extra }
+});
+const containerLog = (home) => { try { return fs.readFileSync(path.join(home, 'containers.log'), 'utf8').trim().split('\n'); } catch { return []; } };
+
+test('Z7 RealZwift.status: Skript, Laufzeit, Image und Zustimmung aus rollout-run --zwift-status', async () => {
+  const home = runtimeHome({ image: true });
+  const z = realZwift(home);
+  assert.deepEqual(await z.status(), { script: false, runtime: 'podman', image: true, consent: false, ref: 'docker.io/netbrain/zwift:1.2.3', problem: '' });
+  await z.installScript(new AbortController().signal);
+  assert.equal((await z.status()).script, true);
+  fs.mkdirSync(path.join(home, 'state'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'state/zwift-image-ok'), 'docker.io/netbrain/zwift:1.2.3\n');
+  fs.rmSync(path.join(home, 'image-present'));
+  const s = await z.status();
+  assert.equal(s.image, false);
+  assert.equal(s.consent, true);
+  assert.equal(containerLog(home).filter((l) => / pull /.test(l)).length, 0, 'status zieht nie');
+});
+
+test('Z8 RealZwift.status: fehlende Laufzeit und fehlender Tag werden unterschieden, ohne Starter gibt es einen Fehler', async () => {
+  const home = runtimeHome({ image: true });
+  assert.equal((await realZwift(home, { FAKE_INFO_FAIL: 'Cannot connect to the Docker daemon' }).status()).problem, 'runtime');
+  assert.equal((await realZwift(home, { ROLLOUT_ZWIFT_TAG: '' }).status()).problem, 'tag');
+  const bare = makeHome();
+  assert.equal((await realZwift(bare).status()).problem, 'error');
+});
+
+test('Z9 RealZwift.pullImage: zieht über rollout-run, meldet Zeilen, merkt die Zustimmung; Fehler tragen ihren Code', async () => {
+  const home = runtimeHome();
+  const lines = [];
+  await realZwift(home).pullImage((l) => lines.push(l), new AbortController().signal);
+  assert.deepEqual(lines.filter((l) => /^Copying/.test(l)).sort(), ['Copying blob aaa done', 'Copying blob bbb done']);
+  assert.ok(containerLog(home).includes('podman pull docker.io/netbrain/zwift:1.2.3'));
+  assert.equal(fs.readFileSync(path.join(home, 'state/zwift-image-ok'), 'utf8'), 'docker.io/netbrain/zwift:1.2.3\n');
+  const home2 = runtimeHome();
+  await expectError(realZwift(home2, { FAKE_PULL_FAIL: '1' }).pullImage(() => {}, new AbortController().signal), 'pull');
+  await expectError(realZwift(home2, { FAKE_INFO_FAIL: 'Cannot connect' }).pullImage(() => {}, new AbortController().signal), 'runtime');
+  await expectError(realZwift(home2, { ROLLOUT_ZWIFT_TAG: '' }).pullImage(() => {}, new AbortController().signal), 'tag');
+  const aborted = new AbortController();
+  aborted.abort();
+  await expectError(realZwift(home2).pullImage(() => {}, aborted.signal), 'abort');
+});
+
+// --- Anbindung an SimBackend ----------------------------------------------------------------------------------------------
+function backendWith(service, { cfg } = {}) {
+  const dir = cfg ?? path.join(work, `cfg-b${(counter += 1)}`);
+  fs.mkdirSync(dir, { recursive: true });
+  const files = path.join(dir, 'config.toml');
+  const store = { load: () => (fs.existsSync(files) ? config.parseConfig(fs.readFileSync(files, 'utf8')) : { ...config.DEFAULTS }), save: (s) => fs.writeFileSync(files, config.serializeConfig(s)) };
+  const updates = { snapshot: () => ({ status: 'none', version: '1.0.0', next: '', mb: 0, progress: 0, blocked: false, previous: '', notice: '' }), settingsChanged() {}, busyChanged() {} };
+  const bt = { adapter: async () => 'ready', scan: async () => {} };
+  const steam = { status: () => ({ state: 'out', steamRunning: false, message: '' }), set: async () => ({ status: 'done', message: '' }) };
+  const snaps = [];
+  const backend = new sim.SimBackend((s) => snaps.push(s), 'en', steam, store, bt, updates, {}, service);
+  return { backend, store, snaps, files };
+}
+const settle = async (backend, until, ms = 8000) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const snap = await backend.getSnapshot();
+    if (until(snap)) return snap;
+    if (Date.now() > end) throw new Error('Zeitüberschreitung');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+};
+
+test('Z10 Installation über RealZwift: Skript laden, Tag eintragen, Image ziehen, Fortschritt, am Ende installiert und Image da', async () => {
+  const home = runtimeHome();
+  // rollout-run liest dieselbe config.toml wie der Speicher: derselbe Config-Ordner, und der Tag kommt nur aus dieser Datei.
+  const cfgHome = path.join(work, 'cfg-z10');
+  const z = realZwift(home, { ROLLOUT_ZWIFT_TAG: undefined, ROLLOUT_CONFIG_HOME: cfgHome });
+  const b = backendWith(z, { cfg: cfgHome });
+  const first = await b.backend.getSnapshot();
+  assert.equal(first.apps.zwift.installed, false);
+  assert.equal(first.apps.zwift.problem, '', 'kein Tag vor der Installation ist kein Fehler');
+  await b.backend.install('zwift', { steam: false, hd: false });
+  assert.equal(b.snaps.at(-1).job.app, 'zwift');
+  const done = await settle(b.backend, (s) => !s.job);
+  assert.equal(done.apps.zwift.installed, true);
+  assert.equal(done.apps.zwift.problem, '');
+  assert.equal(done.finished.app, 'zwift');
+  assert.ok(zwift.scriptReady(home, pin()));
+  assert.match(fs.readFileSync(path.join(cfgHome, 'config.toml'), 'utf8'), /zwift_tag = "1\.2\.3"/);
+  assert.ok(containerLog(home).includes('podman pull docker.io/netbrain/zwift:1.2.3'));
+  const progress = b.snaps.filter((s) => s.job).map((s) => s.job.progress);
+  assert.ok(progress.includes(5), 'Skript geladen');
+  assert.ok(progress.some((p) => p > 5 && p < 100), 'Schichten zählen mit');
+  assert.deepEqual([...progress].sort((x, y) => x - y), progress, 'Fortschritt fällt nie');
+});
+
+test('Z11 Zustand kommt aus der Laufzeit: Skript und Image da = installiert; Image weg = nicht mehr installiert', async () => {
+  const home = runtimeHome({ image: true });
+  const z = realZwift(home);
+  await z.installScript(new AbortController().signal);
+  const { backend } = backendWith(z);
+  assert.equal((await backend.getSnapshot()).apps.zwift.installed, true);
+  fs.rmSync(path.join(home, 'image-present'));
+  await new Promise((r) => setTimeout(r, 5200)); // Zwischenspeicher des Zustands läuft ab (5 s)
+  const snap = await backend.getSnapshot();
+  assert.equal(snap.apps.zwift.installed, false);
+  // Entfernen ist für echtes Zwift noch nicht gebaut: es spiegelt nichts vor.
+  fs.writeFileSync(path.join(home, 'image-present'), '');
+  const { backend: b2 } = backendWith(z);
+  assert.equal((await b2.getSnapshot()).apps.zwift.installed, true);
+  await b2.remove('zwift');
+  assert.equal((await b2.getSnapshot()).apps.zwift.installed, true);
+});
+
+test('Z12 Fehlerfälle erscheinen als Problem in der Karte, nichts bleibt hängen; MyWhoosh bleibt unberührt', async () => {
+  for (const [mode, problem] of [['nonet', 'net'], ['nopull', 'pull'], ['norun', 'runtime']]) {
+    const { backend } = backendWith(new zwift.FakeZwift(mode, 5));
+    await backend.install('zwift', { steam: false, hd: false });
+    const snap = await settle(backend, (s) => !s.job && s.apps.zwift.problem !== '');
+    assert.equal(snap.apps.zwift.problem, problem, mode);
+    assert.equal(snap.apps.zwift.installed, false, mode);
+    assert.equal(snap.finished, null, mode);
+    assert.equal(snap.apps.mywhoosh.problem, '');
+  }
+  // Nach einem Fehler geht ein neuer Versuch (Attrappe „ready“ nach Installation).
+  const { backend } = backendWith(new zwift.FakeZwift('', 5));
+  await backend.install('zwift', { steam: true, hd: false });
+  const snap = await settle(backend, (s) => !s.job && s.apps.zwift.installed);
+  assert.equal(snap.apps.zwift.steam, true);
+  assert.equal(snap.apps.zwift.problem, '');
+  // Ohne Dienst bleibt Zwift wie bisher simuliert (Fortschritt in 120-ms-Schritten).
+  const sim0 = backendWith(null);
+  await sim0.backend.install('zwift', { steam: false, hd: false });
+  assert.equal(sim0.snaps.at(-1).job.app, 'zwift');
+  await sim0.backend.remove('mywhoosh');
+});
+
+test('Z13 echtes Netz (nur mit ROLLOUT_ZWIFT_NET=1): das gepinnte zwift.sh von GitHub hat die Prüfsumme aus upstreams.json', { skip: process.env.ROLLOUT_ZWIFT_NET !== '1' }, async () => {
+  const real = JSON.parse(fs.readFileSync(path.join(root, 'upstreams.json'), 'utf8')).zwift;
+  const home = makeHome();
+  const download = async (url, dest) => {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Rollout' } });
+    assert.equal(res.status, 200, url);
+    fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+  };
+  assert.equal(await zwift.installScript({ home, pin: real, download }), true);
+  assert.ok(zwift.scriptReady(home, real));
+  assert.match(fs.readFileSync(path.join(home, 'zwift', real.commit, 'zwift.sh'), 'utf8'), /^#!\/usr\/bin\/env bash/);
+});

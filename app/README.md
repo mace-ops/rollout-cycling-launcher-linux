@@ -27,7 +27,7 @@ Die Szenarien S1 bis S4 (Oberfläche des Launcher-Updates) laufen mit `ROLLOUT_S
 ```text
 bin/rollout            Starter und Wächter (scripts/bin-rollout.sh), Steam-Ziel, ändert sich im Pfad nie
 bin/rollout-run        Spielstarter (scripts/bin-rollout-run.sh): Umgebung bereinigen, Bildschirm wachhalten, state/run.pid; Zwift über die Container-Laufzeit (unten)
-zwift/<sha>/zwift.sh  Startskript von netbrain/zwift (legt der Zwift-Adapter bereit, noch nicht gebaut; ROLLOUT_ZWIFT_SCRIPT ersetzt es)
+zwift/<commit>/zwift.sh  Startskript von netbrain/zwift, gepinnt in upstreams.json, vom Zwift-Adapter (src/main/zwift.ts) geladen und geprüft; ROLLOUT_ZWIFT_SCRIPT ersetzt es
 current -> versions/<v>   previous -> versions/<v>
 versions/<v>/          package.json, dist/, bootstrap/rollout, runtime (Name des Electron-Ordners)
 electron/<v>/          Electron
@@ -131,4 +131,20 @@ zwift_digest = "sha256:…"           # optional: gezogen wird dann genau dieser
 
 Gezogen wird nur mit Zustimmung für genau diese Angabe: `rollout-run --zwift-pull` (vom Launcher nach Bestätigung, oder von Hand) zieht und merkt sich die Zustimmung in `state/zwift-image-ok`.
 `rollout-run --container-check` nennt die nutzbare Laufzeit. Exit-Codes: 10 keine Laufzeit, 11 Image nicht eingestellt, 12 Image fehlt oder Ziehen gescheitert, 127 `zwift.sh` fehlt.
-Tests R9 bis R17 in `test/run.test.mjs` nutzen Attrappen für `podman` und `docker`.
+`rollout-run --zwift-status` gibt `runtime=`, `ref=`, `image=present|missing` und `consent=yes|no` aus (zieht und startet nichts; Exit 10 oder 11 wie oben). Fehlt `USER`, setzt `rollout-run` es für `zwift.sh`.
+Tests R9 bis R19 in `test/run.test.mjs` nutzen Attrappen für `podman` und `docker`.
+
+### Zwift-Adapter (`src/main/zwift.ts`, `upstreams.json`)
+
+`upstreams.json` pinnt `zwift.sh` (Repo, Commit, Pfad `src/zwift.sh`, SHA-256) und nennt das Standard-Image samt Tag; sie wird beim Bauen in den Hauptprozess eingebündelt. Der Adapter
+lädt `https://raw.githubusercontent.com/<repo>/<commit>/<pfad>` (höchstens 256 KiB), prüft die SHA-256, legt die Datei unter `zwift/.staging-*` an und setzt sie mit `rename` nach
+`zwift/<commit>/zwift.sh` (ausführbar). Danach verschwinden Skripte anderer Commits. Ein verändertes oder nicht ausführbares Skript gilt als nicht da und wird ersetzt. Pin neu setzen:
+Commit und `sha256sum` der Datei in `upstreams.json` eintragen, `ROLLOUT_ZWIFT_NET=1 node --test test/zwift.test.mjs` prüft den Pin gegen GitHub.
+
+Anbindung an `SimBackend`: Mit `ROLLOUT_ZWIFT=real` gilt Zwift als installiert, wenn das gepinnte Skript da ist und `--zwift-status` das Image meldet (Zustand bei jedem Snapshot, höchstens alle 5 s
+neu abgefragt). „Installieren“ lädt `zwift.sh`, trägt den Tag aus `upstreams.json` als `zwift_tag` ein, wenn keiner eingestellt ist, und zieht das Image mit `rollout-run --zwift-pull`;
+die Bestätigung im Installieren-Dialog ist die Zustimmung. Der Fortschritt zählt fertige Image-Schichten (Schätzung). Fehler stehen als `apps.zwift.problem` im Snapshot
+(`net`, `verify`, `disk`, `runtime`, `tag`, `pull`, `error`); die Oberfläche zeigt sie noch nicht. `ROLLOUT_ZWIFT=fake` (Zustand per `ROLLOUT_SIM_ZWIFT`: leer, `ready`, `norun`, `nonet`, `nopull`)
+ersetzt Netz und Container durch eine Attrappe; ohne die Variable bleibt Zwift simuliert wie bisher. Starten und Entfernen von Zwift sind auch mit `real` noch nicht angebunden
+(Start simuliert, Entfernen ohne Wirkung).
+Tests Z1 bis Z13 in `test/zwift.test.mjs` (Download und Pin, `rollout-run` mit Container-Attrappen, Anbindung; Z13 nur mit `ROLLOUT_ZWIFT_NET=1` gegen das echte GitHub).

@@ -1,4 +1,4 @@
-// Prüft den Spielstarter scripts/bin-rollout-run.sh (R1 bis R17) in Wegwerf-Ordnern, mit bash, `bash --posix` und, falls vorhanden, dash.
+// Prüft den Spielstarter scripts/bin-rollout-run.sh (R1 bis R19) in Wegwerf-Ordnern, mit bash, `bash --posix` und, falls vorhanden, dash.
 // Der Upstream ist ein Shell-Skript (ROLLOUT_RUN_UPSTREAM), das sein Verhalten aus RUN_MODE liest und in calls.log protokolliert.
 // Podman und Docker sind Attrappen im PATH (fakebin/), die ihre Aufrufe in containers.log schreiben: Es startet nie ein echter Container.
 import assert from 'node:assert/strict';
@@ -20,6 +20,7 @@ const argv = (sh, ...rest) => [sh.split(' ')[0], [...sh.split(' ').slice(1), ...
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const UPSTREAM = `#!/bin/sh
+echo "\${USER-}" > "$ROLLOUT_HOME/user.log"
 echo "tool=$CONTAINER_TOOL image=$IMAGE version=$VERSION fg=\${ZWIFT_FG-} noupdate=\${DONT_UPDATE-}" > "$ROLLOUT_HOME/env.log"
 echo "start args=$* preload=\${LD_PRELOAD+set} libpath=\${LD_LIBRARY_PATH+set} pidfile=$(cat "$ROLLOUT_HOME/state/run.pid" 2>/dev/null) parent=$PPID" >> "$ROLLOUT_HOME/calls.log"
 case $RUN_MODE in
@@ -144,7 +145,7 @@ for (const sh of shells) {
     const home = makeHome();
     const r = run(sh, home, ['--bootstrap-selftest'], { RUN_MODE: 'exit 0' });
     assert.equal(r.status, 0);
-    assert.equal(r.stdout.trim(), 'rollout-bootstrap 2 run');
+    assert.equal(r.stdout.trim(), 'rollout-bootstrap 3 run');
     assert.equal(calls(home).length, 0);
     assert.equal(pidFile(home), null);
   });
@@ -191,7 +192,8 @@ test('R7 mywhoosh und zwift finden ihren Upstream ohne Überschreibung', () => {
   assert.equal(calls(home).length, 2);
 });
 
-// --- Container-Laufzeit und Zwift-Image (R9 bis R17) ---------------------------------------------------------------------------
+// --- Container-Laufzeit und Zwift-Image (R9 bis R19) ---------------------------------------------------------------------------
+const userLog = (home) => fs.readFileSync(path.join(home, 'user.log'), 'utf8').trim();
 const envLog = (home) => fs.readFileSync(path.join(home, 'env.log'), 'utf8').trim();
 // PATH ohne podman und docker des Prüfrechners: nur die Werkzeuge, die der Starter braucht, und die Shells.
 function bareTools(home) {
@@ -361,6 +363,38 @@ for (const sh of shells) {
     const same = run(sh, home, ['zwift'], { ...extra, FAKE_REPODIGEST: `docker.io/netbrain/zwift@${digest}` });
     assert.equal(same.status, 0, same.stderr);
     assert.equal(calls(home).length, 1);
+  });
+
+  test(`R18 --zwift-status (${sh}): meldet Laufzeit, Image, Bild und Zustimmung, ohne zu ziehen oder zu starten`, () => {
+    const home = makeHome();
+    const lines = (r) => r.stdout.trim().split('\n');
+    const a = run(sh, home, ['--zwift-status'], {});
+    assert.equal(a.status, 0, a.stderr);
+    assert.deepEqual(lines(a), ['runtime=podman', 'ref=docker.io/netbrain/zwift:1.2.3', 'image=present', 'consent=no']);
+    fs.writeFileSync(path.join(home, 'state/zwift-image-ok'), 'docker.io/netbrain/zwift:1.2.3\n');
+    fs.rmSync(path.join(home, 'image-present'));
+    assert.deepEqual(lines(run(sh, home, ['--zwift-status'], {})), ['runtime=podman', 'ref=docker.io/netbrain/zwift:1.2.3', 'image=missing', 'consent=yes']);
+    assert.equal(containers(home).filter((l) => / pull /.test(l)).length, 0, 'zieht nie');
+    assert.equal(calls(home).length, 0, 'startet kein Spiel');
+    assert.equal(pidFile(home), null);
+    assert.equal(run(sh, home, ['--zwift-status'], { ROLLOUT_ZWIFT_TAG: '' }).status, 11);
+    assert.equal(run(sh, home, ['--zwift-status'], { FAKE_INFO_FAIL: 'Cannot connect' }).status, 10);
+    // Mit festem Digest zählt nur genau dieser.
+    const digest = `sha256:${'ef'.repeat(32)}`;
+    fs.writeFileSync(path.join(home, 'image-present'), '');
+    const other = run(sh, home, ['--zwift-status'], { ROLLOUT_ZWIFT_DIGEST: digest, FAKE_REPODIGEST: 'x' });
+    assert.match(other.stdout, /image=missing/);
+    const same = run(sh, home, ['--zwift-status'], { ROLLOUT_ZWIFT_DIGEST: digest, FAKE_REPODIGEST: `docker.io/netbrain/zwift@${digest}` });
+    assert.match(same.stdout, /image=present/);
+  });
+
+  test(`R19 USER (${sh}): fehlt USER, setzt der Starter es für zwift.sh (das sonst mit „unbound variable“ abbricht); ein vorhandenes bleibt`, () => {
+    const home = makeHome();
+    zwiftScript(home);
+    assert.equal(run(sh, home, ['zwift'], { RUN_MODE: 'exit 0', USER: undefined }).status, 0);
+    assert.equal(userLog(home), os.userInfo().username);
+    assert.equal(run(sh, home, ['zwift'], { RUN_MODE: 'exit 0', USER: 'fahrer' }).status, 0);
+    assert.equal(userLog(home), 'fahrer');
   });
 
   test(`--container-check (${sh}) nennt die Laufzeit auf stdout`, () => {

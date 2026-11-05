@@ -1,8 +1,9 @@
 #!/bin/sh
-# rollout-bootstrap: 2
+# rollout-bootstrap: 3
 # Startet ein Spiel (Konzept 5.2), vom Launcher und von Steam gleich aufgerufen: rollout-run <mywhoosh|zwift> [Argumente].
-# Weitere Aufrufe: rollout-run --container-check (nennt die nutzbare Container-Laufzeit, sonst Meldung und Exit 10) und
-# rollout-run --zwift-pull (zieht das eingestellte Zwift-Image und merkt sich die Zustimmung, nur nach Bestätigung durch den Nutzer).
+# Weitere Aufrufe: rollout-run --container-check (nennt die nutzbare Container-Laufzeit, sonst Meldung und Exit 10),
+# rollout-run --zwift-pull (zieht das eingestellte Zwift-Image und merkt sich die Zustimmung, nur nach Bestätigung durch den Nutzer) und
+# rollout-run --zwift-status (stdout: runtime=<podman|docker>, ref=<Image:Tag>, image=<present|missing>, consent=<yes|no>; zieht und startet nichts).
 # Exit-Codes von Rollout selbst: 1 läuft schon, 2 Aufruf, 10 keine nutzbare Container-Laufzeit, 11 Zwift-Image nicht eingestellt,
 # 12 Zwift-Image fehlt (keine Zustimmung oder Ziehen gescheitert), 127 Upstream fehlt. Sonst der Exit-Code des Spiels.
 # Reines POSIX-sh wie bin/rollout. state/run.pid nennt diesen Prozess, solange das Spiel läuft: Das Aufräumen
@@ -116,11 +117,19 @@ zwift_prepare() {
   fi
   # DONT_UPDATE: Das Image ist festgelegt, zwift.sh zieht und prüft nichts selbst. ZWIFT_FG: Container im Vordergrund, damit Steam das Ende sieht.
   export CONTAINER_TOOL=$rt IMAGE=$zw_image VERSION=$zw_tag DONT_UPDATE=1 ZWIFT_FG=1
+  # zwift.sh bricht mit „USER: unbound variable“ ab, wenn USER fehlt (am Ally beim Probelauf mit leerer Umgebung aufgefallen).
+  [ -n "${USER:-}" ] || { USER=$(id -un 2>/dev/null) || USER=; export USER; }
 }
 
 # Upstream je App: MyWhoosh liegt im Launcher-Release, Zwift ist das Startskript von netbrain/zwift unter zwift/<sha>/ (ROLLOUT_ZWIFT_SCRIPT ersetzt es).
 case $app in
   --container-check) rt_detect || exit 10; echo "$rt"; exit 0 ;;
+  --zwift-status)
+    rt_detect || exit 10; zwift_config || exit 11
+    echo "runtime=$rt"; echo "ref=$zw_want"
+    if zwift_have; then echo "image=present"; else echo "image=missing"; fi
+    if [ "$(sed -n '1p' "$state/zwift-image-ok" 2>/dev/null)" = "$zw_want" ]; then echo "consent=yes"; else echo "consent=no"; fi
+    exit 0 ;;
   --zwift-pull) rt_detect || exit 10; zwift_config || exit 11; zwift_pull || exit 12; exit 0 ;;
   mywhoosh) up=$home/current/vendor/mywhoosh.sh; set -- run "$@" ;;
   zwift) up=${ROLLOUT_ZWIFT_SCRIPT:-$(ls -td "$home"/zwift/*/zwift.sh 2>/dev/null | head -n 1)} ;;

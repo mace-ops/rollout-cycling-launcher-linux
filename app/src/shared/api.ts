@@ -5,10 +5,17 @@ export type AppId = 'mywhoosh' | 'zwift';
 export const APP_IDS: readonly AppId[] = ['mywhoosh', 'zwift'];
 export const APP_NAMES: Record<AppId, string> = { mywhoosh: 'MyWhoosh', zwift: 'Zwift' };
 
+/**
+ * Warum eine Installation oder Prüfung nicht klappte (leer = kein Problem). `net` Download, `verify` Prüfsumme oder Pin,
+ * `disk` Ablegen, `runtime` keine nutzbare Container-Laufzeit, `tag` kein Image eingestellt, `pull` Ziehen des Images, `error` sonst.
+ */
+export type AppProblem = '' | 'net' | 'verify' | 'disk' | 'runtime' | 'tag' | 'pull' | 'error';
+
 export interface AppInfo {
   installed: boolean;
   steam: boolean;
   updateAvailable: boolean;
+  problem: AppProblem;
 }
 
 export type GraphicsOutput = 'auto' | 'wayland' | 'x11';

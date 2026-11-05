@@ -34,6 +34,19 @@ await session('frisch', { ROLLOUT_SIM_STATE: 'fresh' }, async (t) => {
   await t.expect(t.waitFor('Settings'), 'zurück in der Übersicht');
 });
 
+// Zwift über die Attrappe des Adapters (ROLLOUT_ZWIFT=fake): Skript und Image kommen aus dem Dienst, nicht aus der Simulation.
+await session('zwift-attrappe', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake' }, async (t) => {
+  await t.expect(t.clickSel('article[data-tone=zwift] .btn.primary'), 'Zwift-Karte angeklickt');
+  await t.expect(t.waitFor('Zwift may therefore ban your account'), 'Zwift-Hinweis');
+  await t.click('Install');
+  await t.expect(t.waitFor('is being installed'), 'Fortschritt-Ansicht');
+  await t.expect(t.waitFor('is ready', 25000), 'Installation über den Dienst fertig');
+  await t.click('Ride');
+  await t.expect(t.waitFor('Running', 15000), 'Spiel läuft (Start bleibt simuliert)');
+  await t.click('Quit game');
+  await t.expect(t.waitFor('Settings'), 'zurück in der Übersicht');
+});
+
 await session('einstellungen', {}, async (t) => {
   await t.click('Settings');
   await t.expect(t.waitFor('Download updates automatically'), 'Settings');

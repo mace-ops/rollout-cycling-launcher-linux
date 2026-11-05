@@ -1,0 +1,10 @@
+{
+  "zwift": {
+    "repo": "netbrain/zwift",
+    "commit": "445efbdd36cd82ea75cbc75a52e790c4811de734",
+    "path": "src/zwift.sh",
+    "sha256": "30d5f18941ec44860e623e9874159f12739594e1fda5fdeb3518122a2e59435f",
+    "image": "docker.io/netbrain/zwift",
+    "tag": "1.124.0"
+  }
+}

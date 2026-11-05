@@ -10,6 +10,8 @@ import { SelfUpdater, type SelfUpdateService } from './selfupdate';
 import { FakeFeed, FakeSelfUpdate } from './selfupdate-fake';
 import { UPDATE_KEYS } from './selfupdate-keys';
 import { realFeed } from './selfupdate-net';
+import upstreams from '../../upstreams.json';
+import { FakeZwift, RealZwift, type ZwiftService } from './zwift';
 import { zoomFor } from './zoom';
 import * as steam from './steam';
 
@@ -72,6 +74,14 @@ if (!app.requestSingleInstanceLock()) {
   const steamService = (): SteamService => process.env.ROLLOUT_SIM_STEAM === 'fake'
     ? new FakeSteam(process.env.ROLLOUT_SIM_STEAM_RUNNING === '1')
     : { status: steam.status, set: (on, restart) => steam.setRolloutInSteam(on, restart, (dir, id) => writeArtwork(dir, id, true)) };
+
+  /** Zwift echt (`real`), als Attrappe (`fake`, Zustand aus ROLLOUT_SIM_ZWIFT) oder wie bisher simuliert (ohne Variable). */
+  const zwiftService = (): ZwiftService | null => {
+    const mode = process.env.ROLLOUT_ZWIFT;
+    if (mode === 'fake') return new FakeZwift(process.env.ROLLOUT_SIM_ZWIFT ?? '');
+    if (mode === 'real') return new RealZwift({ home: steam.rolloutHome(), pin: upstreams.zwift, download: realFeed.download });
+    return null;
+  };
 
   const handlers: Record<Command, (...args: unknown[]) => unknown> = {
     getSnapshot: () => backend.getSnapshot(),
@@ -149,7 +159,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     // Das Backend entsteht erst danach und fragt den Dienst schon im Konstruktor: bis dahin gilt „nichts belegt“.
     const updates = selfUpdateService(() => (backend ? backend.settings() : { autoUpdate: true, channel: 'stable' }), () => (backend ? backend.busy() : false));
-    backend = new SimBackend((snapshot: Snapshot) => win?.webContents.send('rollout-snapshot', snapshot), app.getLocale(), steamService(), fileStore, process.env.ROLLOUT_BT === 'fake' ? new FakeBluetooth(process.env.ROLLOUT_SIM_BT === 'problem') : realBluetooth, updates);
+    backend = new SimBackend((snapshot: Snapshot) => win?.webContents.send('rollout-snapshot', snapshot), app.getLocale(), steamService(), fileStore, process.env.ROLLOUT_BT === 'fake' ? new FakeBluetooth(process.env.ROLLOUT_SIM_BT === 'problem') : realBluetooth, updates, process.env, zwiftService());
     updates.onChange(() => backend.refresh());
     updates.start();
     win = new BrowserWindow({
