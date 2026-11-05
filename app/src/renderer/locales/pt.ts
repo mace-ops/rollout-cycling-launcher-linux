@@ -171,5 +171,23 @@ export const pt: Messages = {
   'adv.previous': 'Versão anterior',
   'adv.previousStart': 'Iniciar',
   'adv.previousTitle': 'Iniciar a versão {version}?',
-  'adv.previousBody': 'O Rollout reinicia e pula a versão {current}.'
+  'adv.previousBody': 'O Rollout reinicia e pula a versão {current}.',
+
+  'pill.problem': 'Precisa de atenção',
+  'btn.retry': 'Tentar de novo',
+  'problem.net': 'O Rollout não conseguiu baixar o script de inicialização do Zwift. Verifique sua conexão com a internet e tente de novo.',
+  'problem.verify': 'O script de inicialização do Zwift baixado não passou na verificação de segurança, por isso o Rollout não o usou. Nada foi alterado. Tente de novo mais tarde.',
+  'problem.disk': 'O Rollout não conseguiu salvar os arquivos do Zwift. Verifique se o armazenamento não está cheio e tente de novo.',
+  'problem.runtime': 'O Zwift roda em um contêiner, mas o Podman ou o Docker não está funcionando. No Bazzite, configure-o no Modo Desktop e tente de novo.',
+  'problem.tag': 'Ainda não há uma versão do Zwift definida. Instale o Zwift de novo para escolher a atual.',
+  'problem.pull': 'Não foi possível baixar a imagem do Zwift. Verifique sua conexão com a internet e o espaço livre (cerca de 21 GB) e tente de novo.',
+  'problem.error': 'Algo deu errado com o Zwift. Crie um arquivo de ajuda e envie para a pessoa que ajuda você.',
+  'image.title': 'Baixar a imagem do Zwift?',
+  'image.body': 'O Zwift roda em um contêiner. O Rollout baixa a versão {tag} do Docker Hub, cerca de {gb} GB. Só essa versão exata é usada, nunca “latest”.',
+  'image.confirm': 'Baixar',
+  'remove.confirmBodyImage': 'Isso remove a imagem do Zwift (versão {tag}) e libera cerca de {gb} GB. O Podman ou o Docker continua instalado.',
+  'remove.failed': 'Não foi possível remover a imagem. Feche o Zwift e tente de novo.',
+  'launch.zwiftPrepare': 'Preparando o contêiner do Zwift',
+  'launch.zwiftStart': 'Iniciando o Zwift. Pode levar um minuto',
+  'error.launch.title': '{app} não conseguiu iniciar'
 };

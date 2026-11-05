@@ -171,5 +171,23 @@ export const fr: Messages = {
   'adv.previous': 'Version précédente',
   'adv.previousStart': 'Démarrer',
   'adv.previousTitle': 'Démarrer la version {version} ?',
-  'adv.previousBody': 'Rollout redémarre et ignore la version {current}.'
+  'adv.previousBody': 'Rollout redémarre et ignore la version {current}.',
+
+  'pill.problem': 'À vérifier',
+  'btn.retry': 'Réessayer',
+  'problem.net': 'Rollout n’a pas pu télécharger le script de démarrage de Zwift. Vérifiez votre connexion internet et réessayez.',
+  'problem.verify': 'Le script de démarrage de Zwift téléchargé n’a pas réussi le contrôle de sécurité, Rollout ne l’a donc pas utilisé. Rien n’a été modifié. Réessayez plus tard.',
+  'problem.disk': 'Rollout n’a pas pu enregistrer les fichiers de Zwift. Vérifiez que le stockage n’est pas plein, puis réessayez.',
+  'problem.runtime': 'Zwift fonctionne dans un conteneur, mais Podman ou Docker ne fonctionne pas. Sur Bazzite, configurez-le en mode Bureau, puis réessayez.',
+  'problem.tag': 'Aucune version de Zwift n’est encore définie. Réinstallez Zwift pour choisir la version actuelle.',
+  'problem.pull': 'L’image de Zwift n’a pas pu être téléchargée. Vérifiez votre connexion internet et l’espace libre (environ 21 Go), puis réessayez.',
+  'problem.error': 'Un problème est survenu avec Zwift. Créez un fichier d’aide et envoyez-le à la personne qui vous aide.',
+  'image.title': 'Télécharger l’image de Zwift ?',
+  'image.body': 'Zwift fonctionne dans un conteneur. Rollout télécharge la version {tag} depuis Docker Hub, environ {gb} Go. Seule cette version précise est utilisée, jamais « latest ».',
+  'image.confirm': 'Télécharger',
+  'remove.confirmBodyImage': 'Cela supprime l’image de Zwift (version {tag}) et libère environ {gb} Go. Podman ou Docker reste installé.',
+  'remove.failed': 'L’image n’a pas pu être supprimée. Fermez Zwift et réessayez.',
+  'launch.zwiftPrepare': 'Préparation du conteneur Zwift',
+  'launch.zwiftStart': 'Démarrage de Zwift. Cela peut prendre une minute',
+  'error.launch.title': '{app} n’a pas pu démarrer'
 };

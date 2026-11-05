@@ -171,5 +171,23 @@ export const es: Messages = {
   'adv.previous': 'Versión anterior',
   'adv.previousStart': 'Iniciar',
   'adv.previousTitle': '¿Iniciar la versión {version}?',
-  'adv.previousBody': 'Rollout se reinicia y omite la versión {current}.'
+  'adv.previousBody': 'Rollout se reinicia y omite la versión {current}.',
+
+  'pill.problem': 'Requiere atención',
+  'btn.retry': 'Reintentar',
+  'problem.net': 'Rollout no pudo descargar el script de inicio de Zwift. Revisa tu conexión a internet e inténtalo de nuevo.',
+  'problem.verify': 'El script de inicio de Zwift descargado no superó la comprobación de seguridad, por eso Rollout no lo usó. No se cambió nada. Inténtalo más tarde.',
+  'problem.disk': 'Rollout no pudo guardar los archivos de Zwift. Comprueba que el almacenamiento no esté lleno e inténtalo de nuevo.',
+  'problem.runtime': 'Zwift se ejecuta en un contenedor, pero Podman o Docker no funciona. En Bazzite, configúralo en el Modo Escritorio e inténtalo de nuevo.',
+  'problem.tag': 'Todavía no hay una versión de Zwift configurada. Instala Zwift de nuevo para elegir la actual.',
+  'problem.pull': 'No se pudo descargar la imagen de Zwift. Revisa tu conexión a internet y el espacio libre (unos 21 GB) e inténtalo de nuevo.',
+  'problem.error': 'Algo salió mal con Zwift. Crea un archivo de ayuda y envíaselo a la persona que te ayuda.',
+  'image.title': '¿Descargar la imagen de Zwift?',
+  'image.body': 'Zwift se ejecuta en un contenedor. Rollout descarga la versión {tag} de Docker Hub, unos {gb} GB. Solo se usa exactamente esta versión, nunca «latest».',
+  'image.confirm': 'Descargar',
+  'remove.confirmBodyImage': 'Esto elimina la imagen de Zwift (versión {tag}) y libera unos {gb} GB. Podman o Docker sigue instalado.',
+  'remove.failed': 'No se pudo eliminar la imagen. Cierra Zwift e inténtalo de nuevo.',
+  'launch.zwiftPrepare': 'Preparando el contenedor de Zwift',
+  'launch.zwiftStart': 'Iniciando Zwift. Puede tardar un minuto',
+  'error.launch.title': '{app} no se pudo iniciar'
 };

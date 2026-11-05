@@ -185,7 +185,25 @@ export const en = {
   'adv.previous': 'Previous version',
   'adv.previousStart': 'Start',
   'adv.previousTitle': 'Start version {version}?',
-  'adv.previousBody': 'Rollout restarts and skips version {current}.'
+  'adv.previousBody': 'Rollout restarts and skips version {current}.',
+
+  'pill.problem': 'Needs attention',
+  'btn.retry': 'Try again',
+  'problem.net': 'Rollout could not download the Zwift start script. Check your internet connection and try again.',
+  'problem.verify': 'The downloaded Zwift start script did not pass its safety check, so Rollout did not use it. Nothing was changed. Try again later.',
+  'problem.disk': 'Rollout could not save the Zwift files. Check that your storage is not full, then try again.',
+  'problem.runtime': 'Zwift runs in a container, but Podman or Docker is not working. On Bazzite, set it up in Desktop Mode, then try again.',
+  'problem.tag': 'No Zwift version is set yet. Install Zwift again to choose the current one.',
+  'problem.pull': 'The Zwift image could not be downloaded. Check your internet connection and free storage (about 21 GB), then try again.',
+  'problem.error': 'Something went wrong with Zwift. Create a help file and send it to the person who helps you.',
+  'image.title': 'Download the Zwift image?',
+  'image.body': 'Zwift runs in a container. Rollout downloads version {tag}, about {gb} GB, from Docker Hub. Only this exact version is used, never “latest”.',
+  'image.confirm': 'Download',
+  'remove.confirmBodyImage': 'This removes the Zwift image (version {tag}) and frees about {gb} GB. Podman or Docker stays installed.',
+  'remove.failed': 'The image could not be removed. Close Zwift and try again.',
+  'launch.zwiftPrepare': 'Preparing the Zwift container',
+  'launch.zwiftStart': 'Starting Zwift. This can take a minute',
+  'error.launch.title': '{app} could not start'
 } as const;
 
 export type MessageKey = keyof typeof en;

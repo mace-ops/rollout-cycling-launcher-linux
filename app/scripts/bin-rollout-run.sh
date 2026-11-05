@@ -1,11 +1,12 @@
 #!/bin/sh
-# rollout-bootstrap: 3
+# rollout-bootstrap: 4
 # Startet ein Spiel (Konzept 5.2), vom Launcher und von Steam gleich aufgerufen: rollout-run <mywhoosh|zwift> [Argumente].
 # Weitere Aufrufe: rollout-run --container-check (nennt die nutzbare Container-Laufzeit, sonst Meldung und Exit 10),
 # rollout-run --zwift-pull (zieht das eingestellte Zwift-Image und merkt sich die Zustimmung, nur nach Bestätigung durch den Nutzer) und
-# rollout-run --zwift-status (stdout: runtime=<podman|docker>, ref=<Image:Tag>, image=<present|missing>, consent=<yes|no>; zieht und startet nichts).
+# rollout-run --zwift-status (stdout: runtime=<podman|docker>, ref=<Image:Tag>, image=<present|missing>, consent=<yes|no>; zieht und startet nichts) und
+# rollout-run --zwift-remove (entfernt das eingestellte Image mit „rmi“ und vergisst die Zustimmung; nur nach Rückfrage des Nutzers, ohne Image ebenfalls Erfolg).
 # Exit-Codes von Rollout selbst: 1 läuft schon, 2 Aufruf, 10 keine nutzbare Container-Laufzeit, 11 Zwift-Image nicht eingestellt,
-# 12 Zwift-Image fehlt (keine Zustimmung oder Ziehen gescheitert), 127 Upstream fehlt. Sonst der Exit-Code des Spiels.
+# 12 Zwift-Image fehlt (keine Zustimmung oder Ziehen gescheitert), 13 Image konnte nicht entfernt werden, 127 Upstream fehlt. Sonst der Exit-Code des Spiels.
 # Reines POSIX-sh wie bin/rollout. state/run.pid nennt diesen Prozess, solange das Spiel läuft: Das Aufräumen
 # eines Updates löscht dann keine Version unter dem laufenden Spiel weg. Die Nummer oben nur bei echtem Bedarf erhöhen.
 if [ "${1:-}" = --bootstrap-selftest ]; then
@@ -104,6 +105,15 @@ zwift_pull() {
   mkdir -p "$state" && printf '%s\n' "$zw_want" > "$state/zwift-image-ok"
 }
 
+# zwift_remove: entfernt das eingestellte Image (nur die Marke Image:Tag, ein fester Digest hängt am selben Image) und vergisst die Zustimmung.
+# Ein Image, das nicht da ist, gilt als entfernt. Die Container-Laufzeit und netbrains Einstellungen bleiben.
+zwift_remove() {
+  if "$rt" image inspect "$zw_ref" >/dev/null 2>&1 </dev/null; then
+    "$rt" rmi "$zw_ref" </dev/null || { msg "Das Zwift-Image $zw_ref konnte nicht entfernt werden (läuft noch ein Container damit?)."; return 1; }
+  fi
+  rm -f "$state/zwift-image-ok"
+}
+
 # zwift_prepare: Laufzeit, Image und Umgebung für netbrains zwift.sh. Gezogen wird nur mit Zustimmung für genau diese Angabe.
 zwift_prepare() {
   rt_detect || return 10
@@ -131,6 +141,7 @@ case $app in
     if [ "$(sed -n '1p' "$state/zwift-image-ok" 2>/dev/null)" = "$zw_want" ]; then echo "consent=yes"; else echo "consent=no"; fi
     exit 0 ;;
   --zwift-pull) rt_detect || exit 10; zwift_config || exit 11; zwift_pull || exit 12; exit 0 ;;
+  --zwift-remove) rt_detect || exit 10; zwift_config || exit 11; zwift_remove || exit 13; exit 0 ;;
   mywhoosh) up=$home/current/vendor/mywhoosh.sh; set -- run "$@" ;;
   zwift) up=${ROLLOUT_ZWIFT_SCRIPT:-$(ls -td "$home"/zwift/*/zwift.sh 2>/dev/null | head -n 1)} ;;
   *) echo "Aufruf: rollout-run mywhoosh|zwift" >&2; exit 2 ;;

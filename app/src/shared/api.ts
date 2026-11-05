@@ -34,12 +34,15 @@ export interface Job {
   hd: boolean;
 }
 
-export type LaunchPhase = 'updates' | 'bluetooth' | 'starting' | 'running' | 'bterror' | 'crash';
+/** `failed`: der Start kam nicht zustande, `Launch.problem` nennt den Grund (nur bei echtem Zwift). */
+export type LaunchPhase = 'updates' | 'bluetooth' | 'starting' | 'running' | 'bterror' | 'crash' | 'failed';
 
 export interface Launch {
   app: AppId;
   phase: LaunchPhase;
   progress: number;
+  /** Grund bei `phase === 'failed'`, sonst leer */
+  problem: AppProblem;
 }
 
 export interface Sensor {
@@ -114,6 +117,8 @@ export interface Snapshot {
   systemLocale: string;
   overrides: Record<AppId, Overrides>;
   finished: Finished | null;
+  /** Tag des Zwift-Images, das die Installation zieht (Zustimmungsdialog); leer, solange Zwift nur simuliert wird */
+  zwiftTag: string;
 }
 
 export interface InstallOptions {
@@ -166,9 +171,12 @@ export const COMMANDS = [
 ] as const;
 export type Command = (typeof COMMANDS)[number];
 
-/** Beispielwerte, bis die Adapter echte Größen liefern. */
+/**
+ * Beispielwerte, bis die Adapter echte Größen liefern. Zwift: Docker Hub liefert für 1.124.0 etwa 6 GB, entpackt belegt das Image am Ally
+ * (Podman 5.8.2, Stand 2026-11-05) 20,4 GB.
+ */
 export const download = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 15 : 4) : 6);
-export const space = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 20 : 8) : 10);
+export const space = (app: AppId, hd: boolean): number => (app === 'mywhoosh' ? (hd ? 20 : 8) : 21);
 
 export const RECOMMENDED_PROTON = 'GE-Proton11-9';
 export const PROTON_VERSIONS = ['GE-Proton11-12', 'GE-Proton11-11', 'GE-Proton11-8'] as const;

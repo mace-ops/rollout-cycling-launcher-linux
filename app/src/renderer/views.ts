@@ -1,8 +1,9 @@
 import {
   APP_IDS, APP_NAMES, PROTON_VERSIONS, RECOMMENDED_PROTON, download, space,
-  type AppId, type LaunchPhase, type Snapshot
+  type AppId, type AppProblem, type LaunchPhase, type Snapshot
 } from '../shared/api';
 import { formatNumber, languageName, LANGUAGES, t } from './i18n';
+import type { MessageKey } from './locales/en';
 import { ICON } from './icons';
 import { anyCustom, isCustom, type AdvTab, type Screen, type Ui } from './ui';
 
@@ -16,6 +17,9 @@ const width = (pct: number): string => `data-w="${pct}"`;
 const versionNote = (version: string): string | null =>
   version === 'GE-Proton11-12' || version === 'GE-Proton11-11' ? t('adv.note.notRecommended')
     : version === 'GE-Proton11-8' ? t('adv.note.older') : null;
+
+/** Satz zum Problem einer App: was passiert ist und was der Nutzer tun kann. */
+export const problemText = (problem: Exclude<AppProblem, ''>): string => t(`problem.${problem}` as MessageKey);
 
 const backBtn = (to: Screen): string =>
   `<button class="btn ghost back" data-act="go" data-arg="${to}">${ICON.back}${t('common.back')}</button>`;
@@ -53,6 +57,7 @@ function library(snap: Snapshot): string {
         <h2 class="cardname">${APP_NAMES[id]}</h2>
         <div class="status">
           <span class="pill ${hasUpdate ? 'warn' : info.installed ? 'ok' : ''}"><span class="dot"></span><span id="status-${id}">${cardStatus(id, snap)}</span></span>
+          ${info.problem ? `<span class="pill warn" title="${esc(problemText(info.problem))}"><span class="dot"></span>${t('pill.problem')}</span>` : ''}
           ${info.installed && info.steam ? `<span class="pill">${t('pill.steam')}</span>` : ''}
           ${info.installed && isCustom(snap.overrides[id]) ? `<span class="pill warn">${t('pill.custom')}</span>` : ''}
         </div>
@@ -78,8 +83,9 @@ function library(snap: Snapshot): string {
   </div>`;
 }
 
-function setup(ui: Ui): string {
+function setup(ui: Ui, snap: Snapshot): string {
   const id = ui.setupApp;
+  const problem = snap.apps[id].problem;
   return `<div class="page">
     ${backBtn('library')}
     <div class="split">
@@ -93,12 +99,13 @@ function setup(ui: Ui): string {
       </div>
       <div>
         <div class="panel stack">
+          ${problem ? `<p class="note warn" role="alert">${problemText(problem)}</p>` : ''}
           <label class="check"><input type="checkbox" data-change="setupSteam" ${ui.setupSteam ? 'checked' : ''}><span>${t('setup.steam')}</span></label>
           ${id === 'zwift' ? `<p class="muted small">${t('setup.zwiftNote')}</p>` : ''}
         </div>
         <div class="actions">
           ${id === 'mywhoosh' ? `<button class="linkbtn" data-act="hd">${ui.hd ? t('setup.hdOff', { gb: download('mywhoosh', false) }) : t('setup.hdOn', { gb: download('mywhoosh', true) })}</button>` : ''}
-          <button class="btn primary push" data-act="install">${t('btn.install')}</button>
+          <button class="btn primary push" data-act="install">${problem ? t('btn.retry') : t('btn.install')}</button>
         </div>
       </div>
     </div>
@@ -158,12 +165,15 @@ const done = (ui: Ui): string => `<div class="center">
     <button class="btn" data-act="go" data-arg="library">${t('common.overview')}</button>
   </div>`;
 
-export const launchText = (phase: LaunchPhase | undefined): string =>
-  phase === 'bluetooth' ? t('launch.bluetooth') : phase === 'starting' ? t('launch.starting') : t('launch.updates');
+export const launchText = (phase: LaunchPhase | undefined, app?: AppId): string => {
+  // Zwift prüft keinen Bluetooth-Adapter und keine Updates: es bereitet den Container vor und startet ihn.
+  if (app === 'zwift') return phase === 'starting' ? t('launch.zwiftStart') : t('launch.zwiftPrepare');
+  return phase === 'bluetooth' ? t('launch.bluetooth') : phase === 'starting' ? t('launch.starting') : t('launch.updates');
+};
 
 const launching = (ui: Ui, snap: Snapshot): string => `<div class="center onscene">
     <p class="splashname">${APP_NAMES[ui.launchApp]}</p>
-    <p class="lead" id="launchText" role="status">${launchText(snap.launch?.phase)}</p>
+    <p class="lead" id="launchText" role="status">${launchText(snap.launch?.phase, ui.launchApp)}</p>
     <div class="bar splashbar"><i id="launchBar" ${width(snap.launch?.progress ?? 0)}></i></div>
     <button class="btn" data-act="stopLaunch">${t('common.cancel')}</button>
   </div>`;
@@ -190,6 +200,16 @@ const crash = (ui: Ui): string => `<div class="page slim vcenter">
     <h1 class="title">${t('error.crash.title', { app: APP_NAMES[ui.launchApp] })}</h1>
     <div class="actions left">
       <button class="btn primary" data-act="safeStart">${t('error.crash.safe')}</button>
+      <button class="btn" data-act="go" data-arg="help">${t('common.getHelp')}</button>
+    </div>
+  </div>`;
+
+const failed = (ui: Ui, snap: Snapshot): string => `<div class="page slim vcenter">
+    ${ICON.alert}
+    <h1 class="title">${t('error.launch.title', { app: APP_NAMES[ui.launchApp] })}</h1>
+    <p class="lead">${problemText(snap.launch?.problem || 'error')}</p>
+    <div class="actions left">
+      <button class="btn primary" data-act="launch" data-arg="${ui.launchApp}">${t('btn.retry')}</button>
       <button class="btn" data-act="go" data-arg="help">${t('common.getHelp')}</button>
     </div>
   </div>`;
@@ -306,7 +326,7 @@ const help = (ui: Ui): string => `<div class="page slim">
 
 function remove(snap: Snapshot): string {
   const rows = APP_IDS.filter((id) => snap.apps[id].installed).map((id) => `<div class="row">
-      <span class="rowtext"><strong>${APP_NAMES[id]}</strong><span class="muted small">${t('remove.uses', { gb: space(id, false) })}</span></span>
+      <span class="rowtext"><strong>${APP_NAMES[id]}</strong><span class="muted small">${t('remove.uses', { gb: space(id, false) })}</span>${snap.apps[id].problem ? `<span class="warntext small" role="alert">${t('remove.failed')}</span>` : ''}</span>
       <button class="btn danger" data-act="remove" data-arg="${id}">${t('remove.button')}</button>
     </div>`).join('');
   return `<div class="page slim">
@@ -377,13 +397,14 @@ function advanced(ui: Ui, snap: Snapshot): string {
 export function view(ui: Ui, snap: Snapshot): string {
   switch (ui.screen) {
     case 'library': return library(snap);
-    case 'setup': return setup(ui);
+    case 'setup': return setup(ui, snap);
     case 'progress': return progress(ui, snap);
     case 'done': return done(ui);
     case 'launching': return launching(ui, snap);
     case 'running': return running(ui);
     case 'bterror': return btError(ui);
     case 'crash': return crash(ui);
+    case 'failed': return failed(ui, snap);
     case 'bluetooth': return bluetooth(ui, snap);
     case 'settings': return settings(snap);
     case 'help': return help(ui);
@@ -430,11 +451,18 @@ export function modal(ui: Ui, snap: Snapshot): string {
       <div class="actions"><button class="btn ghost" data-act="closeModal">${t('steam.later')}</button><button class="btn primary" data-act="${ui.steamRollout !== null ? 'steamRestartNow' : 'closeModal'}">${t('steam.now')}</button></div>
     </div></div>`;
   }
+  if (ui.confirmImage) {
+    return `<div class="modalbg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg">
+      <h2 id="dlg">${t('image.title')}</h2>
+      <p class="muted">${t('image.body', { tag: snap.zwiftTag, gb: download('zwift', false) })}</p>
+      <div class="actions"><button class="btn primary" data-act="imageConfirm">${t('image.confirm')}</button><button class="btn ghost" data-act="closeModal">${t('common.cancel')}</button></div>
+    </div></div>`;
+  }
   if (ui.confirmRemove) {
     const id = ui.confirmRemove;
     return `<div class="modalbg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg">
       <h2 id="dlg">${t('remove.confirmTitle', { app: APP_NAMES[id] })}</h2>
-      <p class="muted">${t('remove.confirmBody', { gb: space(id, false) })}</p>
+      <p class="muted">${id === 'zwift' && snap.zwiftTag ? t('remove.confirmBodyImage', { tag: snap.zwiftTag, gb: space(id, false) }) : t('remove.confirmBody', { gb: space(id, false) })}</p>
       <div class="actions"><button class="btn danger" data-act="removeConfirm" data-arg="${id}">${t('remove.button')}</button><button class="btn primary" data-act="closeModal">${t('common.cancel')}</button></div>
     </div></div>`;
   }
@@ -451,4 +479,4 @@ export function modal(ui: Ui, snap: Snapshot): string {
 /** Hinweis nach einem Rollback: einmalig auf der Startseite, bis er bestätigt wurde. */
 export const noticeVisible = (ui: Ui, snap: Snapshot): boolean =>
   ui.screen === 'library' && !!snap.selfUpdate.notice && !ui.steamModal && ui.steamRollout === null && !ui.picker && !ui.confirmRemove && !ui.confirmQuit
-  && !ui.confirmRestart && !ui.confirmPrevious;
+  && !ui.confirmRestart && !ui.confirmPrevious && !ui.confirmImage;

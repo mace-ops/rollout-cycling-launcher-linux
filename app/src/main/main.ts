@@ -11,7 +11,7 @@ import { FakeFeed, FakeSelfUpdate } from './selfupdate-fake';
 import { UPDATE_KEYS } from './selfupdate-keys';
 import { realFeed } from './selfupdate-net';
 import upstreams from '../../upstreams.json';
-import { FakeZwift, RealZwift, type ZwiftService } from './zwift';
+import { FakeZwift, RealZwift, chooseZwiftMode, type ZwiftService } from './zwift';
 import { zoomFor } from './zoom';
 import * as steam from './steam';
 
@@ -75,11 +75,15 @@ if (!app.requestSingleInstanceLock()) {
     ? new FakeSteam(process.env.ROLLOUT_SIM_STEAM_RUNNING === '1')
     : { status: steam.status, set: (on, restart) => steam.setRolloutInSteam(on, restart, (dir, id) => writeArtwork(dir, id, true)) };
 
-  /** Zwift echt (`real`), als Attrappe (`fake`, Zustand aus ROLLOUT_SIM_ZWIFT) oder wie bisher simuliert (ohne Variable). */
+  /**
+   * Zwift echt (`real`), als Attrappe (`fake`, Zustand aus ROLLOUT_SIM_ZWIFT) oder simuliert (`sim`). Ohne die Variable gilt `real`,
+   * sobald bin/rollout-run da ist und der Pin in upstreams.json stimmt (chooseZwiftMode); sonst bleibt es bei der Simulation.
+   */
   const zwiftService = (): ZwiftService | null => {
-    const mode = process.env.ROLLOUT_ZWIFT;
+    const home = steam.rolloutHome();
+    const mode = chooseZwiftMode({ mode: process.env.ROLLOUT_ZWIFT, runnerExists: fs.existsSync(path.join(home, 'bin/rollout-run')), pin: upstreams.zwift });
     if (mode === 'fake') return new FakeZwift(process.env.ROLLOUT_SIM_ZWIFT ?? '');
-    if (mode === 'real') return new RealZwift({ home: steam.rolloutHome(), pin: upstreams.zwift, download: realFeed.download });
+    if (mode === 'real') return new RealZwift({ home, pin: upstreams.zwift, download: realFeed.download });
     return null;
   };
 

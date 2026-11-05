@@ -1,7 +1,7 @@
 import type { AppId, Overrides, Snapshot } from '../shared/api';
 
 export type Screen =
-  | 'library' | 'setup' | 'progress' | 'done' | 'launching' | 'running' | 'bterror' | 'crash'
+  | 'library' | 'setup' | 'progress' | 'done' | 'launching' | 'running' | 'bterror' | 'crash' | 'failed'
   | 'bluetooth' | 'settings' | 'help' | 'remove' | 'gate' | 'advanced';
 
 export type AdvTab = AppId | 'bluetooth' | 'launcher';
@@ -27,17 +27,19 @@ export interface Ui {
   confirmRestart: boolean;
   /** Dialog „Version x starten?“ (vorherige Version) */
   confirmPrevious: boolean;
+  /** Zustimmungsdialog „Zwift-Image herunterladen?“ (nur wenn Zwift echt installiert wird) */
+  confirmImage: boolean;
   gatePassed: boolean;
   advTab: AdvTab;
 }
 
 export const freshUi = (): Ui => ({
   screen: 'library', setupApp: 'mywhoosh', setupSteam: true, hd: false, updateDone: false,
-  launchApp: 'mywhoosh', btHelp: false, reportDone: false, steamModal: false, steamRollout: null, picker: null, confirmRemove: null, confirmQuit: false, confirmRestart: false, confirmPrevious: false,
+  launchApp: 'mywhoosh', btHelp: false, reportDone: false, steamModal: false, steamRollout: null, picker: null, confirmRemove: null, confirmQuit: false, confirmRestart: false, confirmPrevious: false, confirmImage: false,
   gatePassed: false, advTab: 'mywhoosh'
 });
 
-export const LAUNCH_SCREENS: readonly Screen[] = ['launching', 'running', 'bterror', 'crash'];
+export const LAUNCH_SCREENS: readonly Screen[] = ['launching', 'running', 'bterror', 'crash', 'failed'];
 
 /** Wohin „Zurück“ führt, auch für Esc und die B-Taste. `null`: kein Zurück. */
 export const BACK: Partial<Record<Screen, Screen>> = {

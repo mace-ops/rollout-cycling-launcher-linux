@@ -41,6 +41,9 @@ export async function session(name, env, steps, opts = {}) {
   const feedDir = opts.feedDir ?? fs.mkdtempSync(path.join(os.tmpdir(), `rollout-smoke-feed-${stamp}-`));
   const childEnv = {
     ROLLOUT_SIM_LANG: 'en', ...process.env, ...env,
+    // Zwift ist ohne ausdrückliche Wahl simuliert: Mit einem Wegwerf-ROLLOUT_HOME ohne bin/rollout-run wäre es das ohnehin, die
+    // Festlegung schützt auch Läufe mit eigenem home vor dem echten Container. `real` braucht Attrappen (siehe unten).
+    ROLLOUT_ZWIFT: env.ROLLOUT_ZWIFT || 'sim',
     ROLLOUT_SIM_STEAM: 'fake', ROLLOUT_BT: env.ROLLOUT_BT === 'real' ? 'real' : 'fake', ROLLOUT_SELFUPDATE: 'fake',
     ROLLOUT_HOME: home, ROLLOUT_CONFIG_HOME: opts.configHome ?? path.join(os.tmpdir(), `rollout-smoke-cfg-${stamp}`),
     ROLLOUT_SELFUPDATE_DIR: feedDir, ROLLOUT_SELFUPDATE_KEY: opts.key ?? testKey().publicB64
@@ -55,6 +58,13 @@ export async function session(name, env, steps, opts = {}) {
   const forced = childEnv.ROLLOUT_SIM_STEAM === 'fake' && childEnv.ROLLOUT_SELFUPDATE === 'fake' && (childEnv.ROLLOUT_BT === 'fake' || env.ROLLOUT_BT === 'real')
     && childEnv.ROLLOUT_HOME.startsWith(tmp) && childEnv.ROLLOUT_CONFIG_HOME.startsWith(tmp);
   if (!forced) throw new Error('Attrappen nicht erzwungen, Test abgebrochen');
+  // Echtes Zwift (ROLLOUT_ZWIFT=real) nur mit Container-Attrappen: Das erste PATH-Verzeichnis enthält podman und docker mit der Marke,
+  // und der Upstream von rollout-run ist ersetzt (nie das echte zwift.sh mit einem echten Container).
+  if (childEnv.ROLLOUT_ZWIFT === 'real') {
+    const first = (childEnv.PATH ?? '').split(':')[0];
+    const marked = ['podman', 'docker'].every((tool) => { try { return fs.readFileSync(path.join(first, tool), 'utf8').includes('# rollout-test-attrappe'); } catch { return false; } });
+    if (!first.startsWith(tmp) || !marked || !childEnv.ROLLOUT_RUN_UPSTREAM) throw new Error('Container-Attrappen nicht erzwungen, Test abgebrochen');
+  }
   const userData = opts.userData ?? path.join(os.tmpdir(), `rollout-smoke-${stamp}`);
   const debug = `--remote-debugging-port=${port}`;
   const [cmd, args] = opts.launcher

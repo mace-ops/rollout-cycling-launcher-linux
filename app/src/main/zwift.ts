@@ -131,12 +131,43 @@ export interface ZwiftStatus {
   problem: AppProblem;
 }
 
+/** Ein laufender Start über `rollout-run zwift`. */
+export interface ZwiftRun {
+  /** Endet, wenn der Starter endet: sein Exit-Code, bei einem Signal `null`. */
+  done: Promise<number | null>;
+  /** Beendet das Spiel (TERM an die ganze Prozessgruppe, nach einer Frist KILL). */
+  stop(): void;
+}
+
+/** Exit-Codes von `rollout-run zwift`, die einen Grund tragen (Konzept 5.2). Alles andere ist ein Absturz des Spiels oder von `zwift.sh`. */
+export const RUN_PROBLEM: Record<number, Exclude<AppProblem, ''>> = { 10: 'runtime', 11: 'tag', 12: 'pull', 127: 'error' };
+
+/** Erkennt in der Ausgabe von `zwift.sh` die Zeile, ab der der Container startet (Phase „Spiel startet“). Farbcodes sind schon entfernt. */
+export const isStartLine = (line: string): boolean => /\bLaunching Zwift\b/.test(line);
+
+const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
+/** Teilt einen Ausgabestrom in Zeilen (auch bei `\r`), entfernt Farbcodes und kürzt auf 300 Zeichen. */
+function feedLines(stream: NodeJS.ReadableStream, onLine: (line: string) => void): void {
+  let rest = '';
+  const emit = (raw: string): void => { const line = raw.replace(ANSI, '').trim(); if (line) onLine(line.slice(0, 300)); };
+  stream.on('data', (d: Buffer) => {
+    const parts = (rest + d.toString()).split(/\r?\n|\r/);
+    rest = parts.pop() ?? '';
+    for (const line of parts) emit(line);
+  });
+  stream.on('end', () => emit(rest));
+}
+
 export interface ZwiftService {
   status(): Promise<ZwiftStatus>;
   /** Lädt und prüft `zwift.sh`. */
   installScript(signal: AbortSignal): Promise<void>;
   /** Zieht das eingestellte Image (`rollout-run --zwift-pull`). Nur nach Bestätigung durch den Nutzer aufrufen. `onLine` bekommt die Ausgabe zeilenweise. */
   pullImage(onLine: (line: string) => void, signal: AbortSignal): Promise<void>;
+  /** Startet das Spiel (`rollout-run zwift`). `onLine` bekommt die Ausgabe zeilenweise, ohne Farbcodes. */
+  start(onLine: (line: string) => void): ZwiftRun;
+  /** Entfernt das Image (`rollout-run --zwift-remove`, also `podman rmi`) und die gemerkte Zustimmung. Nur nach Rückfrage aufrufen. */
+  removeImage(signal: AbortSignal): Promise<void>;
   /** Voreinstellung für den Image-Tag */
   readonly defaultTag: string;
 }
@@ -152,6 +183,8 @@ export interface RealZwiftOptions {
   env?: NodeJS.ProcessEnv;
   /** Zeitgrenze für `--zwift-status` in ms */
   statusTimeoutMs?: number;
+  /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 15000 */
+  stopGraceMs?: number;
 }
 
 export class RealZwift implements ZwiftService {
@@ -165,8 +198,8 @@ export class RealZwift implements ZwiftService {
     this.defaultTag = this.pin.tag;
   }
 
-  private spawnRunner(arg: string) {
-    return spawn(this.runner, [arg], { env: { ...(this.o.env ?? process.env), ROLLOUT_HOME: this.o.home }, stdio: ['ignore', 'pipe', 'pipe'] });
+  private spawnRunner(arg: string, detached = false) {
+    return spawn(this.runner, [arg], { env: { ...(this.o.env ?? process.env), ROLLOUT_HOME: this.o.home }, stdio: ['ignore', 'pipe', 'pipe'], detached });
   }
 
   async status(): Promise<ZwiftStatus> {
@@ -195,17 +228,8 @@ export class RealZwift implements ZwiftService {
   async pullImage(onLine: (line: string) => void, signal: AbortSignal): Promise<void> {
     if (signal.aborted) throw new ZwiftError('abort', 'abgebrochen');
     const child = this.spawnRunner('--zwift-pull');
-    const feed = (stream: NodeJS.ReadableStream): void => {
-      let rest = '';
-      stream.on('data', (d: Buffer) => {
-        const parts = (rest + d.toString()).split(/\r?\n|\r/);
-        rest = parts.pop() ?? '';
-        for (const line of parts) if (line.trim()) onLine(line.trim().slice(0, 300));
-      });
-      stream.on('end', () => { if (rest.trim()) onLine(rest.trim().slice(0, 300)); });
-    };
-    feed(child.stdout);
-    feed(child.stderr);
+    feedLines(child.stdout, onLine);
+    feedLines(child.stderr, onLine);
     const onAbort = (): void => { child.kill('SIGTERM'); };
     signal.addEventListener('abort', onAbort);
     const code = await new Promise<number | null>((resolve) => {
@@ -216,11 +240,63 @@ export class RealZwift implements ZwiftService {
     if (signal.aborted) throw new ZwiftError('abort', 'abgebrochen');
     if (code !== 0) throw new ZwiftError(code !== null && EXIT_PROBLEM[code] ? EXIT_PROBLEM[code] : 'pull', `rollout-run --zwift-pull endete mit ${code ?? 'Fehler'}`);
   }
+
+  start(onLine: (line: string) => void): ZwiftRun {
+    if (!fs.existsSync(this.runner)) return { done: Promise.resolve(127), stop: () => {} };
+    // Eigene Prozessgruppe: `zwift.sh` startet den Container als Kind. Ein TERM nur an den Starter ließe den Container weiterlaufen.
+    const child = this.spawnRunner('zwift', true);
+    feedLines(child.stdout, onLine);
+    feedLines(child.stderr, onLine);
+    let killer: NodeJS.Timeout | null = null;
+    const signalGroup = (sig: NodeJS.Signals): void => {
+      try { if (child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch { try { child.kill(sig); } catch { /* schon beendet */ } }
+    };
+    const done = new Promise<number | null>((resolve) => {
+      child.on('error', () => resolve(127));
+      child.on('close', (code) => { if (killer) clearTimeout(killer); resolve(code); });
+    });
+    return {
+      done,
+      stop: () => {
+        signalGroup('SIGTERM');
+        killer ??= setTimeout(() => signalGroup('SIGKILL'), this.o.stopGraceMs ?? 15_000);
+      }
+    };
+  }
+
+  async removeImage(signal: AbortSignal): Promise<void> {
+    if (signal.aborted) throw new ZwiftError('abort', 'abgebrochen');
+    if (!fs.existsSync(this.runner)) throw new ZwiftError('error', 'rollout-run fehlt');
+    const child = this.spawnRunner('--zwift-remove');
+    let last = '';
+    feedLines(child.stdout, (l) => { last = l; });
+    feedLines(child.stderr, (l) => { last = l; });
+    const code = await new Promise<number | null>((resolve) => {
+      child.on('error', () => resolve(null));
+      child.on('close', (c) => resolve(c));
+    });
+    if (code !== 0) throw new ZwiftError(code === 10 ? 'runtime' : code === 11 ? 'tag' : 'error', `rollout-run --zwift-remove endete mit ${code ?? 'Fehler'}: ${last}`);
+  }
+}
+
+/**
+ * Wann Zwift echt läuft (Konzept 5.2): ohne ausdrückliche Wahl (`ROLLOUT_ZWIFT`) echt, sobald `rollout-run` da ist und der Pin gilt,
+ * sonst wie bisher simuliert. `fake` und `real` erzwingen den Dienst, `sim` die Simulation.
+ */
+export function chooseZwiftMode(opts: { mode: string | undefined; runnerExists: boolean; pin: unknown }): 'real' | 'fake' | 'sim' {
+  if (opts.mode === 'fake') return 'fake';
+  if (opts.mode === 'real') return 'real';
+  if (opts.mode) return 'sim';
+  if (!opts.runnerExists) return 'sim';
+  try { checkPin(opts.pin); } catch { return 'sim'; }
+  return 'real';
 }
 
 /**
  * Attrappe für Oberfläche und Tests (ROLLOUT_ZWIFT=fake): kein Netz, kein Container. `mode` wählt den Zustand:
- * leer = nichts da, `ready` = Skript und Image da, `norun` = keine Laufzeit, `nonet` = Download scheitert, `nopull` = Ziehen scheitert.
+ * leer = nichts da, `ready` = Skript und Image da, `norun` = keine Laufzeit, `nonet` = Download scheitert, `nopull` = Ziehen scheitert,
+ * `runcrash` = wie `ready`, aber der Start bricht nach den Meldungen mit Exit 1 ab, `runfail` = wie `ready`, aber der Start meldet Exit 12
+ * (Image fehlt), `norem` = wie `ready`, aber das Entfernen scheitert.
  */
 export class FakeZwift implements ZwiftService {
   readonly defaultTag = '1.0.0';
@@ -228,8 +304,9 @@ export class FakeZwift implements ZwiftService {
   private image: boolean;
 
   constructor(private readonly mode: string = '', private readonly stepMs = 150) {
-    this.script = mode === 'ready';
-    this.image = mode === 'ready';
+    const ready = ['ready', 'runcrash', 'runfail', 'norem'].includes(mode);
+    this.script = ready;
+    this.image = ready;
   }
 
   async status(): Promise<ZwiftStatus> {
@@ -251,5 +328,26 @@ export class FakeZwift implements ZwiftService {
     }
     if (this.mode === 'nopull') throw new ZwiftError('pull', 'Attrappe: Ziehen gescheitert');
     this.image = true;
+  }
+
+  start(onLine: (line: string) => void): ZwiftRun {
+    let finish: (code: number | null) => void = () => {};
+    const done = new Promise<number | null>((resolve) => { finish = resolve; });
+    const timers: NodeJS.Timeout[] = [];
+    const at = (n: number, fn: () => void): void => { timers.push(setTimeout(fn, n * this.stepMs)); };
+    if (this.mode === 'runfail') at(1, () => finish(12));
+    else {
+      at(1, () => onLine('Preparing to launch Zwift'));
+      at(2, () => onLine('Looking for container tool'));
+      at(3, () => onLine('Launching Zwift'));
+      if (this.mode === 'runcrash') at(4, () => finish(1));
+    }
+    return { done, stop: () => { timers.forEach(clearTimeout); finish(143); } };
+  }
+
+  async removeImage(): Promise<void> {
+    await new Promise((r) => setTimeout(r, this.stepMs));
+    if (this.mode === 'norem') throw new ZwiftError('error', 'Attrappe: Entfernen gescheitert');
+    this.image = false;
   }
 }

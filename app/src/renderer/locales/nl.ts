@@ -171,5 +171,23 @@ export const nl: Messages = {
   'adv.previous': 'Vorige versie',
   'adv.previousStart': 'Starten',
   'adv.previousTitle': 'Versie {version} starten?',
-  'adv.previousBody': 'Rollout start opnieuw en slaat versie {current} over.'
+  'adv.previousBody': 'Rollout start opnieuw en slaat versie {current} over.',
+
+  'pill.problem': 'Aandacht nodig',
+  'btn.retry': 'Opnieuw proberen',
+  'problem.net': 'Rollout kon het startscript van Zwift niet downloaden. Controleer je internetverbinding en probeer het opnieuw.',
+  'problem.verify': 'Het gedownloade startscript van Zwift heeft de veiligheidscontrole niet doorstaan, daarom heeft Rollout het niet gebruikt. Er is niets gewijzigd. Probeer het later opnieuw.',
+  'problem.disk': 'Rollout kon de Zwift-bestanden niet opslaan. Controleer of de opslag niet vol is en probeer het opnieuw.',
+  'problem.runtime': 'Zwift draait in een container, maar Podman of Docker werkt niet. Stel het op Bazzite in via de bureaubladmodus en probeer het opnieuw.',
+  'problem.tag': 'Er is nog geen Zwift-versie ingesteld. Installeer Zwift opnieuw om de huidige te kiezen.',
+  'problem.pull': 'De Zwift-image kon niet worden gedownload. Controleer je internetverbinding en de vrije ruimte (ongeveer 21 GB) en probeer het opnieuw.',
+  'problem.error': 'Er ging iets mis met Zwift. Maak een hulpbestand en stuur het naar de persoon die je helpt.',
+  'image.title': 'Zwift-image downloaden?',
+  'image.body': 'Zwift draait in een container. Rollout downloadt versie {tag} van Docker Hub, ongeveer {gb} GB. Alleen precies deze versie wordt gebruikt, nooit “latest”.',
+  'image.confirm': 'Downloaden',
+  'remove.confirmBodyImage': 'Dit verwijdert de Zwift-image (versie {tag}) en maakt ongeveer {gb} GB vrij. Podman of Docker blijft geïnstalleerd.',
+  'remove.failed': 'De image kon niet worden verwijderd. Sluit Zwift en probeer het opnieuw.',
+  'launch.zwiftPrepare': 'Zwift-container wordt voorbereid',
+  'launch.zwiftStart': 'Zwift start. Dit kan een minuut duren',
+  'error.launch.title': '{app} kon niet starten'
 };

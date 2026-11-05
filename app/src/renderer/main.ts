@@ -29,14 +29,14 @@ const sceneImg = (id: AppId): string => `<img class="scene" data-app="${id}" src
 const isAppTab = (tab: AdvTab): tab is AppId => tab === 'mywhoosh' || tab === 'zwift';
 
 const screenForPhase = (phase: LaunchPhase): Screen =>
-  phase === 'running' ? 'running' : phase === 'bterror' ? 'bterror' : phase === 'crash' ? 'crash' : 'launching';
+  phase === 'running' ? 'running' : phase === 'bterror' ? 'bterror' : phase === 'crash' ? 'crash' : phase === 'failed' ? 'failed' : 'launching';
 
 /** Alles, was die Ansicht neu zeichnen muss. Fortschritt, Suchergebnisse und Starttext nicht. */
 function structKey(): string {
   const { progress: _progress, ...selfUpdate } = snap.selfUpdate;
   return JSON.stringify([
-    ui.screen, ui.steamModal, ui.steamRollout, ui.picker, ui.confirmRemove, ui.confirmQuit, ui.confirmRestart, ui.confirmPrevious, snap.updateChannel, selfUpdate, snap.apps, snap.job && [snap.job.app, snap.job.kind],
-    snap.launch && screenForPhase(snap.launch.phase), snap.bluetooth, snap.autoUpdate, snap.rolloutSteam, snap.overrides, snap.language, snap.theme, snap.scale
+    ui.screen, ui.steamModal, ui.steamRollout, ui.picker, ui.confirmRemove, ui.confirmQuit, ui.confirmRestart, ui.confirmPrevious, ui.confirmImage, snap.zwiftTag, snap.updateChannel, selfUpdate, snap.apps, snap.job && [snap.job.app, snap.job.kind],
+    snap.launch && [screenForPhase(snap.launch.phase), snap.launch.problem], snap.bluetooth, snap.autoUpdate, snap.rolloutSteam, snap.overrides, snap.language, snap.theme, snap.scale
   ]);
 }
 
@@ -123,7 +123,7 @@ function patch(): void {
   }
   if (snap.launch) {
     const text = $('launchText');
-    if (text) text.textContent = launchText(snap.launch.phase);
+    if (text) text.textContent = launchText(snap.launch.phase, snap.launch.app);
     setBar('launchBar', snap.launch.progress);
   }
   setHtml('scan', scanHtml(snap));
@@ -151,7 +151,11 @@ function onSnapshot(next: Snapshot): void {
   } else if (LAUNCH_SCREENS.includes(ui.screen)) {
     ui.screen = 'library';
   }
-  if (!snap.job && ui.screen === 'progress') ui.screen = 'library';
+  if (!snap.job && ui.screen === 'progress') {
+    // Eine gescheiterte Installation zeigt ihren Grund dort, wo man es noch einmal versuchen kann.
+    const info = snap.apps[ui.setupApp];
+    ui.screen = info.problem && !info.installed ? 'setup' : 'library';
+  }
   if (renderedKey !== structKey()) render();
   else patch();
 }
@@ -179,6 +183,12 @@ const ACTIONS: Record<string, Action> = {
   },
   hd() { ui.hd = !ui.hd; },
   install() {
+    // Echtes Zwift lädt ein mehrere GB großes Image: erst fragen, mit Tag und Größe.
+    if (ui.setupApp === 'zwift' && snap.zwiftTag) { ui.confirmImage = true; return; }
+    ACTIONS.imageConfirm('');
+  },
+  imageConfirm() {
+    ui.confirmImage = false;
     void api.install(ui.setupApp, { steam: ui.setupSteam, hd: ui.hd });
     ui.screen = 'progress';
   },
@@ -190,7 +200,7 @@ const ACTIONS: Record<string, Action> = {
   btHelp() { ui.btHelp = !ui.btHelp; },
   auto() { void api.setAutoUpdate(!snap.autoUpdate); },
   steam(arg) { const id = arg as AppId; void api.setSteam(id, !snap.apps[id].steam); ui.steamModal = true; },
-  closeModal() { ui.steamModal = false; ui.steamRollout = null; ui.confirmRemove = null; ui.picker = null; ui.confirmQuit = false; ui.confirmRestart = false; ui.confirmPrevious = false; },
+  closeModal() { ui.steamModal = false; ui.steamRollout = null; ui.confirmRemove = null; ui.picker = null; ui.confirmQuit = false; ui.confirmRestart = false; ui.confirmPrevious = false; ui.confirmImage = false; },
   suAsk() { ui.confirmRestart = true; },
   suRestartNow() { ui.confirmRestart = false; void api.restartForUpdate(); },
   suCheck() { void api.checkSelfUpdate(); },
@@ -283,11 +293,11 @@ viewEl.addEventListener('change', (event) => {
 
 /** Esc und die B-Taste: erst den Dialog schließen, sonst eine Ebene zurück. */
 function back(): void {
-  if (ui.steamModal || ui.steamRollout !== null || ui.confirmRemove || ui.picker || ui.confirmQuit || ui.confirmRestart || ui.confirmPrevious) {
+  if (ui.steamModal || ui.steamRollout !== null || ui.confirmRemove || ui.picker || ui.confirmQuit || ui.confirmRestart || ui.confirmPrevious || ui.confirmImage) {
     ACTIONS.closeModal('');
   } else if (noticeVisible(ui, snap)) {
     ACTIONS.suNoticeOk('');
-  } else if (ui.screen === 'launching' || ui.screen === 'bterror' || ui.screen === 'crash') {
+  } else if (ui.screen === 'launching' || ui.screen === 'bterror' || ui.screen === 'crash' || ui.screen === 'failed') {
     ACTIONS.stopLaunch('');
   } else {
     const target = BACK[ui.screen];

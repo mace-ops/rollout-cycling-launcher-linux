@@ -185,5 +185,23 @@ export const de: Messages = {
   'adv.previous': 'Vorherige Version',
   'adv.previousStart': 'Starten',
   'adv.previousTitle': 'Version {version} starten?',
-  'adv.previousBody': 'Rollout startet neu und überspringt Version {current}.'
+  'adv.previousBody': 'Rollout startet neu und überspringt Version {current}.',
+
+  'pill.problem': 'Braucht Aufmerksamkeit',
+  'btn.retry': 'Nochmal versuchen',
+  'problem.net': 'Rollout konnte das Startskript für Zwift nicht laden. Prüfe deine Internetverbindung und versuche es noch einmal.',
+  'problem.verify': 'Das geladene Startskript für Zwift hat die Sicherheitsprüfung nicht bestanden, deshalb hat Rollout es nicht benutzt. Es wurde nichts verändert. Versuche es später noch einmal.',
+  'problem.disk': 'Rollout konnte die Zwift-Dateien nicht speichern. Prüfe, ob der Speicher voll ist, und versuche es dann noch einmal.',
+  'problem.runtime': 'Zwift läuft in einem Container, aber Podman oder Docker funktioniert nicht. Richte es unter Bazzite im Desktop-Modus ein und versuche es dann noch einmal.',
+  'problem.tag': 'Es ist noch keine Zwift-Version eingestellt. Installiere Zwift noch einmal, dann wählt Rollout die aktuelle aus.',
+  'problem.pull': 'Das Zwift-Image konnte nicht geladen werden. Prüfe deine Internetverbindung und den freien Speicher (etwa 21 GB) und versuche es dann noch einmal.',
+  'problem.error': 'Bei Zwift ist etwas schiefgelaufen. Erstelle eine Hilfe-Datei und schicke sie der Person, die dir hilft.',
+  'image.title': 'Zwift-Image herunterladen?',
+  'image.body': 'Zwift läuft in einem Container. Rollout lädt Version {tag} von Docker Hub, etwa {gb} GB. Nur genau diese Version wird benutzt, nie „latest“.',
+  'image.confirm': 'Herunterladen',
+  'remove.confirmBodyImage': 'Das entfernt das Zwift-Image (Version {tag}) und gibt etwa {gb} GB frei. Podman oder Docker bleibt installiert.',
+  'remove.failed': 'Das Image ließ sich nicht entfernen. Beende Zwift und versuche es noch einmal.',
+  'launch.zwiftPrepare': 'Zwift-Container wird vorbereitet',
+  'launch.zwiftStart': 'Zwift startet. Das kann eine Minute dauern',
+  'error.launch.title': '{app} ließ sich nicht starten'
 };

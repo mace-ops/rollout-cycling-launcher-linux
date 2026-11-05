@@ -35,17 +35,142 @@ await session('frisch', { ROLLOUT_SIM_STATE: 'fresh' }, async (t) => {
 });
 
 // Zwift über die Attrappe des Adapters (ROLLOUT_ZWIFT=fake): Skript und Image kommen aus dem Dienst, nicht aus der Simulation.
-await session('zwift-attrappe', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake' }, async (t) => {
+// Vor dem Herunterladen fragt ein Dialog mit Tag und Größe; Starten läuft über den Dienst (Phasen aus der Ausgabe).
+await session('zwift-attrappe', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_ZWIFT_RUNNING_MS: '1500' }, async (t) => {
   await t.expect(t.clickSel('article[data-tone=zwift] .btn.primary'), 'Zwift-Karte angeklickt');
   await t.expect(t.waitFor('Zwift may therefore ban your account'), 'Zwift-Hinweis');
   await t.click('Install');
+  await t.expect(t.waitFor('Download the Zwift image?'), 'Zustimmungsdialog');
+  await t.expect(t.has('version 1.0.0, about 6 GB'), 'Dialog nennt Tag und Größe');
+  await t.expect((async () => (await t.focus()) === 'Download')(), 'Fokus auf „Download“');
+  await t.shot('1-zustimmung');
+  await t.click('Cancel');
+  await t.expect((async () => !(await t.has('Download the Zwift image?')))(), 'Dialog geschlossen, nichts geladen');
+  await t.expect(t.has('Install Zwift'), 'noch in der Installieren-Ansicht');
+  await t.click('Install');
+  await t.click('Download');
   await t.expect(t.waitFor('is being installed'), 'Fortschritt-Ansicht');
   await t.expect(t.waitFor('is ready', 25000), 'Installation über den Dienst fertig');
   await t.click('Ride');
-  await t.expect(t.waitFor('Running', 15000), 'Spiel läuft (Start bleibt simuliert)');
+  await t.expect(t.waitFor('Starting Zwift', 15000), 'Phase „Zwift startet“ aus der Ausgabe');
+  await t.shot('2-startet');
+  await t.expect(t.waitFor('Running', 15000), 'Spiel läuft');
+  await t.expect((async () => !(await t.has('Bluetooth')))(), 'Zwift prüft kein Bluetooth');
   await t.click('Quit game');
   await t.expect(t.waitFor('Settings'), 'zurück in der Übersicht');
+  await t.expect(t.waitUntil(async () => (await t.snapshot()).launch === null), 'Start beendet');
 });
+
+// Probleme beim Installieren: Grund als Satz in der Installieren-Ansicht, Pille an der Karte, neuer Versuch möglich.
+for (const [mode, text] of [['nonet', 'could not download the Zwift start script'], ['nopull', 'image could not be downloaded'], ['norun', 'Podman or Docker is not working']]) {
+  await session(`zwift-problem-${mode}`, { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_SIM_ZWIFT: mode }, async (t) => {
+    if (mode === 'norun') {
+      await t.expect(t.waitUntil(async () => (await t.has('Needs attention'))), 'Pille „Needs attention“ an der Karte, schon vor einem Versuch');
+    } else {
+      await t.expect(t.clickSel('article[data-tone=zwift] .btn.primary'), 'Zwift-Karte angeklickt');
+      await t.click('Install');
+      await t.click('Download');
+      await t.expect(t.waitFor(text, 25000), `Grund steht in der Installieren-Ansicht (${mode})`);
+    }
+    if (mode === 'norun') await t.clickSel('article[data-tone=zwift] .btn.primary');
+    await t.expect(t.waitFor(text, 10000), `Grund: ${text}`);
+    await t.expect(t.has('Try again'), 'Knopf „Try again“');
+    await t.shot('1-problem');
+    await t.click('Back');
+    await t.expect(t.waitFor('Needs attention'), 'Pille an der Karte');
+    await t.expect((async () => (await t.snapshot()).apps.mywhoosh.problem === '')(), 'MyWhoosh unberührt');
+  });
+}
+
+// Probleme beim Start: Absturz (Exit 1 kurz nach dem Start) und „Image fehlt“ (Exit 12) mit Grund und neuem Versuch.
+await session('zwift-start-absturz', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_SIM_ZWIFT: 'runcrash' }, async (t) => {
+  await t.click('Ride');
+  await t.expect(t.waitFor('closed right after starting', 15000), 'Absturz-Ansicht');
+});
+await session('zwift-start-fehler', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_SIM_ZWIFT: 'runfail', ROLLOUT_SIM_LANG: 'de' }, async (t) => {
+  await t.click('Losfahren');
+  await t.expect(t.waitFor('ließ sich nicht starten', 15000), 'Start gescheitert (Deutsch)');
+  await t.expect(t.has('Zwift-Image konnte nicht geladen werden'), 'Grund auf Deutsch');
+  await t.shot('1-start-fehler');
+  await t.click('Nochmal versuchen');
+  await t.expect(t.waitFor('ließ sich nicht starten', 15000), 'neuer Versuch möglich');
+  await t.click('Zurück');
+});
+
+// Entfernen: Rückfrage nennt Tag und Größe, danach ist das Image weg; scheitert es, bleibt Zwift und die Zeile nennt den Grund.
+await session('zwift-entfernen', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_SIM_ZWIFT: 'ready' }, async (t) => {
+  await t.click('Settings');
+  await t.click('Remove an app');
+  await t.expect(t.clickSel('button[data-act=remove][data-arg=zwift]'), 'Entfernen für Zwift');
+  await t.expect(t.waitFor('Remove Zwift?'), 'Rückfrage');
+  await t.expect(t.has('version 1.0.0') , 'Rückfrage nennt den Tag');
+  await t.shot('1-entfernen');
+  await t.clickSel('button[data-act=removeConfirm]');
+  await t.expect(t.waitFor('No app is installed.', 10000), 'Zwift entfernt');
+});
+await session('zwift-entfernen-fehler', { ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'fake', ROLLOUT_SIM_ZWIFT: 'norem' }, async (t) => {
+  await t.click('Settings');
+  await t.click('Remove an app');
+  await t.clickSel('button[data-act=remove][data-arg=zwift]');
+  await t.clickSel('button[data-act=removeConfirm]');
+  await t.expect(t.waitFor('The image could not be removed', 10000), 'Grund in der Zeile');
+  await t.expect(t.has('Zwift'), 'Zwift bleibt in der Liste');
+});
+
+// Echtes Zwift mit Container-Attrappen im PATH und ersetztem Upstream (nie ein echter Container; das echte zwift.sh wird geladen, geprüft
+// und mit DRYRUN getrennt probiert). Braucht Netz für das Skript von GitHub, deshalb nur mit ROLLOUT_ZWIFT_NET=1.
+if (process.env.ROLLOUT_ZWIFT_NET === '1') {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-zwift-real-'));
+  const fakebin = path.join(home, 'fakebin');
+  fs.mkdirSync(path.join(home, 'bin'));
+  fs.mkdirSync(fakebin);
+  fs.copyFileSync(new URL('../scripts/bin-rollout-run.sh', import.meta.url).pathname, path.join(home, 'bin/rollout-run'));
+  fs.chmodSync(path.join(home, 'bin/rollout-run'), 0o755);
+  const tool = `#!/bin/sh
+# rollout-test-attrappe
+echo "\${0##*/} $*" >> "$ROLLOUT_HOME/containers.log"
+case $1 in
+  info) exit 0 ;;
+  image) [ -f "$ROLLOUT_HOME/image-present" ] || exit 1; exit 0 ;;
+  pull) echo "Copying blob aaa done"; sleep 0.3; echo "Copying blob bbb done"; : > "$ROLLOUT_HOME/image-present"; exit 0 ;;
+  rmi) rm -f "$ROLLOUT_HOME/image-present"; exit 0 ;;
+esac
+exit 0
+`;
+  for (const name of ['podman', 'docker']) fs.writeFileSync(path.join(fakebin, name), tool, { mode: 0o755 });
+  fs.writeFileSync(path.join(home, 'up.sh'), '#!/bin/sh\necho "[*] Preparing to launch Zwift"\nsleep 0.5\necho "[*] Launching Zwift"\nsleep 30 &\ns=$!\ntrap \'kill $s; exit 143\' TERM\nwait $s\n', { mode: 0o755 });
+  const log = () => { try { return fs.readFileSync(path.join(home, 'containers.log'), 'utf8'); } catch { return ''; } };
+  await session('zwift-echt', {
+    ROLLOUT_SIM_STATE: 'fresh', ROLLOUT_ZWIFT: 'real', ROLLOUT_ZWIFT_RUNNING_MS: '1500',
+    PATH: `${fakebin}:${process.env.PATH}`, ROLLOUT_RUN_UPSTREAM: path.join(home, 'up.sh'), ROLLOUT_RUN_NO_INHIBIT: '1'
+  }, async (t) => {
+    await t.expect(t.waitUntil(async () => (await t.snapshot()).zwiftTag !== ''), 'echter Dienst aktiv (Tag im Zustand)');
+    await t.expect(t.clickSel('article[data-tone=zwift] .btn.primary'), 'Zwift-Karte angeklickt');
+    await t.click('Install');
+    await t.expect(t.waitFor('Download the Zwift image?'), 'Zustimmungsdialog');
+    await t.shot('1-zustimmung');
+    await t.click('Download');
+    await t.expect(t.waitFor('is ready', 60000), 'Skript geladen, Prüfsumme stimmt, Image „gezogen“ (Attrappe)');
+    await t.expect(log().includes('pull docker.io/netbrain/zwift:'), 'Ziehen nur nach Zustimmung, über die Attrappe');
+    await t.click('Ride');
+    await t.expect(t.waitFor('Starting Zwift', 15000), 'Phase aus der Ausgabe des Starters');
+    await t.expect(t.waitFor('Running', 15000), 'läuft');
+    await t.shot('2-laeuft');
+    await t.expect((async () => fs.existsSync(path.join(home, 'state/run.pid')))(), 'run.pid vom Starter');
+    await t.click('Quit game');
+    await t.expect(t.waitUntil(async () => (await t.snapshot()).launch === null && !fs.existsSync(path.join(home, 'state/run.pid')), 15000), 'Spiel beendet, run.pid weg');
+    await t.click('Settings');
+    await t.click('Remove an app');
+    await t.clickSel('button[data-act=remove][data-arg=zwift]');
+    await t.expect(t.waitFor('Remove Zwift?'), 'Rückfrage');
+    await t.clickSel('button[data-act=removeConfirm]');
+    await t.expect(t.waitFor('No app is installed.', 15000), 'entfernt');
+    await t.expect(log().includes('rmi docker.io/netbrain/zwift:'), 'podman rmi lief (Attrappe)');
+    await t.expect(!/ run /.test(log()), 'kein Container gestartet');
+    await t.expect(!fs.existsSync(path.join(home, 'state/zwift-image-ok')), 'Zustimmung vergessen');
+  }, { home });
+  fs.rmSync(home, { recursive: true, force: true });
+}
 
 await session('einstellungen', {}, async (t) => {
   await t.click('Settings');

@@ -171,5 +171,23 @@ export const pl: Messages = {
   'adv.previous': 'Poprzednia wersja',
   'adv.previousStart': 'Uruchom',
   'adv.previousTitle': 'Uruchomić wersję {version}?',
-  'adv.previousBody': 'Rollout uruchomi się ponownie i pominie wersję {current}.'
+  'adv.previousBody': 'Rollout uruchomi się ponownie i pominie wersję {current}.',
+
+  'pill.problem': 'Wymaga uwagi',
+  'btn.retry': 'Spróbuj ponownie',
+  'problem.net': 'Rollout nie mógł pobrać skryptu startowego Zwift. Sprawdź połączenie z internetem i spróbuj ponownie.',
+  'problem.verify': 'Pobrany skrypt startowy Zwift nie przeszedł kontroli bezpieczeństwa, dlatego Rollout go nie użył. Nic nie zostało zmienione. Spróbuj ponownie później.',
+  'problem.disk': 'Rollout nie mógł zapisać plików Zwift. Sprawdź, czy pamięć nie jest pełna, i spróbuj ponownie.',
+  'problem.runtime': 'Zwift działa w kontenerze, ale Podman lub Docker nie działa. W Bazzite skonfiguruj go w trybie pulpitu i spróbuj ponownie.',
+  'problem.tag': 'Nie ustawiono jeszcze wersji Zwift. Zainstaluj Zwift ponownie, aby wybrać aktualną.',
+  'problem.pull': 'Nie udało się pobrać obrazu Zwift. Sprawdź połączenie z internetem i wolne miejsce (około 21 GB), po czym spróbuj ponownie.',
+  'problem.error': 'Coś poszło nie tak z Zwift. Utwórz plik pomocy i wyślij go osobie, która Ci pomaga.',
+  'image.title': 'Pobrać obraz Zwift?',
+  'image.body': 'Zwift działa w kontenerze. Rollout pobiera wersję {tag} z Docker Hub, około {gb} GB. Używana jest tylko dokładnie ta wersja, nigdy „latest”.',
+  'image.confirm': 'Pobierz',
+  'remove.confirmBodyImage': 'To usuwa obraz Zwift (wersja {tag}) i zwalnia około {gb} GB. Podman lub Docker pozostaje zainstalowany.',
+  'remove.failed': 'Nie udało się usunąć obrazu. Zamknij Zwift i spróbuj ponownie.',
+  'launch.zwiftPrepare': 'Przygotowywanie kontenera Zwift',
+  'launch.zwiftStart': 'Uruchamianie Zwift. To może potrwać minutę',
+  'error.launch.title': 'Nie udało się uruchomić: {app}'
 };

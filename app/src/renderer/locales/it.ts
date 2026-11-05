@@ -171,5 +171,23 @@ export const it: Messages = {
   'adv.previous': 'Versione precedente',
   'adv.previousStart': 'Avvia',
   'adv.previousTitle': 'Avviare la versione {version}?',
-  'adv.previousBody': 'Rollout si riavvia e salta la versione {current}.'
+  'adv.previousBody': 'Rollout si riavvia e salta la versione {current}.',
+
+  'pill.problem': 'Richiede attenzione',
+  'btn.retry': 'Riprova',
+  'problem.net': 'Rollout non è riuscito a scaricare lo script di avvio di Zwift. Controlla la connessione a internet e riprova.',
+  'problem.verify': 'Lo script di avvio di Zwift scaricato non ha superato il controllo di sicurezza, quindi Rollout non lo ha usato. Non è stato modificato nulla. Riprova più tardi.',
+  'problem.disk': 'Rollout non è riuscito a salvare i file di Zwift. Controlla che la memoria non sia piena, poi riprova.',
+  'problem.runtime': 'Zwift funziona in un container, ma Podman o Docker non funziona. Su Bazzite configuralo in modalità Desktop, poi riprova.',
+  'problem.tag': 'Non è ancora impostata alcuna versione di Zwift. Installa di nuovo Zwift per scegliere quella attuale.',
+  'problem.pull': 'Non è stato possibile scaricare l’immagine di Zwift. Controlla la connessione a internet e lo spazio libero (circa 21 GB), poi riprova.',
+  'problem.error': 'Qualcosa è andato storto con Zwift. Crea un file di aiuto e invialo alla persona che ti aiuta.',
+  'image.title': 'Scaricare l’immagine di Zwift?',
+  'image.body': 'Zwift funziona in un container. Rollout scarica la versione {tag} da Docker Hub, circa {gb} GB. Viene usata solo questa versione esatta, mai «latest».',
+  'image.confirm': 'Scarica',
+  'remove.confirmBodyImage': 'Questo rimuove l’immagine di Zwift (versione {tag}) e libera circa {gb} GB. Podman o Docker resta installato.',
+  'remove.failed': 'Non è stato possibile rimuovere l’immagine. Chiudi Zwift e riprova.',
+  'launch.zwiftPrepare': 'Preparazione del container di Zwift',
+  'launch.zwiftStart': 'Avvio di Zwift. Può richiedere un minuto',
+  'error.launch.title': '{app} non è riuscito ad avviarsi'
 };

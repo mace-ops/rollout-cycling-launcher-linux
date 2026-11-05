@@ -133,6 +133,7 @@ case $1 in
   info) [ -n "\${FAKE_INFO_FAIL:-}" ] && { echo "$FAKE_INFO_FAIL" >&2; exit 125; }; exit 0 ;;
   image) [ -f "$ROLLOUT_HOME/image-present" ] || exit 1; exit 0 ;;
   pull) [ -n "\${FAKE_PULL_FAIL:-}" ] && exit 1; echo "Copying blob aaa done"; echo "Copying blob bbb done" >&2; : > "$ROLLOUT_HOME/image-present"; exit 0 ;;
+  rmi) [ -n "\${FAKE_RMI_FAIL:-}" ] && { echo "image is in use" >&2; exit 2; }; rm -f "$ROLLOUT_HOME/image-present"; exit 0 ;;
 esac
 exit 0
 `;
@@ -192,7 +193,7 @@ test('Z9 RealZwift.pullImage: zieht über rollout-run, meldet Zeilen, merkt die 
 });
 
 // --- Anbindung an SimBackend ----------------------------------------------------------------------------------------------
-function backendWith(service, { cfg } = {}) {
+function backendWith(service, { cfg, env = {} } = {}) {
   const dir = cfg ?? path.join(work, `cfg-b${(counter += 1)}`);
   fs.mkdirSync(dir, { recursive: true });
   const files = path.join(dir, 'config.toml');
@@ -201,7 +202,7 @@ function backendWith(service, { cfg } = {}) {
   const bt = { adapter: async () => 'ready', scan: async () => {} };
   const steam = { status: () => ({ state: 'out', steamRunning: false, message: '' }), set: async () => ({ status: 'done', message: '' }) };
   const snaps = [];
-  const backend = new sim.SimBackend((s) => snaps.push(s), 'en', steam, store, bt, updates, {}, service);
+  const backend = new sim.SimBackend((s) => snaps.push(s), 'en', steam, store, bt, updates, env, service);
   return { backend, store, snaps, files };
 }
 const settle = async (backend, until, ms = 8000) => {
@@ -248,12 +249,6 @@ test('Z11 Zustand kommt aus der Laufzeit: Skript und Image da = installiert; Ima
   await new Promise((r) => setTimeout(r, 5200)); // Zwischenspeicher des Zustands läuft ab (5 s)
   const snap = await backend.getSnapshot();
   assert.equal(snap.apps.zwift.installed, false);
-  // Entfernen ist für echtes Zwift noch nicht gebaut: es spiegelt nichts vor.
-  fs.writeFileSync(path.join(home, 'image-present'), '');
-  const { backend: b2 } = backendWith(z);
-  assert.equal((await b2.getSnapshot()).apps.zwift.installed, true);
-  await b2.remove('zwift');
-  assert.equal((await b2.getSnapshot()).apps.zwift.installed, true);
 });
 
 test('Z12 Fehlerfälle erscheinen als Problem in der Karte, nichts bleibt hängen; MyWhoosh bleibt unberührt', async () => {
@@ -277,6 +272,197 @@ test('Z12 Fehlerfälle erscheinen als Problem in der Karte, nichts bleibt hänge
   await sim0.backend.install('zwift', { steam: false, hd: false });
   assert.equal(sim0.snaps.at(-1).job.app, 'zwift');
   await sim0.backend.remove('mywhoosh');
+});
+
+// --- Start, Beenden, Entfernen (Z14 bis Z21) --------------------------------------------------------------------------------------
+/** Upstream-Attrappe für `rollout-run zwift` (ROLLOUT_RUN_UPSTREAM): ersetzt zwift.sh, es startet nie ein Container. */
+function stubUpstream(home, body) {
+  const file = path.join(home, 'up.sh');
+  fs.writeFileSync(file, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+  return { ROLLOUT_RUN_UPSTREAM: file, ROLLOUT_RUN_NO_INHIBIT: '1' };
+}
+const STUB_OK = `printf '\\033[34m[*] Preparing to launch Zwift\\033[0m\\n'
+echo "env tool=$CONTAINER_TOOL image=$IMAGE version=$VERSION fg=$ZWIFT_FG noupdate=$DONT_UPDATE"
+printf '\\033[34m[*] Launching Zwift\\033[0m\\n'`;
+const collect = (z) => { const lines = []; return { lines, run: z.start((l) => lines.push(l)) }; };
+
+test('Z14 RealZwift.start: Ausgabe zeilenweise ohne Farbcodes, die Startzeile wird erkannt, Umgebung für zwift.sh, Exit 0', async () => {
+  const home = runtimeHome({ image: true });
+  const { lines, run } = collect(realZwift(home, stubUpstream(home, STUB_OK)));
+  assert.equal(await run.done, 0);
+  assert.deepEqual(lines, ['[*] Preparing to launch Zwift', 'env tool=podman image=docker.io/netbrain/zwift version=1.2.3 fg=1 noupdate=1', '[*] Launching Zwift']);
+  assert.deepEqual(lines.map(zwift.isStartLine), [false, false, true]);
+  assert.equal(zwift.isStartLine('[*] Preparing to launch Zwift'), false);
+  assert.equal(containerLog(home).filter((l) => / (pull|run|rmi) /.test(l)).length, 0, 'nur geprüft, nichts gezogen oder gestartet');
+});
+
+test('Z15 RealZwift.start: Exit-Codes von rollout-run tragen ihren Grund (Laufzeit, Tag, Image fehlt, Starter fehlt)', async () => {
+  const exitOf = async (home, extra) => collect(realZwift(home, { ...stubUpstream(home, 'exit 0'), ...extra })).run.done;
+  assert.equal(await exitOf(runtimeHome({ image: true }), { FAKE_INFO_FAIL: 'Cannot connect' }), 10);
+  assert.equal(await exitOf(runtimeHome({ image: true }), { ROLLOUT_ZWIFT_TAG: '' }), 11);
+  assert.equal(await exitOf(runtimeHome(), {}), 12, 'Image fehlt und keine Zustimmung: nichts wird gezogen');
+  assert.equal(await collect(realZwift(makeHome())).run.done, 127, 'ohne Starter');
+  const bare = runtimeHome({ image: true });
+  assert.equal(await exitOf(bare, { ROLLOUT_RUN_UPSTREAM: path.join(bare, 'fehlt.sh') }), 127);
+  assert.deepEqual(zwift.RUN_PROBLEM, { 10: 'runtime', 11: 'tag', 12: 'pull', 127: 'error' });
+  assert.equal(containerLog(bare).filter((l) => / pull /.test(l)).length, 0);
+});
+
+test('Z16 RealZwift.start.stop: TERM geht an die ganze Prozessgruppe, auch an Kinder des Spiels (der Container), und das Warten endet', async () => {
+  const home = runtimeHome({ image: true });
+  const { lines, run } = collect(realZwift(home, stubUpstream(home, `sleep 30 & echo $! > "$ROLLOUT_HOME/child.pid"\necho "Launching Zwift"\nwait`)));
+  const end = Date.now() + 5000;
+  while (!lines.some(zwift.isStartLine) && Date.now() < end) await new Promise((r) => setTimeout(r, 20));
+  const child = Number(fs.readFileSync(path.join(home, 'child.pid'), 'utf8'));
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  assert.equal(alive(child), true, 'Kind läuft');
+  run.stop();
+  const code = await run.done;
+  assert.notEqual(code, 0);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(alive(child), false, 'auch das Kind ist beendet');
+  assert.equal(fs.existsSync(path.join(home, 'state/run.pid')), false, 'run.pid aufgeräumt');
+});
+
+test('Z17 RealZwift.removeImage: podman rmi für genau Image:Tag, Zustimmung vergessen; ohne Image ebenfalls Erfolg; Fehler tragen ihren Grund', async () => {
+  const home = runtimeHome({ image: true });
+  fs.mkdirSync(path.join(home, 'state'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'state/zwift-image-ok'), 'docker.io/netbrain/zwift:1.2.3\n');
+  const z = realZwift(home);
+  await z.removeImage(new AbortController().signal);
+  assert.ok(containerLog(home).includes('podman rmi docker.io/netbrain/zwift:1.2.3'));
+  assert.equal(fs.existsSync(path.join(home, 'image-present')), false);
+  assert.equal(fs.existsSync(path.join(home, 'state/zwift-image-ok')), false, 'Zustimmung vergessen');
+  const before = containerLog(home).length;
+  await z.removeImage(new AbortController().signal);
+  assert.equal(containerLog(home).filter((l) => / rmi /.test(l)).length, 1, 'ohne Image kein zweites rmi');
+  assert.ok(containerLog(home).length > before - 1);
+  const busy = runtimeHome({ image: true });
+  await expectError(realZwift(busy, { FAKE_RMI_FAIL: '1' }).removeImage(new AbortController().signal), 'error');
+  assert.equal(fs.existsSync(path.join(busy, 'image-present')), true, 'bei Fehler bleibt das Image');
+  await expectError(realZwift(runtimeHome({ image: true }), { FAKE_INFO_FAIL: 'Cannot connect' }).removeImage(new AbortController().signal), 'runtime');
+  await expectError(realZwift(runtimeHome({ image: true }), { ROLLOUT_ZWIFT_TAG: '' }).removeImage(new AbortController().signal), 'tag');
+  await expectError(realZwift(makeHome()).removeImage(new AbortController().signal), 'error');
+});
+
+const launchOf = async (backend, until, ms) => (await settle(backend, until, ms)).launch;
+const READY = { ROLLOUT_ZWIFT_RUNNING_MS: '300' };
+
+test('Z18 Start über SimBackend mit RealZwift: Phasen aus der Ausgabe (Vorbereiten, Startet, Läuft), Beenden stoppt das Spiel', async () => {
+  const home = runtimeHome({ image: true });
+  const z = realZwift(home, stubUpstream(home, `echo "[*] Preparing to launch Zwift"\nsleep 0.4\necho "[*] Launching Zwift"\nsleep 30 &\nwait`));
+  await z.installScript(new AbortController().signal);
+  const { backend, snaps } = backendWith(z, { env: READY });
+  assert.equal((await backend.getSnapshot()).apps.zwift.installed, true);
+  await backend.launch('zwift');
+  assert.equal(snaps.at(-1).launch.phase, 'updates');
+  assert.equal(snaps.at(-1).launch.problem, '');
+  await launchOf(backend, (s) => s.launch?.phase === 'starting');
+  const running = await launchOf(backend, (s) => s.launch?.phase === 'running');
+  assert.equal(running.progress, 100);
+  const seen = snaps.filter((s) => s.launch).map((s) => s.launch.phase);
+  assert.deepEqual([...new Set(seen)], ['updates', 'starting', 'running']);
+  assert.ok(!seen.includes('bluetooth'), 'Zwift prüft kein Bluetooth');
+  const progress = snaps.filter((s) => s.launch).map((s) => s.launch.progress);
+  assert.deepEqual([...progress].sort((a, b) => a - b), progress, 'Fortschritt fällt nie');
+  await backend.launch('zwift'); // zweiter Start läuft nicht an
+  await backend.stopLaunch();
+  const after = await backend.getSnapshot();
+  assert.equal(after.launch, null);
+  assert.equal(fs.existsSync(path.join(home, 'state/run.pid')), false);
+  assert.equal(after.apps.zwift.installed, true);
+});
+
+test('Z19 Start endet: Exit 0 = Spiel beendet; Fehler kurz nach dem Start = Absturz; Exit 10 bis 12 und 127 = Start gescheitert mit Grund', async () => {
+  const ended = async (body) => {
+    const home = runtimeHome({ image: true });
+    const z = realZwift(home, stubUpstream(home, body));
+    await z.installScript(new AbortController().signal);
+    const { backend } = backendWith(z, { env: READY });
+    assert.equal((await backend.getSnapshot()).apps.zwift.installed, true);
+    await backend.launch('zwift');
+    const snap = await settle(backend, (s) => s.launch === null || ['crash', 'failed'].includes(s.launch.phase));
+    await backend.stopLaunch(); // räumt den Zustand und den Takt auf
+    assert.equal((await backend.getSnapshot()).launch, null, 'Verlassen der Fehleransicht beendet den Start');
+    return snap.launch;
+  };
+  assert.equal(await ended('echo "Launching Zwift"\nexit 0'), null);
+  assert.equal((await ended('echo "Launching Zwift"\nexit 1')).phase, 'crash');
+  for (const [code, problem] of [[10, 'runtime'], [11, 'tag'], [12, 'pull'], [127, 'error']]) {
+    const launch = await ended(`exit ${code}`);
+    assert.deepEqual([launch.phase, launch.problem], ['failed', problem], `Exit ${code}`);
+  }
+  // Die Attrappe: Exit 12 (Image fehlt) und Exit 1 nach der Startzeile.
+  for (const [mode, phase, problem] of [['runfail', 'failed', 'pull'], ['runcrash', 'crash', '']]) {
+    const { backend } = backendWith(new zwift.FakeZwift(mode, 5));
+    await backend.getSnapshot();
+    await backend.launch('zwift');
+    const launch = await launchOf(backend, (s) => s.launch && ['crash', 'failed'].includes(s.launch.phase));
+    assert.deepEqual([launch.phase, launch.problem], [phase, problem], mode);
+    await backend.stopLaunch();
+  }
+});
+
+test('Z20 Entfernen über SimBackend: Image weg, nicht mehr installiert, Skript bleibt, Steam-Eintrag weg; Fehler bleiben sichtbar und nichts geht verloren', async () => {
+  const home = runtimeHome({ image: true });
+  const z = realZwift(home);
+  await z.installScript(new AbortController().signal);
+  const { backend } = backendWith(z);
+  await backend.setSteam('zwift', true);
+  assert.equal((await backend.getSnapshot()).apps.zwift.installed, true);
+  await backend.remove('zwift');
+  const snap = await backend.getSnapshot();
+  assert.equal(snap.apps.zwift.installed, false);
+  assert.equal(snap.apps.zwift.steam, false);
+  assert.equal(snap.apps.zwift.problem, '');
+  assert.ok(containerLog(home).includes('podman rmi docker.io/netbrain/zwift:1.2.3'));
+  assert.ok(zwift.scriptReady(home, pin()), 'das geprüfte Skript bleibt für eine Neuinstallation');
+  // Scheitert rmi (Container läuft noch), bleibt Zwift installiert und die Karte nennt das Problem.
+  const busy = runtimeHome({ image: true });
+  const zb = realZwift(busy, { FAKE_RMI_FAIL: '1' });
+  await zb.installScript(new AbortController().signal);
+  const b2 = backendWith(zb).backend;
+  await b2.getSnapshot();
+  await b2.remove('zwift');
+  const kept = await b2.getSnapshot();
+  assert.equal(kept.apps.zwift.installed, true);
+  assert.equal(kept.apps.zwift.problem, 'error');
+  // Attrappe: dasselbe.
+  const { backend: fb } = backendWith(new zwift.FakeZwift('norem', 5));
+  await fb.getSnapshot();
+  await fb.remove('zwift');
+  assert.equal((await fb.getSnapshot()).apps.zwift.problem, 'error');
+  assert.equal((await fb.getSnapshot()).apps.zwift.installed, true);
+  // Ohne Dienst bleibt Entfernen die Simulation wie bei MyWhoosh.
+  const plain = backendWith(null).backend;
+  await plain.remove('zwift');
+  assert.equal((await plain.getSnapshot()).apps.zwift.installed, false);
+});
+
+test('Z21 Tag für den Zustimmungsdialog: leer ohne Dienst, sonst Umgebung vor config.toml vor dem Pin; Fortschritt der Installation bleibt stabil', async () => {
+  assert.equal((await backendWith(null).backend.getSnapshot()).zwiftTag, '');
+  const fake = new zwift.FakeZwift('', 5);
+  assert.equal((await backendWith(fake).backend.getSnapshot()).zwiftTag, '1.0.0', 'Pin als Voreinstellung');
+  const cfg = path.join(work, 'cfg-z21');
+  fs.mkdirSync(cfg, { recursive: true });
+  fs.writeFileSync(path.join(cfg, 'config.toml'), 'zwift_tag = "2.0.0"\n');
+  assert.equal((await backendWith(fake, { cfg }).backend.getSnapshot()).zwiftTag, '2.0.0', 'config.toml vor dem Pin');
+  assert.equal((await backendWith(fake, { cfg, env: { ROLLOUT_ZWIFT_TAG: '3.0.0' } }).backend.getSnapshot()).zwiftTag, '3.0.0', 'Umgebung vor config.toml');
+});
+
+test('Z22 chooseZwiftMode: echt, sobald rollout-run da ist und der Pin gilt; ausdrückliche Wahl gewinnt; sonst Simulation', () => {
+  const good = pin();
+  const mode = (m, runnerExists, p = good) => zwift.chooseZwiftMode({ mode: m, runnerExists, pin: p });
+  assert.equal(mode(undefined, true), 'real');
+  assert.equal(mode(undefined, false), 'sim');
+  assert.equal(mode(undefined, true, { ...good, sha256: 'x' }), 'sim', 'ungültiger Pin');
+  assert.equal(mode('', true), 'real');
+  assert.equal(mode('sim', true), 'sim');
+  assert.equal(mode('real', false), 'real');
+  assert.equal(mode('fake', false), 'fake');
+  assert.equal(mode('unsinn', true), 'sim');
+  const real = JSON.parse(fs.readFileSync(path.join(root, 'upstreams.json'), 'utf8')).zwift;
+  assert.equal(mode(undefined, true, real), 'real', 'der echte Pin aus upstreams.json');
 });
 
 test('Z13 echtes Netz (nur mit ROLLOUT_ZWIFT_NET=1): das gepinnte zwift.sh von GitHub hat die Prüfsumme aus upstreams.json', { skip: process.env.ROLLOUT_ZWIFT_NET !== '1' }, async () => {

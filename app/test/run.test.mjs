@@ -39,6 +39,7 @@ case $1 in
   info) [ -n "\${FAKE_INFO_FAIL:-}" ] && { echo "$FAKE_INFO_FAIL" >&2; exit 125; }; exit 0 ;;
   image) [ -f "$ROLLOUT_HOME/image-present" ] || exit 1; [ "$2 $3" = "inspect --format" ] && echo "[\"\${FAKE_REPODIGEST:-}\"]"; exit 0 ;;
   pull) [ -n "\${FAKE_PULL_FAIL:-}" ] && exit 1; : > "$ROLLOUT_HOME/image-present"; exit 0 ;;
+  rmi) [ -n "\${FAKE_RMI_FAIL:-}" ] && { echo "image is in use" >&2; exit 2; }; rm -f "$ROLLOUT_HOME/image-present"; exit 0 ;;
   tag) exit 0 ;;
 esac
 exit 0
@@ -145,7 +146,7 @@ for (const sh of shells) {
     const home = makeHome();
     const r = run(sh, home, ['--bootstrap-selftest'], { RUN_MODE: 'exit 0' });
     assert.equal(r.status, 0);
-    assert.equal(r.stdout.trim(), 'rollout-bootstrap 3 run');
+    assert.equal(r.stdout.trim(), 'rollout-bootstrap 4 run');
     assert.equal(calls(home).length, 0);
     assert.equal(pidFile(home), null);
   });
@@ -395,6 +396,30 @@ for (const sh of shells) {
     assert.equal(userLog(home), os.userInfo().username);
     assert.equal(run(sh, home, ['zwift'], { RUN_MODE: 'exit 0', USER: 'fahrer' }).status, 0);
     assert.equal(userLog(home), 'fahrer');
+  });
+
+  test(`R20 --zwift-remove (${sh}): rmi für genau Image:Tag, Zustimmung vergessen, ohne Image ebenfalls Erfolg, Fehler als Exit 10, 11, 13`, () => {
+    const home = makeHome();
+    fs.writeFileSync(path.join(home, 'state/zwift-image-ok'), 'docker.io/netbrain/zwift:1.2.3\n');
+    const a = run(sh, home, ['--zwift-remove'], {});
+    assert.equal(a.status, 0, a.stderr);
+    assert.ok(containers(home).includes('podman rmi docker.io/netbrain/zwift:1.2.3'));
+    assert.equal(fs.existsSync(path.join(home, 'image-present')), false);
+    assert.equal(fs.existsSync(path.join(home, 'state/zwift-image-ok')), false);
+    const again = run(sh, home, ['--zwift-remove'], {});
+    assert.equal(again.status, 0);
+    assert.equal(containers(home).filter((l) => / rmi /.test(l)).length, 1, 'ohne Image kein rmi');
+    const busy = makeHome();
+    fs.writeFileSync(path.join(busy, 'state/zwift-image-ok'), 'x\n');
+    const failed = run(sh, busy, ['--zwift-remove'], { FAKE_RMI_FAIL: '1' });
+    assert.equal(failed.status, 13);
+    assert.match(failed.stderr, /konnte nicht entfernt werden/);
+    assert.equal(fs.existsSync(path.join(busy, 'image-present')), true);
+    assert.equal(fs.existsSync(path.join(busy, 'state/zwift-image-ok')), true, 'bei Fehler bleibt die Zustimmung');
+    assert.equal(run(sh, makeHome(), ['--zwift-remove'], { FAKE_INFO_FAIL: 'Cannot connect' }).status, 10);
+    assert.equal(run(sh, makeHome(), ['--zwift-remove'], { ROLLOUT_ZWIFT_TAG: '' }).status, 11);
+    assert.equal(calls(home).length, 0, 'startet kein Spiel');
+    assert.equal(pidFile(home), null);
   });
 
   test(`--container-check (${sh}) nennt die Laufzeit auf stdout`, () => {
