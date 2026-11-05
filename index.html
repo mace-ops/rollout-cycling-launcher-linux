@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rollout – Zwift &amp; MyWhoosh on Steam Deck and Bazzite</title>
+<meta name="description" content="Play Zwift and MyWhoosh on Steam Deck, SteamOS and Bazzite. Rollout installs, updates and starts them with a controller. Download, double-click, ride.">
+<link rel="canonical" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/">
+<link rel="alternate" hreflang="en" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/">
+<link rel="alternate" hreflang="de" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/de/">
+<link rel="alternate" hreflang="es" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/es/">
+<link rel="alternate" hreflang="fr" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/fr/">
+<link rel="alternate" hreflang="it" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/it/">
+<link rel="alternate" hreflang="pt" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/pt/">
+<link rel="alternate" hreflang="nl" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/nl/">
+<link rel="alternate" hreflang="pl" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/pl/">
+<link rel="alternate" hreflang="x-default" href="https://mace-ops.github.io/rollout-cycling-launcher-linux/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rollout">
+<meta property="og:title" content="Rollout – Zwift &amp; MyWhoosh on Steam Deck and Bazzite">
+<meta property="og:description" content="Download, double-click, ride. Made for Steam Deck, ROG Ally and Bazzite.">
+<meta property="og:url" content="https://mace-ops.github.io/rollout-cycling-launcher-linux/">
+<meta property="og:image" content="https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/og/en.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rollout home screen with MyWhoosh and Zwift side by side">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Rollout – Zwift &amp; MyWhoosh on Steam Deck and Bazzite">
+<meta name="twitter:description" content="Download, double-click, ride. Made for Steam Deck, ROG Ally and Bazzite.">
+<meta name="twitter:image" content="https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/og/en.jpg">
+<meta name="theme-color" content="#0B0C10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FAFAF8" media="(prefers-color-scheme: light)">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css?v=49bb30a8">
+<script>document.documentElement.classList.add('js');try{var m=localStorage.getItem('theme');if(m==='light'||m==='dark')document.documentElement.dataset.theme=m}catch(e){}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Rollout","description":"Play Zwift and MyWhoosh on Steam Deck, SteamOS and Bazzite. Rollout installs, updates and starts them with a controller. Download, double-click, ride.","url":"https://mace-ops.github.io/rollout-cycling-launcher-linux/","applicationCategory":"GameApplication","applicationSubCategory":"Game launcher","operatingSystem":"SteamOS, Bazzite","softwareVersion":"0.9.0-beta.1","inLanguage":["en","de","es","fr","it","pt","nl","pl"],"isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"screenshot":"https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/screens/en/home.jpg","image":"https://mace-ops.github.io/rollout-cycling-launcher-linux/assets/og/en.jpg","featureList":["Controller first. Mouse optional.","One button to install.","Updates itself. Safely.","Right in your Steam library.","Know your sensors work.","Errors that help.","Deep when you need it."]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does Zwift run on Steam Deck and Bazzite?","acceptedAnswer":{"@type":"Answer","text":"On Bazzite it does: Zwift runs in a container based on netbrain/zwift, which Rollout installs and starts. Rollout is tested on a ROG Ally with Bazzite; the Steam Deck is not yet verified. SteamOS usually needs Podman or Docker first. Sensors connect through Zwift Companion on your phone or Direct Connect, not directly over Bluetooth."}},{"@type":"Question","name":"Does MyWhoosh run on SteamOS and Linux with Bluetooth?","acceptedAnswer":{"@type":"Answer","text":"Yes. MyWhoosh runs with GE-Proton and talks to your trainer and heart-rate strap over Bluetooth directly. You pair them in the game, like on Windows."}},{"@type":"Question","name":"Does Zwift work on the ROG Ally?","acceptedAnswer":{"@type":"Answer","text":"Yes, on Bazzite. Install Rollout in Desktop Mode, then start Zwift from Rollout or from Steam in Gaming Mode. Your controller steers the game."}},{"@type":"Question","name":"Do I need a terminal?","acceptedAnswer":{"@type":"Answer","text":"No. Download Rollout.desktop, double-click it in Desktop Mode and confirm once. Rollout then appears in your app menu."}},{"@type":"Question","name":"Can I use a controller?","acceptedAnswer":{"@type":"Answer","text":"Yes. Rollout works with gamepad, touch and keyboard. In Gaming Mode your controller also steers Zwift."}},{"@type":"Question","name":"How do updates work?","acceptedAnswer":{"@type":"Answer","text":"Rollout checks for new versions in the background and installs them automatically if you want. Launcher updates are signed, and a broken update rolls back on its own."}},{"@type":"Question","name":"Is Rollout official? Can my account get banned?","acceptedAnswer":{"@type":"Answer","text":"No. Rollout is an independent project, not affiliated with Zwift, Inc., MyWhoosh or Valve. Their terms restrict unapproved third-party tools, and they can suspend accounts at their discretion. Read the terms and decide for yourself."}},{"@type":"Question","name":"Which devices and systems are supported?","acceptedAnswer":{"@type":"Answer","text":"Rollout is in beta. It is tested on a ROG Ally with Bazzite. SteamOS on the Steam Deck is the second target but not yet verified. Other Linux distributions are at your own risk."}}]}</script>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<a class="skip" href="#main">Skip to content</a>
+<div class="hint" id="hint" role="status" hidden><span id="hint-text"></span> <a id="hint-link" href="./"></a><button type="button" id="hint-close">×</button></div>
+<script type="application/json" id="hints">{"en":{"text":"This page is also available in English.","go":"Read in English","close":"Dismiss","href":"./"},"de":{"text":"Diese Seite gibt es auch auf Deutsch.","go":"Auf Deutsch lesen","close":"Schließen","href":"de/"},"es":{"text":"Esta página también está disponible en español.","go":"Leer en español","close":"Cerrar","href":"es/"},"fr":{"text":"Cette page existe aussi en français.","go":"Lire en français","close":"Fermer","href":"fr/"},"it":{"text":"Questa pagina è disponibile anche in italiano.","go":"Leggi in italiano","close":"Chiudi","href":"it/"},"pt":{"text":"Esta página também está disponível em português.","go":"Ler em português","close":"Fechar","href":"pt/"},"nl":{"text":"Deze pagina is ook beschikbaar in het Nederlands.","go":"Lees in het Nederlands","close":"Sluiten","href":"nl/"},"pl":{"text":"Ta strona jest też dostępna po polsku.","go":"Czytaj po polsku","close":"Zamknij","href":"pl/"}}</script>
+
+<header id="top">
+  <div class="wrap nav">
+    <a class="brand" href="./" aria-label="Rollout"><svg class="logo" viewBox="130 130 764 764" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="currentColor" stroke-width="32"/><path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="currentColor" stroke-width="32"/><path d="M713.1 303L759.5 254.8" stroke="var(--accent)" stroke-width="40"/></svg>Rollout</a>
+    <nav aria-label="Main">
+      <a href="#action">In action</a>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="right">
+      <details class="langmenu">
+        <summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 3.9 5.7 3.9 9s-1.3 6.3-3.9 9c-2.6-2.7-3.9-5.7-3.9-9S9.4 5.7 12 3z"/></svg><span>EN</span><span class="sr">Language</span></summary>
+        <ul>
+          <li><a href="./" hreflang="en" lang="en" aria-current="page">English<small>en</small></a></li>
+          <li><a href="de/" hreflang="de" lang="de">Deutsch<small>de</small></a></li>
+          <li><a href="es/" hreflang="es" lang="es">Español<small>es</small></a></li>
+          <li><a href="fr/" hreflang="fr" lang="fr">Français<small>fr</small></a></li>
+          <li><a href="it/" hreflang="it" lang="it">Italiano<small>it</small></a></li>
+          <li><a href="pt/" hreflang="pt" lang="pt">Português<small>pt</small></a></li>
+          <li><a href="nl/" hreflang="nl" lang="nl">Nederlands<small>nl</small></a></li>
+          <li><a href="pl/" hreflang="pl" lang="pl">Polski<small>pl</small></a></li>
+        </ul>
+      </details>
+      <button class="btn iconbtn" id="theme" type="button" aria-label="Switch between light and dark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="btn gh" href="https://github.com/mace-ops/rollout-cycling-launcher-linux" aria-label="GitHub"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a>
+      <a class="btn primary dlbtn" href="#download">Download</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" aria-labelledby="h1">
+  <div class="wrap">
+    <span class="pill badge"><span class="dot"></span>Free · beta</span>
+    <h1 id="h1" class="display">MyWhoosh &amp; Zwift on SteamOS and Bazzite.</h1>
+    <p class="lead">Rollout installs, updates and starts your indoor cycling apps. Download, double-click, ride, all with a controller.</p>
+    <div class="ctas">
+      <a class="btn primary" href="#download"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Download</span></a>
+      <a class="btn" href="#action"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg><span>See it in action</span></a>
+    </div>
+    <ul class="meta"><li>SteamOS</li><li>Bazzite</li><li>Steam Deck</li><li>ROG Ally</li></ul>
+    <p class="smallnote">Beta: tested on ROG Ally with Bazzite. Steam Deck not yet verified.</p>
+    <div class="frame rv">
+      <div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/home-640.webp 640w, assets/screens/en/home.webp 1280w" sizes="(min-width:1160px) 1112px, calc(100vw - 32px)"><img src="assets/screens/en/home.jpg" alt="Rollout home screen with MyWhoosh and Zwift side by side, each with a Ride button" width="1280" height="800" fetchpriority="high" decoding="async"></picture></div>
+    </div>
+  </div>
+</section>
+
+<section id="action" class="action" aria-roledescription="carousel" aria-labelledby="act-h" data-of="{n} / {total}" data-prev="Previous screenshot" data-next="Next screenshot">
+  <div class="wrap center">
+    <span class="eyebrow">See it in action</span>
+    <h2 id="act-h" class="display">From download to first ride.</h2>
+  </div>
+  <div class="track" id="track" aria-label="Screenshots">
+
+    <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="1 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/home-640.webp 640w, assets/screens/en/home.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/home.jpg" alt="Rollout home screen with MyWhoosh and Zwift side by side, each with a Ride button" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Home</b> <span>Both apps side by side, one button each.</span></p>
+    </div>
+
+    <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="2 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/pick-640.webp 640w, assets/screens/en/pick.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/pick.jpg" alt="Rollout home screen with the Zwift card enlarged because it has focus" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Pick an app</b> <span>The card in focus grows. Works with controller, touch and mouse.</span></p>
+    </div>
+
+    <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="3 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/before-install-640.webp 640w, assets/screens/en/before-install.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/before-install.jpg" alt="Install MyWhoosh screen showing download size, needed space and time, with an Add to Steam checkbox" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Before installing</b> <span>Download size, space and time up front. Add to Steam is already ticked.</span></p>
+    </div>
+
+    <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="4 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/installing-640.webp 640w, assets/screens/en/installing.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/installing.jpg" alt="Zwift installation at 46 percent with the phases listed next to a progress number" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Installing</b> <span>Clear phases and an honest time estimate.</span></p>
+    </div>
+
+    <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="5 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/done-640.webp 640w, assets/screens/en/done.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/done.jpg" alt="Screen saying Zwift is ready, with a green check mark and a Ride button" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Done</b> <span>Ready to ride. Nothing else to set up.</span></p>
+    </div>
+
+    <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="6 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/bluetooth-640.webp 640w, assets/screens/en/bluetooth.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/bluetooth.jpg" alt="Bluetooth screen listing a trainer and a heart-rate strap that were found nearby" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Bluetooth check</b> <span>Find your trainer and heart-rate strap before the ride.</span></p>
+    </div>
+
+    <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="7 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/starting-640.webp 640w, assets/screens/en/starting.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/starting.jpg" alt="MyWhoosh start screen with a progress bar and a Cancel button" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Starting</b> <span>Rollout checks Bluetooth and starts the game.</span></p>
+    </div>
+
+    <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="8 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/error-640.webp 640w, assets/screens/en/error.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/error.jpg" alt="Error screen saying the trainer was not found, with two steps and the buttons Search again, Start anyway and Get help" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>When something is off</b> <span>Plain steps and one button to try again.</span></p>
+    </div>
+
+    <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="9 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/settings-640.webp 640w, assets/screens/en/settings.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/settings.jpg" alt="Settings screen with language, interface size, appearance, automatic updates and Steam switches" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Settings</b> <span>Language, updates and Steam in one short list.</span></p>
+    </div>
+
+    <div class="slide" data-tone="mywhoosh" role="group" aria-roledescription="slide" aria-label="10 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/advanced-640.webp 640w, assets/screens/en/advanced.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/advanced.jpg" alt="Advanced settings for MyWhoosh with Proton version, graphics output and recommended values" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Advanced</b> <span>Proton version, graphics and more, each with its recommended value.</span></p>
+    </div>
+
+    <div class="slide" data-tone="zwift" role="group" aria-roledescription="slide" aria-label="11 / 11">
+      <div class="frame"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/light-640.webp 640w, assets/screens/en/light.webp 1280w" sizes="(min-width:1116px) 960px, 86vw"><img src="assets/screens/en/light.jpg" alt="Settings screen in light mode" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      <p class="cap"><b>Light mode</b> <span>Follows your system theme.</span></p>
+    </div>
+
+  </div>
+  <div class="cbar" id="cbar" hidden>
+    <button class="btn cbtn" id="prev" type="button" aria-label="Previous screenshot"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+    <div class="ccap" aria-live="polite"><div class="num" id="cnum"></div><h3 id="ctitle"></h3><p id="cdesc"></p></div>
+    <button class="btn cbtn" id="next" type="button" aria-label="Next screenshot"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+  </div>
+  <div class="dots" id="dots" hidden></div>
+</section>
+
+<section id="apps" class="tight" aria-labelledby="apps-h">
+  <div class="wrap">
+    <span class="eyebrow">Two apps, one launcher</span>
+    <h2 id="apps-h" class="display rv">Pick your ride.</h2>
+    <p class="lead rv">Each app gets the setup that works best on Linux. Rollout picks it for you.</p>
+    <div class="duo">
+      <article class="appcard rv" data-tone="mywhoosh">
+        <div class="shot"><picture><source type="image/webp" srcset="assets/screens/en/starting-640.webp 640w, assets/screens/en/starting.webp 1280w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="assets/screens/en/starting.jpg" alt="MyWhoosh start screen with a progress bar and a Cancel button" width="1280" height="800" loading="lazy" decoding="async"></picture></div>
+        <div class="body">
+          <h3 class="display">MyWhoosh</h3>
+          <span class="pill"><span class="dot"></span>Direct Bluetooth</span>
+          <ul>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Trainer and heart-rate strap over Bluetooth, paired in the game like on Windows</span></li>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Runs with GE-Proton, downloaded and verified for you</span></li>
+          </ul>
+        </div>
+      </article>
+      <article class="appcard rv" data-tone="zwift">
+        <div class="shot"><picture><source type="image/webp" srcset="assets/screens/en/installing-640.webp 640w, assets/screens/en/installing.webp 1280w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="assets/screens/en/installing.jpg" alt="Zwift installation at 46 percent with the phases listed next to a progress number" width="1280" height="800" loading="lazy" decoding="async"></picture></div>
+        <div class="body">
+          <h3 class="display">Zwift</h3>
+          <span class="pill"><span class="dot"></span>Companion or Direct Connect</span>
+          <ul>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Runs in a container from netbrain/zwift, kept apart from your system</span></li>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Sensors connect through Zwift Companion on your phone or Direct Connect, not directly over Bluetooth</span></li>
+            <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Your controller steers the game in Gaming Mode</span></li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="tight" aria-labelledby="feat-h">
+  <div class="wrap">
+    <span class="eyebrow">Features</span>
+    <h2 id="feat-h" class="display rv">Built for the couch and the saddle.</h2>
+    <div class="showcase">
+      <div class="flist" id="flist">
+
+        <article class="fitem on" data-f="0">
+          <span class="n">01</span>
+          <h3>Controller first. Mouse optional.</h3>
+          <p>Every screen works with gamepad, touch and keyboard. Menus and lists are Rollout's own, so they work in Gaming Mode where native popups don't.</p>
+          <div class="chips"><span><i class="kc">✚</i><i class="kc">L</i>focus</span><span><i class="kc">A</i>select</span><span><i class="kc">B</i>back</span><span><i class="kc">R</i>scroll</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/home-640.webp 640w, assets/screens/en/home.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/home.jpg" alt="Rollout home screen with MyWhoosh and Zwift side by side, each with a Ride button" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+        <article class="fitem" data-f="1">
+          <span class="n">02</span>
+          <h3>One button to install.</h3>
+          <p>No mandatory questions, no terminal, no sudo. Rollout shows size and time up front, then clear phases with progress.</p>
+          <div class="chips"><span>No sudo</span><span>Clear phases</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/installing-640.webp 640w, assets/screens/en/installing.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/installing.jpg" alt="Zwift installation at 46 percent with the phases listed next to a progress number" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+        <article class="fitem" data-f="2">
+          <span class="n">03</span>
+          <h3>Updates itself. Safely.</h3>
+          <p>Rollout can update itself in the background. Every launcher update is signed and test-started; if it fails, Rollout goes back to the last good version on its own.</p>
+          <div class="chips"><span>Ed25519</span><span>SHA-256</span><span>Auto rollback</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/settings-640.webp 640w, assets/screens/en/settings.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/settings.jpg" alt="Settings screen with language, interface size, appearance, automatic updates and Steam switches" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+        <article class="fitem" data-f="3">
+          <span class="n">04</span>
+          <h3>Right in your Steam library.</h3>
+          <p>One switch adds Rollout and your apps to Steam, with artwork. Start rides straight from Gaming Mode; play time survives updates.</p>
+          <div class="chips"><span>Gaming Mode</span><span>Library artwork</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/steam-640.webp 640w, assets/screens/en/steam.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/steam.jpg" alt="Dialog saying Steam needs to restart briefly, with the buttons Do it later and Restart now" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+        <article class="fitem" data-f="4">
+          <span class="n">05</span>
+          <h3>Know your sensors work.</h3>
+          <p>For MyWhoosh, the Bluetooth check shows which trainers and heart-rate straps are sending before you clip in, and can restart a stuck adapter.</p>
+          <div class="chips"><span>FTMS</span><span>Cycling Power</span><span>Heart Rate</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/bluetooth-640.webp 640w, assets/screens/en/bluetooth.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/bluetooth.jpg" alt="Bluetooth screen listing a trainer and a heart-rate strap that were found nearby" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+        <article class="fitem" data-f="5">
+          <span class="n">06</span>
+          <h3>Errors that help.</h3>
+          <p>When something goes wrong, Rollout says what to do next in plain words, with one button to try again. Details only if you want them.</p>
+          <div class="chips"><span>Plain language</span><span>Start anyway</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/error-640.webp 640w, assets/screens/en/error.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/error.jpg" alt="Error screen saying the trainer was not found, with two steps and the buttons Search again, Start anyway and Get help" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+        <article class="fitem" data-f="6">
+          <span class="n">07</span>
+          <h3>Deep when you need it.</h3>
+          <p>Behind “Advanced”: Proton version, graphics output, Bluetooth adapter, update channel, logs and diagnostics. Every option shows the recommended value.</p>
+          <div class="chips"><span>GE-Proton</span><span>Logs</span><span>Diagnostics</span></div>
+          <div class="frame inline"><div class="screen"><picture><source type="image/webp" srcset="assets/screens/en/advanced-640.webp 640w, assets/screens/en/advanced.webp 1280w" sizes="(min-width:1160px) 568px, 92vw"><img src="assets/screens/en/advanced.jpg" alt="Advanced settings for MyWhoosh with Proton version, graphics output and recommended values" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+        </article>
+
+      </div>
+      <div class="fstage" aria-hidden="true">
+        <div class="frame"><div class="screen"><picture class="on"><source type="image/webp" srcset="assets/screens/en/home-640.webp 640w, assets/screens/en/home.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/home.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="assets/screens/en/installing-640.webp 640w, assets/screens/en/installing.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/installing.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="assets/screens/en/settings-640.webp 640w, assets/screens/en/settings.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/settings.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="assets/screens/en/steam-640.webp 640w, assets/screens/en/steam.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/steam.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="assets/screens/en/bluetooth-640.webp 640w, assets/screens/en/bluetooth.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/bluetooth.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="assets/screens/en/error-640.webp 640w, assets/screens/en/error.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/error.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture><picture><source type="image/webp" srcset="assets/screens/en/advanced-640.webp 640w, assets/screens/en/advanced.webp 1280w" sizes="(min-width:1160px) 640px, 55vw"><img src="assets/screens/en/advanced.jpg" alt="" width="1280" height="800" loading="lazy" decoding="async"></picture></div></div>
+      </div>
+    </div>
+    <div class="extras">
+      <div class="ex rv"><div class="big">8</div><b>Languages</b><span>Follows your system, switch any time.</span></div>
+      <div class="ex rv"><div class="big">0</div><b>Terminal commands</b><span>Download, double-click, done.</span></div>
+      <div class="ex rv"><div class="big">48&thinsp;px</div><b>Big targets</b><span>Light and dark, interface size up to 200 %. Readable from the saddle.</span></div>
+      <div class="ex rv"><div class="big">~/</div><b>Home folder only</b><span>No root, no system packages. Your OS stays as it is.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="download" aria-labelledby="dl-h">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow">Download</span>
+      <h2 id="dl-h" class="display rv">Double-click. Ride.</h2>
+      <p class="lead">Pick your system, download Rollout and open it in Desktop Mode. No terminal needed.</p>
+      <p class="beta">Beta: tested on ROG Ally with Bazzite. Steam Deck not yet verified.</p>
+    </div>
+    <div class="dlgrid">
+      <article class="osc rv" data-os="steamos">
+        <div class="top">
+          <div class="oslogo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="4"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg></div>
+          <div><h3>SteamOS</h3><div class="dev">Steam Deck LCD &amp; OLED</div></div>
+        </div>
+        <div class="mid">
+          <a class="btn primary disabled" role="link" aria-disabled="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Download for SteamOS</span></a>
+          <div class="fileinfo"><span>Rollout.desktop</span><span>·</span><span>v0.9.0-beta.1</span></div>
+          <div class="fileinfo"><span>Starter file, installs Rollout into your home folder</span></div>
+          <p class="soon">Download coming soon.</p>
+        </div>
+        <ol class="steps"><li>Steam button → Power → Switch to Desktop</li><li>Double-click Rollout.desktop in “Downloads”</li><li>Confirm the prompt once. Rollout appears in your app menu.</li></ol>
+        <p class="osnote">Zwift also needs Podman or Docker, which SteamOS usually does not include. MyWhoosh needs neither.</p>
+      </article>
+      <article class="osc rv" data-os="bazzite">
+        <div class="top">
+          <div class="oslogo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h8a4 4 0 0 1 0 8H5zM5 12h9a4 4 0 0 1 0 8H5z"/></svg></div>
+          <div><h3>Bazzite</h3><div class="dev">ROG Ally, other handhelds, desktop PCs</div></div>
+        </div>
+        <div class="mid">
+          <a class="btn primary disabled" role="link" aria-disabled="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Download for Bazzite</span></a>
+          <div class="fileinfo"><span>Rollout.desktop</span><span>·</span><span>v0.9.0-beta.1</span></div>
+          <div class="fileinfo"><span>Starter file, installs Rollout into your home folder</span></div>
+          <p class="soon">Download coming soon.</p>
+        </div>
+        <ol class="steps"><li>On a handheld, switch to Desktop Mode. On a PC you are already there.</li><li>Double-click Rollout.desktop in “Downloads”</li><li>Confirm the prompt once. Rollout appears in your app menu.</li></ol>
+        <p class="osnote">Podman is included, which Zwift needs. Bazzite with GNOME: downloaded .desktop files do not start by double-click there, so this install does not work on that edition yet. Use the KDE edition.</p>
+      </article>
+    </div>
+    <ul class="req">
+      <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>8–21 GB free per app</li>
+      <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>Internet for the first install</li>
+      <li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>Bluetooth for MyWhoosh sensors</li>
+    </ul>
+    <p class="other">Other Linux distributions: not supported, at your own risk. See <a href="https://github.com/mace-ops/rollout-cycling-launcher-linux#install">GitHub</a>.</p>
+  </div>
+</section>
+
+<section id="how" aria-labelledby="how-h">
+  <div class="wrap">
+    <span class="eyebrow">Under the hood</span>
+    <h2 id="how-h" class="display rv">Thin launcher. Proven engines.</h2>
+    <p class="lead">Rollout does not patch games. It drives open projects that already do the hard work.</p>
+    <div class="how">
+      <article class="tile rv"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 7v6c0 4 3.5 7 8 8 4.5-1 8-4 8-8V7z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Verified downloads</h3><p>Upstream scripts are pinned to an exact commit and checked with SHA-256. Launcher updates are signed with Ed25519.</p></article>
+      <article class="tile rv"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg></div><h3>Stays out of your system</h3><p>Rollout lives in ~/.local/share/rollout. Installing needs no root and changes no system packages on SteamOS or Bazzite.</p></article>
+      <article class="tile rv"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16v.5"/></svg></div><h3>Honest about limits</h3><p>Zwift has no direct Bluetooth in its container, and neither game is officially supported on Linux. Rollout says so instead of hiding it.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="tight" aria-labelledby="faq-h">
+  <div class="wrap">
+    <div class="center"><span class="eyebrow">FAQ</span><h2 id="faq-h" class="display">Questions riders ask.</h2></div>
+    <div class="faq">
+
+      <details><summary>Does Zwift run on Steam Deck and Bazzite?</summary><p>On Bazzite it does: Zwift runs in a container based on netbrain/zwift, which Rollout installs and starts. Rollout is tested on a ROG Ally with Bazzite; the Steam Deck is not yet verified. SteamOS usually needs Podman or Docker first. Sensors connect through Zwift Companion on your phone or Direct Connect, not directly over Bluetooth.</p></details>
+
+      <details><summary>Does MyWhoosh run on SteamOS and Linux with Bluetooth?</summary><p>Yes. MyWhoosh runs with GE-Proton and talks to your trainer and heart-rate strap over Bluetooth directly. You pair them in the game, like on Windows.</p></details>
+
+      <details><summary>Does Zwift work on the ROG Ally?</summary><p>Yes, on Bazzite. Install Rollout in Desktop Mode, then start Zwift from Rollout or from Steam in Gaming Mode. Your controller steers the game.</p></details>
+
+      <details><summary>Do I need a terminal?</summary><p>No. Download Rollout.desktop, double-click it in Desktop Mode and confirm once. Rollout then appears in your app menu.</p></details>
+
+      <details><summary>Can I use a controller?</summary><p>Yes. Rollout works with gamepad, touch and keyboard. In Gaming Mode your controller also steers Zwift.</p></details>
+
+      <details><summary>How do updates work?</summary><p>Rollout checks for new versions in the background and installs them automatically if you want. Launcher updates are signed, and a broken update rolls back on its own.</p></details>
+
+      <details><summary>Is Rollout official? Can my account get banned?</summary><p>No. Rollout is an independent project, not affiliated with Zwift, Inc., MyWhoosh or Valve. Their terms restrict unapproved third-party tools, and they can suspend accounts at their discretion. Read the terms and decide for yourself.</p></details>
+
+      <details><summary>Which devices and systems are supported?</summary><p>Rollout is in beta. It is tested on a ROG Ally with Bazzite. SteamOS on the Steam Deck is the second target but not yet verified. Other Linux distributions are at your own risk.</p></details>
+
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-h">
+  <div class="wrap">
+    <div class="photos">
+      <div class="photo rv"><picture><source type="image/avif" srcset="assets/photos/mywhoosh-800.avif 800w, assets/photos/mywhoosh-1600.avif 1600w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><source type="image/webp" srcset="assets/photos/mywhoosh-800.webp 800w, assets/photos/mywhoosh-1600.webp 1600w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="assets/photos/mywhoosh-800.jpg" srcset="assets/photos/mywhoosh-800.jpg 800w, assets/photos/mywhoosh-1600.jpg 1600w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw" alt="A rider on a smart trainer in a blue room, the MyWhoosh scene in Rollout" width="1600" height="1000" loading="lazy" decoding="async"></picture></div>
+      <div class="photo rv"><picture><source type="image/avif" srcset="assets/photos/zwift-800.avif 800w, assets/photos/zwift-1600.avif 1600w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><source type="image/webp" srcset="assets/photos/zwift-800.webp 800w, assets/photos/zwift-1600.webp 1600w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw"><img src="assets/photos/zwift-800.jpg" srcset="assets/photos/zwift-800.jpg 800w, assets/photos/zwift-1600.jpg 1600w" sizes="(min-width:1160px) 568px, (min-width:681px) 46vw, 92vw" alt="A rider on a smart trainer in an orange room, the Zwift scene in Rollout" width="1600" height="1000" loading="lazy" decoding="async"></picture></div>
+    </div>
+    <h2 id="final-h" class="display">Clip in. Roll out.</h2>
+    <p class="lead">Free and open source under the MIT license.</p>
+    <a class="btn primary" href="#download"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Download</span></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="./"><svg class="logo" viewBox="130 130 764 764" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M750.5 242.4A360 360 0 1 0 772.3 263.3" stroke="currentColor" stroke-width="32"/><path d="M700.3 291.5A290 290 0 1 0 725.1 315.3" stroke="currentColor" stroke-width="32"/><path d="M713.1 303L759.5 254.8" stroke="var(--accent)" stroke-width="40"/></svg>Rollout</a>
+      <p class="disclaimer">Rollout is an independent project and is not affiliated with, endorsed or sponsored by Zwift, Inc., MyWhoosh or Valve. All trademarks belong to their owners. Using third-party tools may conflict with the apps' terms of service; please read them.</p>
+      <p class="disclaimer">No cookies, no tracking, no external requests.</p>
+    </div>
+    <div><p class="fh">Project</p><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux">GitHub</a><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/releases">Releases</a><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/issues">Report a problem</a><a href="https://github.com/mace-ops/rollout-cycling-launcher-linux/blob/main/LICENSE">MIT license</a></div>
+    <div><p class="fh">Thanks to</p><a href="https://github.com/netbrain/zwift">netbrain/zwift</a><a href="https://github.com/Parapeth962/mywhoosh-linux-installer">mywhoosh-linux-installer</a><a href="https://github.com/Dj0ulo/mywhoosh-linux">Dj0ulo/mywhoosh-linux</a></div>
+  </div>
+</footer>
+
+<a href="#top" class="totop" id="totop" aria-label="Back to top" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></a>
+<script src="assets/bg.js?v=49bb30a8" defer></script>
+<script src="assets/site.js?v=49bb30a8" defer></script>
+</body>
+</html>

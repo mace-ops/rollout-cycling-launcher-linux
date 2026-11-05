@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found – Rollout</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/rollout-cycling-launcher-linux/assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/rollout-cycling-launcher-linux/assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/rollout-cycling-launcher-linux/assets/site.css?v=49bb30a8">
+</head>
+<body>
+<main id="main" class="wrap" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:20px">
+<div data-nf="en" lang="en" style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Page not found</h1><p class="lead">This page does not exist. Go back to the start page.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/">To the start page</a></div>
+<div data-nf="de" lang="de" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Seite nicht gefunden</h1><p class="lead">Diese Seite gibt es nicht. Geh zurück zur Startseite.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/de/">Zur Startseite</a></div>
+<div data-nf="es" lang="es" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Página no encontrada</h1><p class="lead">Esta página no existe. Vuelve a la página de inicio.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/es/">A la página de inicio</a></div>
+<div data-nf="fr" lang="fr" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Page introuvable</h1><p class="lead">Cette page n’existe pas. Retourne à la page d’accueil.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/fr/">Vers la page d’accueil</a></div>
+<div data-nf="it" lang="it" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Pagina non trovata</h1><p class="lead">Questa pagina non esiste. Torna alla pagina iniziale.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/it/">Alla pagina iniziale</a></div>
+<div data-nf="pt" lang="pt" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Página não encontrada</h1><p class="lead">Esta página não existe. Volte para a página inicial.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/pt/">Para a página inicial</a></div>
+<div data-nf="nl" lang="nl" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Pagina niet gevonden</h1><p class="lead">Deze pagina bestaat niet. Ga terug naar de startpagina.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/nl/">Naar de startpagina</a></div>
+<div data-nf="pl" lang="pl" hidden style="display:flex;flex-direction:column;align-items:center;gap:20px"><h1 class="display" style="font-size:clamp(36px,6vw,64px)">Nie znaleziono strony</h1><p class="lead">Ta strona nie istnieje. Wróć na stronę główną.</p><a class="btn primary" href="/rollout-cycling-launcher-linux/pl/">Na stronę główną</a></div>
+</main>
+<script>
+(function(){var seg=location.pathname.replace('/rollout-cycling-launcher-linux/','').split('/')[0],all=document.querySelectorAll('[data-nf]'),hit=null;
+all.forEach(function(e){if(e.dataset.nf===seg)hit=e});
+if(hit){all.forEach(function(e){e.hidden=e!==hit});document.documentElement.lang=seg;document.title=hit.querySelector('h1').textContent+' – Rollout'}})();
+</script>
+</body>
+</html>

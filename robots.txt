@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mace-ops.github.io/rollout-cycling-launcher-linux/sitemap.xml
