@@ -112,7 +112,7 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
 
   const tick = async (): Promise<void> => {
     const win = findZwiftWindow(await exec('xwininfo', ['-root', '-tree']));
-    if (!win) { tagged = 0; setVisible(false); return; }
+    if (!win) { tagged = 0; note('kein Zwift-Fenster gefunden'); setVisible(false); return; }
     if (tagged !== win.id) {
       await exec('xprop', ['-id', win.hex, '-f', 'STEAM_GAME', '32c', '-set', 'STEAM_GAME', appId as string]);
       tagged = win.id;

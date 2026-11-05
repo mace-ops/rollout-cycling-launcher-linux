@@ -285,6 +285,7 @@ export class RealZwift implements ZwiftService {
     const display = w?.display ?? ':0';
     const startPad = w?.pad ?? ((d: string) => ((this.o.env ?? process.env).ROLLOUT_ZWIFT_PAD === 'off' ? null : startPadBridge({ display: d, env: this.o.env, onNote: w?.onNote })));
     const stopPad = (): void => { pad?.stop(); pad = null; };
+    w?.onNote?.(`Start: Fensterüberwachung ${w ? 'an' : 'aus'}, Anzeige ${display}, AppID ${w ? (w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId) : '-'}`);
     const watcher = w && exec
       ? watchZwiftWindow({
         exec, appId: w.appId === undefined ? appIdFromAncestors(process.pid) : w.appId, intervalMs: w.intervalMs, onNote: w.onNote,
