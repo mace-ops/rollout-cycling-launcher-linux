@@ -155,7 +155,7 @@ export const isRunningLine = (line: string): boolean => /Zwift started using win
 
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 /** Teilt einen Ausgabestrom in Zeilen (auch bei `\r`), entfernt Farbcodes und kürzt auf 300 Zeichen. */
-function feedLines(stream: NodeJS.ReadableStream, onLine: (line: string) => void): void {
+export function feedLines(stream: NodeJS.ReadableStream, onLine: (line: string) => void): void {
   let rest = '';
   const emit = (raw: string): void => { const line = raw.replace(ANSI, '').trim(); if (line) onLine(line.slice(0, 300)); };
   stream.on('data', (d: Buffer) => {
@@ -194,7 +194,7 @@ export interface RealZwiftOptions {
   env?: NodeJS.ProcessEnv;
   /** Zeitgrenze für `--zwift-status` in ms */
   statusTimeoutMs?: number;
-  /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 35000 (der Starter wartet höchstens 20 s auf `podman stop`) */
+  /** Frist zwischen TERM und KILL beim Beenden des Spiels in ms, Vorgabe 60000 (der Starter beendet Zwift erst höflich und hart, je bis 8 und 15 s, dann `podman stop` bis 20 s) */
   stopGraceMs?: number;
   /**
    * Fenstersichtbarkeit im Spielmodus (zwift-window.ts). Ohne diese Angabe berührt `start` den X-Server nie (Tests). `display` Vorgabe
@@ -320,7 +320,7 @@ export class RealZwift implements ZwiftService {
         // Nur der Starter bekommt TERM: Er stoppt den Container selbst (podman stop, siehe rollout-run). Ein TERM an die ganze Gruppe
         // träfe auch `podman run` und ließe den Container als Waise weiterlaufen (am Ally beobachtet).
         try { child.kill('SIGTERM'); } catch { /* schon beendet */ }
-        killer ??= setTimeout(() => signalGroup('SIGKILL'), this.o.stopGraceMs ?? 35_000);
+        killer ??= setTimeout(() => signalGroup('SIGKILL'), this.o.stopGraceMs ?? 60_000);
       }
     };
   }

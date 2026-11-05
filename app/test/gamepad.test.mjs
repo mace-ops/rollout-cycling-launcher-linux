@@ -101,3 +101,39 @@ test('P8: ohne lesbares Gamepad startet nichts und es gibt einen Hinweis', () =>
   bridge.stop();
   assert.match(notes[0], /kein lesbares Steam-Gamepad/);
 });
+
+test('P-A: Zeigermodus (MyWhoosh): A ist Linksklick, B bleibt Esc', () => {
+  const lines = [];
+  const m = new pad.PadMapper((l) => lines.push(l), { pointer: true });
+  m.feed(EV_KEY, A, 1); m.feed(EV_KEY, A, 0); m.feed(EV_KEY, B, 1);
+  assert.deepEqual(lines, ['mousedown 1', 'keydown Escape']);
+  m.tick(100);
+  assert.deepEqual(lines.slice(2), ['mouseup 1', 'keyup Escape']);
+});
+
+test('P-B: Zeigermodus sendet nie Pfeiltasten: Steuerkreuz = 12-Pixel-Schritte mit Wiederholung, linker Stick = Zeiger wie der rechte', () => {
+  const lines = [];
+  const m = new pad.PadMapper((l) => lines.push(l), { pointer: true });
+  m.feed(EV_ABS, ABS.HAT0X, 1);
+  assert.deepEqual(lines, ['mousemove_relative -- 12 0']);
+  m.tick(300); assert.equal(lines.length, 1, 'vor 400 ms keine Wiederholung');
+  m.tick(200); assert.equal(lines.length, 2);
+  assert.equal(lines[1], 'mousemove_relative -- 12 0');
+  m.feed(EV_ABS, ABS.HAT0X, 0);
+  m.feed(EV_ABS, ABS.HAT0Y, -1);
+  assert.equal(lines.at(-1), 'mousemove_relative -- 0 -12');
+  m.feed(EV_ABS, ABS.HAT0Y, 0);
+  lines.length = 0;
+  m.feed(EV_ABS, ABS.X, 32767); // linker Stick voll rechts
+  m.tick(100);
+  const move = lines.find((l) => l.startsWith('mousemove_relative'));
+  assert.ok(move && Number(move.split(' ')[2]) > 100, `Zeiger bewegt sich: ${move}`);
+  m.feed(EV_ABS, ABS.RX, 32767); // beide Sticks: höchstens volle Geschwindigkeit
+  lines.length = 0; m.tick(100);
+  assert.ok(Number(lines[0].split(' ')[2]) <= 141, lines[0]);
+  assert.ok(lines.every((l) => !/Up|Down|Left|Right/.test(l)), 'keine Pfeiltasten');
+  // Ohne Zeigermodus (Zwift) bleibt es bei Pfeiltasten.
+  const z = []; const mz = new pad.PadMapper((l) => z.push(l));
+  mz.feed(EV_ABS, ABS.HAT0X, 1);
+  assert.deepEqual(z, ['keydown Right']);
+});

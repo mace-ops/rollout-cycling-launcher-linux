@@ -1,12 +1,14 @@
 #!/bin/sh
-# rollout-bootstrap: 5
+# rollout-bootstrap: 8
 # Startet ein Spiel (Konzept 5.2), vom Launcher und von Steam gleich aufgerufen: rollout-run <mywhoosh|zwift> [Argumente].
 # Weitere Aufrufe: rollout-run --container-check (nennt die nutzbare Container-Laufzeit, sonst Meldung und Exit 10),
 # rollout-run --zwift-pull (zieht das eingestellte Zwift-Image und merkt sich die Zustimmung, nur nach Bestätigung durch den Nutzer) und
 # rollout-run --zwift-status (stdout: runtime=<podman|docker>, ref=<Image:Tag>, image=<present|missing>, consent=<yes|no>; zieht und startet nichts) und
-# rollout-run --zwift-remove (entfernt das eingestellte Image mit „rmi“ und vergisst die Zustimmung; nur nach Rückfrage des Nutzers, ohne Image ebenfalls Erfolg).
+# rollout-run --zwift-remove (entfernt das eingestellte Image mit „rmi“ und vergisst die Zustimmung; nur nach Rückfrage des Nutzers, ohne Image ebenfalls Erfolg) und
+# rollout-run --mywhoosh <install [--hd]|update|uninstall> (richtet MyWhoosh über vendor/mywhoosh.sh ein, ändert oder entfernt es; Bildschirm bleibt wach; läuft ein Spiel, Exit 1).
 # Exit-Codes von Rollout selbst: 1 läuft schon, 2 Aufruf, 10 keine nutzbare Container-Laufzeit, 11 Zwift-Image nicht eingestellt,
-# 12 Zwift-Image fehlt (keine Zustimmung oder Ziehen gescheitert), 13 Image konnte nicht entfernt werden, 127 Upstream fehlt. Sonst der Exit-Code des Spiels.
+# 12 Zwift-Image fehlt (keine Zustimmung oder Ziehen gescheitert), 13 Image konnte nicht entfernt werden, 127 Upstream fehlt. Sonst der Exit-Code des Spiels
+# (bei --mywhoosh der des Skripts).
 # Reines POSIX-sh wie bin/rollout. state/run.pid nennt diesen Prozess, solange das Spiel läuft: Das Aufräumen
 # eines Updates löscht dann keine Version unter dem laufenden Spiel weg. Die Nummer oben nur bei echtem Bedarf erhöhen.
 if [ "${1:-}" = --bootstrap-selftest ]; then
@@ -137,6 +139,10 @@ zwift_prepare() {
   zw_name=zwift-${ZWIFT_RIDER:-$USER}
 }
 
+# mw_hd: nur die HD-Ausgabe ist installiert. Steam ruft ohne Argumente auf, und mywhoosh.sh erkennt die Ausgabe aus dem Vendor-Ordner nicht von selbst.
+mw_hd() { [ -z "${MYWHOOSH_ROOT:-}" ] && [ ! -f "$HOME/Games/mywhoosh-linux/edition" ] && [ -f "$HOME/Games/mywhoosh-hd-linux/edition" ]; }
+mw_setup=
+
 # Upstream je App: MyWhoosh liegt im Launcher-Release, Zwift ist das Startskript von netbrain/zwift unter zwift/<sha>/ (ROLLOUT_ZWIFT_SCRIPT ersetzt es).
 case $app in
   --container-check) rt_detect || exit 10; echo "$rt"; exit 0 ;;
@@ -148,47 +154,101 @@ case $app in
     exit 0 ;;
   --zwift-pull) rt_detect || exit 10; zwift_config || exit 11; zwift_pull || exit 12; exit 0 ;;
   --zwift-remove) rt_detect || exit 10; zwift_config || exit 11; zwift_remove || exit 13; exit 0 ;;
-  mywhoosh) up=$home/current/vendor/mywhoosh.sh; set -- run "$@" ;;
+  --mywhoosh)
+    mw_act=${1:-}
+    case $mw_act in
+      install) ;;
+      update|uninstall) mw_hd && set -- "$@" --hd ;;
+      *) echo "Aufruf: rollout-run --mywhoosh install [--hd]|update|uninstall" >&2; exit 2 ;;
+    esac
+    up=$home/current/vendor/mywhoosh.sh; mw_setup=1 ;;
+  mywhoosh) up=$home/current/vendor/mywhoosh.sh; if mw_hd; then set -- run --hd "$@"; else set -- run "$@"; fi ;;
   zwift) up=${ROLLOUT_ZWIFT_SCRIPT:-$(ls -td "$home"/zwift/*/zwift.sh 2>/dev/null | head -n 1)} ;;
   *) echo "Aufruf: rollout-run mywhoosh|zwift" >&2; exit 2 ;;
 esac
 [ -n "${ROLLOUT_RUN_UPSTREAM:-}" ] && up=$ROLLOUT_RUN_UPSTREAM
 [ -n "$up" ] && [ -x "$up" ] || { echo "Rollout: Upstream für $app ist nicht installiert" >&2; exit 127; }
 if [ "$app" = zwift ]; then zwift_prepare || exit $?; fi
+# MyWhoosh bekommt das virtuelle Gamepad von Steam Input nicht: Rollout gibt es als Tastatur und Maus weiter (gamepad-bridge.ts), und die
+# Oberfläche des Spiels zeigt beim Navigieren per Gamepad keinen Fokus (A beendete es sogar). 045e:028e ist die Kennung, unter der Steam sein Gamepad meldet
+# (Wine liest es über SDL). Nur mit xdotool (sonst bliebe das Spiel ganz ohne Eingabe), nie bei ROLLOUT_MYWHOOSH_PAD=off, und eine eigene Vorgabe gilt.
+if [ "$app" = mywhoosh ] && [ "${ROLLOUT_MYWHOOSH_PAD:-}" != off ] && [ -z "${SDL_GAMECONTROLLER_IGNORE_DEVICES:-}" ] && command -v xdotool >/dev/null 2>&1; then
+  export SDL_GAMECONTROLLER_IGNORE_DEVICES=0x045e/0x028e
+fi
 
 mkdir -p "$state"
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
-if ! ( set -C; echo $$ > "$state/run.pid" ) 2>/dev/null; then
+reaper=
+if [ -n "$mw_setup" ]; then
+  # Einrichten ist kein Spiel und nimmt run.pid nicht, darf aber nie unter einem laufenden Spiel arbeiten (uninstall beendet dessen Wine-Server).
   old=$(sed -n '1p' "$state/run.pid" 2>/dev/null)
   if alive "$old"; then
-    echo "Rollout: Es läuft schon eine App (Prozess $old). Trainer und Bluetooth lassen sich nicht teilen." >&2
+    echo "Rollout: Es läuft schon eine App (Prozess $old)." >&2
     exit 1
   fi
-  echo $$ > "$state/run.pid.tmp" && mv -f "$state/run.pid.tmp" "$state/run.pid"
+  trap '[ -n "$reaper" ] && kill "$reaper" 2>/dev/null' EXIT
+else
+  if ! ( set -C; echo $$ > "$state/run.pid" ) 2>/dev/null; then
+    old=$(sed -n '1p' "$state/run.pid" 2>/dev/null)
+    if alive "$old"; then
+      echo "Rollout: Es läuft schon eine App (Prozess $old). Trainer und Bluetooth lassen sich nicht teilen." >&2
+      exit 1
+    fi
+    echo $$ > "$state/run.pid.tmp" && mv -f "$state/run.pid.tmp" "$state/run.pid"
+  fi
+  trap '[ "$(sed -n "1p" "$state/run.pid" 2>/dev/null)" = "$$" ] && rm -f "$state/run.pid"; [ -n "$reaper" ] && kill "$reaper" 2>/dev/null' EXIT
 fi
-trap '[ "$(sed -n "1p" "$state/run.pid" 2>/dev/null)" = "$$" ] && rm -f "$state/run.pid"' EXIT
 
 # INT und HUP gehen als TERM weiter, damit das Spiel sich beenden kann. Bei Zwift reicht das nicht: Der Container hängt nicht am
 # Prozessbaum von zwift.sh, und sein PID 1 ignoriert TERM. Der Starter stoppt ihn deshalb selbst (Dienst „podman stop“, nach 10 s KILL)
 # und wartet dafür höchstens 20 s; ein Container dieses Namens, der noch nicht oder nicht mehr läuft, ist kein Fehler.
+# MyWhoosh (Spiel und Einrichtung) läuft in einer eigenen Sitzung (setsid, falls da): Wine, umu und der Bluetooth-Helfer hängen nicht
+# am Prozessbaum des Skripts und blieben bei einem TERM an das Skript allein als Waisen zurück. Beim Beenden bekommt die ganze Gruppe
+# TERM, und was nach 12 s noch lebt, KILL.
+grp=
+if { [ "$app" = mywhoosh ] || [ -n "$mw_setup" ]; } && command -v setsid >/dev/null 2>&1; then grp=1; fi
+# zw_quit: Zwift geordnet beenden. Netbrains Skript kopiert Zwifts Einstellungen samt Anmeldung (AppData) erst ins Volume zwischen Läufen, wenn
+# ZwiftApp.exe sich beendet hat. Ein „podman stop“ allein ließ den Container nach 10 s hart beenden, und die Anmeldung ging verloren.
+# Erst höflich (taskkill), nach ROLLOUT_ZWIFT_QUIT_WAIT s (8) hart (taskkill /f; das Skript kopiert dann trotzdem und beendet sich, es prüft alle 5 s),
+# dann bis ROLLOUT_ZWIFT_KILL_WAIT s (15) warten; was bleibt, stoppt der Aufrufer mit „stop“.
+zw_gone() { [ -z "$(limited "$rt" ps -q --filter "name=^${zw_name}\$" 2>/dev/null </dev/null)" ]; }
+zw_wait_gone() { zw_n=$1; while [ "$zw_n" -gt 0 ]; do zw_gone && return 0; sleep 1; zw_n=$((zw_n - 1)); done; zw_gone; }
+zw_quit() {
+  limited "$rt" exec --user user "$zw_name" wine taskkill /im ZwiftApp.exe >/dev/null 2>&1 </dev/null
+  zw_wait_gone "${ROLLOUT_ZWIFT_QUIT_WAIT:-8}" && return 0
+  limited "$rt" exec --user user "$zw_name" wine taskkill /f /im ZwiftApp.exe >/dev/null 2>&1 </dev/null
+  zw_wait_gone "${ROLLOUT_ZWIFT_KILL_WAIT:-15}"
+}
 sig=0
 pid=
 forward() {
   sig=1
-  [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
-  [ -n "${zw_name:-}" ] && limited "$rt" stop -t 10 "$zw_name" >/dev/null 2>&1 </dev/null
+  if [ -n "$pid" ]; then
+    if [ -n "$grp" ]; then kill -s TERM -- "-$pid" 2>/dev/null; else kill -TERM "$pid" 2>/dev/null; fi
+  fi
+  if [ -n "$grp" ] && [ -z "$reaper" ]; then
+    ( sleep "${ROLLOUT_RUN_KILL_AFTER:-12}"; kill -s KILL -- "-$pid" ) >/dev/null 2>&1 </dev/null &
+    reaper=$!
+  fi
+  if [ -n "${zw_name:-}" ]; then
+    zw_quit
+    limited "$rt" stop -t 10 "$zw_name" >/dev/null 2>&1 </dev/null
+  fi
   return 0
 }
 trap forward TERM INT HUP
 
 # Bildschirm wachhalten, wo systemd-inhibit da ist und es darf (in einer SSH-Sitzung verweigert polkit es): vorher ausprobieren,
 # damit ein Fehler der Sperre nie das Spiel verhindert.
-inhibit() { systemd-inhibit --what=idle:sleep --who=Rollout --why="$app läuft" "$@"; }
+why="$app läuft"
+[ -n "$mw_setup" ] && why="MyWhoosh wird eingerichtet"
+inhibit() { systemd-inhibit --what=idle:sleep --who=Rollout --why="$why" "$@"; }
 if [ -z "${ROLLOUT_RUN_NO_INHIBIT:-}" ] && command -v systemd-inhibit >/dev/null 2>&1 && inhibit true >/dev/null 2>&1; then
-  inhibit "$up" "$@" &
+  set -- systemd-inhibit --what=idle:sleep --who=Rollout --why="$why" "$up" "$@"
 else
-  "$up" "$@" &
+  set -- "$up" "$@"
 fi
+if [ -n "$grp" ]; then setsid "$@" & else "$@" & fi
 pid=$!
 while :; do
   wait "$pid"; code=$?

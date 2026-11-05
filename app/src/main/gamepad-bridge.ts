@@ -22,6 +22,8 @@ const REPEAT_FIRST_MS = 400;
 const REPEAT_MS = 110;
 /** Zwift fragt Tasten und Maus je Bild ab: ein Druck, der sofort wieder losgelassen wird, geht verloren (am Ally belegt). */
 const HOLD_MS = 70;
+/** Zeigermodus: Schritt des Steuerkreuzes in Pixel (gedrückt halten wiederholt ihn) */
+const DPAD_STEP = 12;
 
 type Dir = 'Up' | 'Down' | 'Left' | 'Right';
 
@@ -42,7 +44,19 @@ export class PadMapper {
   private clock = 0;
   private readonly releases: { at: number; line: string }[] = [];
 
-  constructor(private readonly send: (line: string) => void) {}
+  /**
+   * `pointer`: Oberflächen mit Mauszeiger wie MyWhoosh (Zwift nutzt Tastaturfokus). A ist Linksklick statt Enter, und es gibt keine Pfeiltasten:
+   * Der linke Stick bewegt den Zeiger wie der rechte, das Steuerkreuz in kleinen Schritten. So entsteht im Spiel kein Fokus, den man nicht sieht.
+   */
+  constructor(private readonly send: (line: string) => void, private readonly opts: { pointer?: boolean } = {}) {}
+
+  /** Pfeil drücken, im Zeigermodus stattdessen den Zeiger einen Schritt bewegen. */
+  private press(dir: Dir): void {
+    if (!this.opts.pointer) { this.key(dir); return; }
+    const dx = dir === 'Left' ? -DPAD_STEP : dir === 'Right' ? DPAD_STEP : 0;
+    const dy = dir === 'Up' ? -DPAD_STEP : dir === 'Down' ? DPAD_STEP : 0;
+    this.send(`mousemove_relative -- ${dx} ${dy}`);
+  }
 
   /** Taste drücken und nach `HOLD_MS` loslassen. */
   private key(name: string): void {
@@ -61,12 +75,13 @@ export class PadMapper {
     for (const d of want) {
       if (this.dirs.has(d)) continue;
       this.dirs.set(d, { since: this.clock, last: this.clock });
-      this.key(d);
+      this.press(d);
     }
   }
 
   private setStick(): void {
     this.stickDirs.clear();
+    if (this.opts.pointer) { this.syncDirs(); return; }
     if (this.lx <= -STICK_ON) this.stickDirs.add('Left');
     if (this.lx >= STICK_ON) this.stickDirs.add('Right');
     if (this.ly <= -STICK_ON) this.stickDirs.add('Up');
@@ -93,7 +108,7 @@ export class PadMapper {
         return;
       }
       if (!down) return;
-      if (code === BTN.R3) { this.click('1'); return; }
+      if (code === BTN.R3 || (code === BTN.A && this.opts.pointer)) { this.click('1'); return; }
       const name = code === BTN.A ? 'Return' : code === BTN.B || code === BTN.START ? 'Escape' : code === BTN.X ? 'Tab'
         : code === BTN.Y ? 'shift+Tab' : code === BTN.SELECT ? 'BackSpace' : '';
       if (name) this.key(name);
@@ -128,7 +143,7 @@ export class PadMapper {
     this.clock += dtMs;
     while (this.releases.length && this.releases[0].at <= this.clock) this.send((this.releases.shift() as { line: string }).line);
     for (const [dir, s] of this.dirs) {
-      if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.key(dir); }
+      if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.press(dir); }
     }
     for (const [key, s] of this.scroll) {
       if (this.clock - s.since >= REPEAT_FIRST_MS && this.clock - s.last >= REPEAT_MS) { s.last = this.clock; this.click(key); }
@@ -139,8 +154,11 @@ export class PadMapper {
       const f = Math.min(1, (m - DEADZONE) / (1 - DEADZONE));
       return Math.sign(v) * f * f;
     };
-    this.carryX += axis(this.rx) * MOUSE_SPEED * dtMs / 1000;
-    this.carryY += axis(this.ry) * MOUSE_SPEED * dtMs / 1000;
+    // Zeigermodus: beide Sticks bewegen den Zeiger (die Summe ist auf volle Geschwindigkeit begrenzt).
+    const mx = this.opts.pointer ? Math.max(-1, Math.min(1, axis(this.rx) + axis(this.lx))) : axis(this.rx);
+    const my = this.opts.pointer ? Math.max(-1, Math.min(1, axis(this.ry) + axis(this.ly))) : axis(this.ry);
+    this.carryX += mx * MOUSE_SPEED * dtMs / 1000;
+    this.carryY += my * MOUSE_SPEED * dtMs / 1000;
     const dx = Math.trunc(this.carryX);
     const dy = Math.trunc(this.carryY);
     if (dx || dy) {
@@ -189,6 +207,8 @@ export interface PadBridgeOptions {
   display: string;
   env?: NodeJS.ProcessEnv;
   onNote?: (text: string) => void;
+  /** Zeigermodus (MyWhoosh): A Linksklick, Sticks und Steuerkreuz bewegen den Zeiger, keine Pfeiltasten */
+  pointer?: boolean;
   /** Ersetzen für Tests */
   devicesFile?: string;
   spawnFn?: typeof spawn;
@@ -209,7 +229,7 @@ export function startPadBridge(opts: PadBridgeOptions): PadBridge {
   xdo.on('close', (code) => { alive = false; note(`xdotool beendet (Code ${code ?? '?'})`); });
   xdo.stdin?.on('error', () => { alive = false; });
   let sent = 0;
-  const mapper = new PadMapper((line) => { if (alive) { xdo.stdin?.write(`${line}\n`); if (sent++ < 5) note(`xdotool: ${line}`); } });
+  const mapper = new PadMapper((line) => { if (alive) { xdo.stdin?.write(`${line}\n`); if (sent++ < 5) note(`xdotool: ${line}`); } }, { pointer: opts.pointer });
   for (const device of pads) {
     const cat = run('cat', [device], { stdio: ['ignore', 'pipe', 'ignore'] });
     children.push(cat);

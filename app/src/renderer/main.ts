@@ -183,7 +183,8 @@ const ACTIONS: Record<string, Action> = {
     else if (info.installed) startLaunch(id);
     else Object.assign(ui, { screen: 'setup', setupApp: id, hd: false, setupSteam: true });
   },
-  appMenu(arg) { ui.menuApp = arg as AppId; ui.screen = 'appmenu'; },
+  // Das Menü zeigt den Bluetooth-Zustand: beim Öffnen frisch vom System holen (der Zustand ändert sich außerhalb von Rollout).
+  appMenu(arg) { ui.menuApp = arg as AppId; ui.screen = 'appmenu'; void api.getSnapshot().then(onSnapshot); },
   appAdvanced(arg) { ui.advTab = arg as AppId; ACTIONS.advanced(''); },
   hd() { ui.hd = !ui.hd; },
   project() { void api.openZwiftProject(); },
@@ -349,7 +350,10 @@ scheme.addEventListener('change', applyScheme);
 initNav({
   scope: () => viewEl.querySelector('.modalbg') ?? viewEl,
   modalOpen: () => !!viewEl.querySelector('.modalbg'),
-  back
+  back,
+  // MyWhoosh hat kein Fenster-Signal wie Zwift: Ab „Startet“ liegt das Spiel vorn und gehört dem Controller; beendet wird es über Steam.
+  // `snap` ist beim ersten Takt noch leer (der erste Snapshot kommt asynchron).
+  padEnabled: () => { const launch = (snap as Snapshot | undefined)?.launch; return !(launch?.app === 'mywhoosh' && (launch.phase === 'starting' || launch.phase === 'running')); }
 });
 
 void api.getSnapshot().then((first) => {

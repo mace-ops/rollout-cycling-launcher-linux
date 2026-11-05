@@ -15,6 +15,9 @@
 //                                Mit dem Dienst starten, beenden und entfernen auch Zwift echt (rollout-run zwift, podman rmi über rollout-run --zwift-remove).
 //   ROLLOUT_ZWIFT_WINDOWS=off    Zwift-Fenster im Spielmodus nicht erkennen und nicht für gamescope kennzeichnen (zwift-window.ts); ROLLOUT_ZWIFT_DISPLAY=<:N> wählt den X-Server (Vorgabe :0)
 //   ROLLOUT_ZWIFT_RUNNING_MS=<ms> Zeit vom Start des Containers bis „Läuft“ (Vorgabe 20000; Zwift meldet das nicht selbst)
+//   ROLLOUT_MYWHOOSH=real|sim    MyWhoosh echt (vendor/mywhoosh.sh über rollout-run, Zustand aus ~/Games/mywhoosh-linux) oder simuliert, siehe mywhoosh.ts;
+//                                ohne die Variable gilt MyWhoosh als echt, sobald bin/rollout-run und vendor/mywhoosh.sh da sind (chooseMywhooshMode).
+//                                MYWHOOSH_ROOT=<Ordner> verlegt den Spielordner (Tests); ROLLOUT_MYWHOOSH_RUNNING_MS=<ms> Zeit vom Start bis „Läuft“ (Vorgabe 20000).
 import type {
   AppId, AppProblem, InstallOptions, Launch, LaunchOptions, Overrides, RolloutApi, Snapshot, SteamResult, UpdateChannel
 } from '../shared/api';
@@ -22,6 +25,7 @@ import type { BluetoothService } from './bluetooth';
 import type { Settings, SettingsStore } from './config';
 import type { SelfUpdateService } from './selfupdate';
 import type { SteamInfo, SteamStatus } from './steam';
+import { MYWHOOSH_RUN_PROBLEM, type MywhooshRun, type MywhooshService } from './mywhoosh';
 import { RUN_PROBLEM, ZwiftError, isRunningLine, isStartLine, type ZwiftRun, type ZwiftService } from './zwift';
 
 const TICK_MS = 120;
@@ -39,6 +43,8 @@ const ZWIFT_RUNNING_MS = 20_000;
 const ZWIFT_START_FALLBACK_MS = 8000;
 /** Endet der Start mit einem Fehler innerhalb dieser Zeit, gilt er als Absturz direkt nach dem Start. */
 const ZWIFT_CRASH_WINDOW_MS = 90_000;
+/** MyWhoosh meldet „läuft“ nicht; Rollout nimmt es an, wenn das Spiel so lange nach der Zeile „starting“ noch lebt (Wine und umu brauchen einen Moment). */
+const MYWHOOSH_RUNNING_MS = 20_000;
 const LAYER_DONE = /Copying blob .* done|Pull complete|Already exists|already exists/i;
 
 const freshOverrides = (): Record<AppId, Overrides> => ({
@@ -81,15 +87,16 @@ export class SimBackend implements Backend {
     private readonly bt: BluetoothService,
     private readonly updates: SelfUpdateService,
     private readonly env: NodeJS.ProcessEnv = process.env,
-    private readonly zwift: ZwiftService | null = null
+    private readonly zwift: ZwiftService | null = null,
+    private readonly mywhoosh: MywhooshService | null = null
   ) {
     const saved = store.load();
     const fresh = env.ROLLOUT_SIM_STATE === 'fresh';
     const update = env.ROLLOUT_SIM_UPDATE === '1';
     this.state = {
       apps: {
-        mywhoosh: { installed: !fresh, steam: !fresh, updateAvailable: !fresh && update, problem: '' },
-        zwift: { installed: false, steam: false, updateAvailable: false, problem: '' }
+        mywhoosh: { installed: !fresh && !mywhoosh, version: '', steam: !fresh && !mywhoosh, updateAvailable: !fresh && !mywhoosh && update, problem: '' },
+        zwift: { installed: false, version: '', steam: false, updateAvailable: false, problem: '' }
       },
       job: null,
       launch: null,
@@ -110,12 +117,15 @@ export class SimBackend implements Backend {
     };
     this.syncZwiftTag();
     this.crash = env.ROLLOUT_SIM_CRASH === '1';
+    // Echtes MyWhoosh: der Zustand kommt von der Platte, schon der erste Snapshot zeigt ihn.
+    this.refreshMywhoosh();
   }
 
   private readonly crash: boolean;
 
   async getSnapshot(): Promise<Snapshot> {
     await this.refreshZwift();
+    this.refreshMywhoosh();
     this.refreshSteam();
     this.state.bluetooth.state = await this.bt.adapter();
     return this.view();
@@ -169,6 +179,159 @@ export class SimBackend implements Backend {
     if (info.installed) this.zwiftInstallProblem = '';
     else info.steam = false;
     info.problem = this.zwiftRemoveProblem || this.zwiftInstallProblem || this.zwiftStatusProblem;
+  }
+
+  // ---------- MyWhoosh echt (mywhoosh.ts) ----------
+
+  private mwInstallProblem: AppProblem = '';
+  private mwRemoveProblem: AppProblem = '';
+  /** Einrichten, Aktualisieren oder Entfernen läuft; `abort` bricht es ab (Beenden von Rollout). */
+  private mwJob: { abort: AbortController; done: Promise<void> } | null = null;
+  private mwRun: MywhooshRun | null = null;
+  private mwStopping = false;
+  private mwTimers: NodeJS.Timeout[] = [];
+
+  /** Zustand aus dem Spielordner. Während eines Vorgangs oder Spiels gehört er dem Vorgang. */
+  private refreshMywhoosh(): void {
+    if (!this.mywhoosh || this.mwJob || this.mwRun) return;
+    const status = this.mywhoosh.status();
+    const info = this.state.apps.mywhoosh;
+    info.installed = status.installed;
+    info.version = status.version;
+    if (!status.installed) Object.assign(info, { steam: false, updateAvailable: false });
+    else this.mwInstallProblem = '';
+    info.problem = this.mwRemoveProblem || (status.installed ? '' : this.mwInstallProblem);
+  }
+
+  /** Führt `work` als Einrichtung oder Aktualisierung von MyWhoosh aus; ein Fehlschlag erscheint als Problem der Karte, nichts bleibt hängen. */
+  private async runMywhooshJob(kind: 'install' | 'update', steam: boolean, hd: boolean, work: (svc: MywhooshService, onPercent: (p: number) => void, signal: AbortSignal) => Promise<void>): Promise<void> {
+    const svc = this.mywhoosh;
+    if (!svc) return;
+    const info = this.state.apps.mywhoosh;
+    this.mwInstallProblem = '';
+    this.mwRemoveProblem = '';
+    info.problem = '';
+    const abort = new AbortController();
+    this.state.job = { app: 'mywhoosh', kind, progress: 0, steam, hd };
+    const run = (async (): Promise<void> => {
+      try {
+        await work(svc, (p) => this.setJobProgress(p), abort.signal);
+        const status = svc.status();
+        info.installed = status.installed;
+        info.version = status.version;
+        info.steam = status.installed && steam;
+        info.updateAvailable = false;
+        this.state.finished = { seq: (this.seq += 1), app: 'mywhoosh', kind };
+      } catch (e) {
+        const code = (e as { problem?: string }).problem;
+        this.mwInstallProblem = code === 'abort' ? '' : (code as AppProblem | undefined) || 'error';
+        info.problem = this.mwInstallProblem;
+      } finally {
+        this.mwJob = null;
+        this.state.job = null;
+        this.refreshMywhoosh();
+        this.changed();
+      }
+    })();
+    this.mwJob = { abort, done: run };
+    this.changed();
+    await run;
+  }
+
+  private launchMywhoosh(mywhoosh: MywhooshService, options: LaunchOptions): void {
+    if (this.mwRun || this.mwJob) return;
+    this.launchStartedAt = Date.now();
+    this.phaseStartedAt = this.launchStartedAt;
+    this.mwStopping = false;
+    // Bluetooth zuerst: Ohne Adapter startet das Spiel, findet aber keinen Trainer. „Trotzdem starten“ überspringt die Prüfung.
+    this.state.launch = { app: 'mywhoosh', phase: 'bluetooth', progress: 3, problem: '' };
+    this.changed();
+    const token = this.launchStartedAt;
+    void this.bt.adapter().then((adapter) => {
+      this.state.bluetooth.state = adapter;
+      if (this.state.launch?.app !== 'mywhoosh' || this.launchStartedAt !== token || this.mwStopping) return;
+      if (adapter === 'problem' && !options.ignoreBluetooth) {
+        this.state.launch = { app: 'mywhoosh', phase: 'bterror', progress: 20, problem: '' };
+        this.changed();
+        return;
+      }
+      this.startMywhooshRun(mywhoosh);
+    });
+  }
+
+  private startMywhooshRun(mywhoosh: MywhooshService): void {
+    this.phaseStartedAt = Date.now();
+    this.state.launch = { app: 'mywhoosh', phase: 'updates', progress: 5, problem: '' };
+    const run: MywhooshRun = mywhoosh.start((line) => {
+      if (this.mwRun !== run) return;
+      if (/\[mywhoosh\] starting MyWhoosh/.test(line)) this.mywhooshStarting();
+    }, (visible) => {
+      if (this.mwRun !== run || this.state.launch?.app !== 'mywhoosh') return;
+      this.state.launch.visible = visible;
+      this.changed();
+    });
+    this.mwRun = run;
+    void run.done.then((code) => this.mywhooshEnded(run, code));
+    this.changed();
+  }
+
+  private mywhooshStarting(): void {
+    const launch = this.state.launch;
+    if (!this.mwRun || !launch || launch.phase !== 'updates') return;
+    launch.phase = 'starting';
+    this.phaseStartedAt = Date.now();
+    const ms = Number(this.env.ROLLOUT_MYWHOOSH_RUNNING_MS) || MYWHOOSH_RUNNING_MS;
+    this.mwTimers.push(setTimeout(() => {
+      const l = this.state.launch;
+      if (!this.mwRun || l?.app !== 'mywhoosh' || l.phase !== 'starting') return;
+      l.phase = 'running';
+      l.progress = 100;
+      this.changed();
+    }, ms));
+    this.changed();
+  }
+
+  private mywhooshEnded(run: MywhooshRun, code: number | null): void {
+    if (this.mwRun !== run) return;
+    this.mwRun = null;
+    this.mwTimers.forEach(clearTimeout);
+    this.mwTimers = [];
+    const launch = this.state.launch;
+    const stopped = this.mwStopping;
+    this.mwStopping = false;
+    if (launch) launch.visible = false;
+    // Ein Update im Start kann die Version geändert haben.
+    this.refreshMywhoosh();
+    if (!launch || stopped || code === 0) this.state.launch = null;
+    else if (code !== null && MYWHOOSH_RUN_PROBLEM[code]) Object.assign(launch, { phase: 'failed', problem: MYWHOOSH_RUN_PROBLEM[code] });
+    else if (Date.now() - this.launchStartedAt < ZWIFT_CRASH_WINDOW_MS) launch.phase = 'crash';
+    else this.state.launch = null;
+    this.changed();
+  }
+
+  private async removeMywhoosh(mywhoosh: MywhooshService): Promise<void> {
+    if (this.mwJob || this.mwRun) return;
+    const info = this.state.apps.mywhoosh;
+    this.mwRemoveProblem = '';
+    const abort = new AbortController();
+    const run = (async (): Promise<void> => {
+      try {
+        await mywhoosh.uninstall(abort.signal);
+        Object.assign(info, { installed: false, version: '', steam: false, updateAvailable: false });
+        this.state.overrides.mywhoosh = freshOverrides().mywhoosh;
+        this.mwInstallProblem = '';
+      } catch (e) {
+        const code = (e as { problem?: string }).problem;
+        this.mwRemoveProblem = code === 'abort' ? '' : 'error';
+      } finally {
+        this.mwJob = null;
+        this.refreshMywhoosh();
+        this.changed();
+      }
+    })();
+    this.mwJob = { abort, done: run };
+    this.changed();
+    await run;
   }
 
   private async installZwift(zwift: ZwiftService, steam: boolean): Promise<void> {
@@ -227,6 +390,11 @@ export class SimBackend implements Backend {
   async install(app: AppId, options: InstallOptions): Promise<void> {
     if (this.state.job || this.state.apps[app].installed || (app === 'zwift' && this.zwiftRemoving)) return;
     if (app === 'zwift' && this.zwift) { void this.installZwift(this.zwift, options.steam); return; }
+    if (app === 'mywhoosh' && this.mywhoosh) {
+      if (this.mwJob || this.mwRun) return;
+      void this.runMywhooshJob('install', options.steam, options.hd, (svc, onPercent, signal) => svc.install({ hd: options.hd }, onPercent, signal));
+      return;
+    }
     this.state.job = { app, kind: 'install', progress: 0, steam: options.steam, hd: options.hd };
     this.changed();
   }
@@ -234,6 +402,10 @@ export class SimBackend implements Backend {
   async startUpdate(app: AppId): Promise<void> {
     const info = this.state.apps[app];
     if (this.state.job || !info.installed || !info.updateAvailable) return;
+    if (app === 'mywhoosh' && this.mywhoosh) {
+      void this.runMywhooshJob('update', info.steam, false, (svc, onPercent, signal) => svc.update(onPercent, signal));
+      return;
+    }
     this.state.job = { app, kind: 'update', progress: 0, steam: info.steam, hd: false };
     this.changed();
   }
@@ -241,6 +413,7 @@ export class SimBackend implements Backend {
   async launch(app: AppId, options: LaunchOptions = {}): Promise<void> {
     if (!this.state.apps[app].installed) return;
     if (app === 'zwift' && this.zwift) { this.launchZwift(this.zwift); return; }
+    if (app === 'mywhoosh' && this.mywhoosh) { this.launchMywhoosh(this.mywhoosh, options); return; }
     this.launchOptions = options;
     this.launchStep = 0;
     this.state.launch = { app, phase: 'updates', progress: 0, problem: '' };
@@ -319,9 +492,26 @@ export class SimBackend implements Backend {
   }
 
   /** Läuft ein echtes Spiel, das beim Beenden von Rollout mit beendet werden muss? */
-  hasRunningGame(): boolean { return this.zwiftRun !== null; }
+  hasRunningGame(): boolean { return this.zwiftRun !== null || this.mwRun !== null || this.mwJob !== null; }
 
   async stopLaunch(): Promise<void> {
+    const job = this.mwJob;
+    if (job) {
+      // Einrichten oder Entfernen abbrechen und abwarten: Sonst bliebe ein halbes Spiel im Ordner und das Skript liefe als Waise weiter.
+      job.abort.abort();
+      await job.done;
+      return;
+    }
+    const mw = this.mwRun;
+    if (mw) {
+      this.mwStopping = true;
+      if (this.state.launch) { this.state.launch.phase = 'stopping'; this.changed(); }
+      mw.stop();
+      await mw.done;
+      return;
+    }
+    // Abbruch während der Bluetooth-Prüfung: nichts läuft, die Antwort der Prüfung wird verworfen (Marke launchStartedAt).
+    if (this.state.launch?.app === 'mywhoosh' && this.state.launch.phase === 'bluetooth') this.launchStartedAt = 0;
     const run = this.zwiftRun;
     if (run) {
       // Das Spiel beenden und abwarten: Erst danach ist run.pid weg und ein neuer Start möglich.
@@ -426,7 +616,8 @@ export class SimBackend implements Backend {
   async remove(app: AppId): Promise<void> {
     if (this.state.job?.app === app || this.state.launch?.app === app) return;
     if (app === 'zwift' && this.zwift) { await this.removeZwift(this.zwift); return; }
-    this.state.apps[app] = { installed: false, steam: false, updateAvailable: false, problem: '' };
+    if (app === 'mywhoosh' && this.mywhoosh) { await this.removeMywhoosh(this.mywhoosh); return; }
+    this.state.apps[app] = { installed: false, version: '', steam: false, updateAvailable: false, problem: '' };
     this.state.overrides[app] = freshOverrides()[app];
     this.changed();
   }
@@ -491,7 +682,7 @@ export class SimBackend implements Backend {
 
   private tick(): void {
     const { job, launch } = this.state;
-    if (job && !this.realJob) {
+    if (job && !this.realJob && !this.mwJob) {
       job.progress = Math.min(100, job.progress + 1);
       if (job.progress >= 100) {
         const info = this.state.apps[job.app];
@@ -502,7 +693,7 @@ export class SimBackend implements Backend {
         this.state.job = null;
       }
     }
-    if (launch?.app === 'zwift' && this.zwift) this.stepZwiftLaunch(launch);
+    if ((launch?.app === 'zwift' && this.zwift) || (launch?.app === 'mywhoosh' && this.mywhoosh)) this.stepZwiftLaunch(launch);
     else if (launch && launch.phase !== 'running' && launch.phase !== 'bterror' && launch.phase !== 'crash') {
       this.launchStep += 1;
       launch.progress = Math.round((this.launchStep / LAUNCH_STEPS) * 100);

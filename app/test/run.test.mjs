@@ -41,6 +41,11 @@ case $1 in
   pull) [ -n "\${FAKE_PULL_FAIL:-}" ] && exit 1; : > "$ROLLOUT_HOME/image-present"; exit 0 ;;
   rmi) [ -n "\${FAKE_RMI_FAIL:-}" ] && { echo "image is in use" >&2; exit 2; }; rm -f "$ROLLOUT_HOME/image-present"; exit 0 ;;
   tag) exit 0 ;;
+  ps) [ -f "$ROLLOUT_HOME/running" ] && echo abc123; exit 0 ;;
+  exec) case "$*" in
+    *"taskkill /f "*) [ -z "\${FAKE_FORCE_IGNORED:-}" ] && rm -f "$ROLLOUT_HOME/running" ;;
+    *"taskkill /im"*) [ -n "\${FAKE_POLITE_KILLS:-}" ] && rm -f "$ROLLOUT_HOME/running" ;;
+  esac; exit 0 ;;
 esac
 exit 0
 `;
@@ -146,7 +151,7 @@ for (const sh of shells) {
     const home = makeHome();
     const r = run(sh, home, ['--bootstrap-selftest'], { RUN_MODE: 'exit 0' });
     assert.equal(r.status, 0);
-    assert.equal(r.stdout.trim(), 'rollout-bootstrap 5 run');
+    assert.equal(r.stdout.trim(), 'rollout-bootstrap 8 run');
     assert.equal(calls(home).length, 0);
     assert.equal(pidFile(home), null);
   });
@@ -461,5 +466,147 @@ for (const sh of shells) {
     assert.equal(r.stdout, 'podman\n');
     assert.equal(calls(home).length, 0);
     assert.equal(pidFile(home), null);
+  });
+}
+
+// --- MyWhoosh über rollout-run (R30 bis R33) -------------------------------------------------------------------------------------
+// Kein echtes MyWhoosh: Der Upstream ist die Attrappe upstream.sh, HOME zeigt auf einen Wegwerf-Ordner (die Ausgabe-Erkennung liest ~/Games).
+function mywhooshHome(edition) {
+  const home = makeHome();
+  const fakeHome = path.join(home, 'userhome');
+  if (edition) {
+    fs.mkdirSync(path.join(fakeHome, 'Games', edition === 'hd' ? 'mywhoosh-hd-linux' : 'mywhoosh-linux'), { recursive: true });
+    fs.writeFileSync(path.join(fakeHome, 'Games', edition === 'hd' ? 'mywhoosh-hd-linux' : 'mywhoosh-linux', 'edition'), `${edition === 'hd' ? 'hd' : 'standard'}\n`);
+  } else fs.mkdirSync(fakeHome, { recursive: true });
+  return { home, extra: { HOME: fakeHome, MYWHOOSH_ROOT: undefined } };
+}
+const argsOf = (home) => calls(home).map((l) => /args=(.*?) preload=/.exec(l)?.[1]);
+
+for (const sh of shells) {
+  test(`R30 --mywhoosh (${sh}): install, update und uninstall laufen über den Upstream, ohne run.pid; --hd nur bei reiner HD-Installation; unbekannte Aktion ist Exit 2`, () => {
+    const std = mywhooshHome('standard');
+    for (const act of ['install', 'update', 'uninstall']) assert.equal(run(sh, std.home, ['--mywhoosh', act], { RUN_MODE: 'exit 0', ...std.extra }).status, 0, act);
+    assert.deepEqual(argsOf(std.home), ['install', 'update', 'uninstall']);
+    assert.ok(calls(std.home).every((l) => /pidfile= /.test(l)), 'Einrichten nimmt run.pid nicht');
+    assert.equal(pidFile(std.home), null);
+    const hd = mywhooshHome('hd');
+    for (const act of ['update', 'uninstall']) run(sh, hd.home, ['--mywhoosh', act], { RUN_MODE: 'exit 0', ...hd.extra });
+    run(sh, hd.home, ['--mywhoosh', 'install', '--hd'], { RUN_MODE: 'exit 0', ...hd.extra });
+    run(sh, hd.home, ['mywhoosh'], { RUN_MODE: 'exit 0', ...hd.extra });
+    assert.deepEqual(argsOf(hd.home), ['update --hd', 'uninstall --hd', 'install --hd', 'run --hd']);
+    const none = mywhooshHome();
+    run(sh, none.home, ['mywhoosh'], { RUN_MODE: 'exit 0', ...none.extra });
+    run(sh, none.home, ['--mywhoosh', 'install'], { RUN_MODE: 'exit 0', ...none.extra });
+    assert.deepEqual(argsOf(none.home), ['run', 'install']);
+    const bad = run(sh, none.home, ['--mywhoosh', 'doctor'], { RUN_MODE: 'exit 0', ...none.extra });
+    assert.equal(bad.status, 2);
+    assert.equal(run(sh, none.home, ['--mywhoosh'], { RUN_MODE: 'exit 0', ...none.extra }).status, 2);
+    assert.equal(calls(none.home).length, 2, 'unbekannte Aktion startet nichts');
+  });
+
+  test(`R31 --mywhoosh (${sh}): Exit-Code des Skripts kommt durch, fehlender Upstream ist 127, ein laufendes Spiel sperrt das Einrichten (Exit 1)`, () => {
+    const m = mywhooshHome('standard');
+    assert.equal(run(sh, m.home, ['--mywhoosh', 'install'], { RUN_MODE: 'exit 7', ...m.extra }).status, 7);
+    assert.equal(run(sh, m.home, ['--mywhoosh', 'update'], { RUN_MODE: 'exit 0', ROLLOUT_RUN_UPSTREAM: '', ...m.extra }).status, 127, 'ohne vendor/mywhoosh.sh');
+    // Ein lebender Prozess in run.pid (hier dieser Test selbst) heißt: Es läuft ein Spiel.
+    fs.writeFileSync(path.join(m.home, 'state/run.pid'), `${process.pid}\n`);
+    const before = calls(m.home).length;
+    const busy = run(sh, m.home, ['--mywhoosh', 'uninstall'], { RUN_MODE: 'exit 0', ...m.extra });
+    assert.equal(busy.status, 1);
+    assert.match(busy.stderr, /läuft schon eine App/);
+    assert.equal(calls(m.home).length, before, 'uninstall wurde nicht gestartet');
+    assert.equal(pidFile(m.home), String(process.pid), 'fremde run.pid bleibt');
+  });
+}
+
+// Beenden: TERM geht an die ganze Sitzung des Spiels (Wine und Helfer hängen nicht am Skript), was TERM ignoriert, bekommt später KILL.
+const TREE_UPSTREAM = `#!/bin/sh
+case $RUN_MODE in
+  tree) sleep 30 >/dev/null 2>&1 & echo $! > "$ROLLOUT_HOME/child.pid"; : > "$ROLLOUT_HOME/started"; wait ;;
+  stubborn) trap '' TERM; sleep 30 >/dev/null 2>&1 & echo $! > "$ROLLOUT_HOME/child.pid"; : > "$ROLLOUT_HOME/started"; while :; do sleep 1; done ;;
+esac
+`;
+const alivePid = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const hasSetsid = spawnSync('setsid', ['--version']).status === 0;
+for (const sh of shells) {
+  test(`R32 Beenden von MyWhoosh (${sh}): TERM trifft auch die Enkel des Skripts, keine Waisen, run.pid weg`, { skip: !hasSetsid && 'setsid fehlt' }, async () => {
+    const m = mywhooshHome('standard');
+    fs.writeFileSync(path.join(m.home, 'upstream.sh'), TREE_UPSTREAM, { mode: 0o755 });
+    const child = start(sh, m.home, ['mywhoosh'], { RUN_MODE: 'tree', ...m.extra });
+    assert.ok(await until(() => fs.existsSync(path.join(m.home, 'started'))), 'Spiel läuft');
+    const grandchild = Number(fs.readFileSync(path.join(m.home, 'child.pid'), 'utf8'));
+    assert.ok(alivePid(grandchild));
+    child.kill('SIGTERM');
+    assert.equal(await exited(child), 143);
+    assert.ok(await until(() => !alivePid(grandchild), 3000), 'Enkel ist weg');
+    assert.equal(pidFile(m.home), null);
+  });
+
+  test(`R33 Beenden von MyWhoosh (${sh}): was TERM ignoriert, bekommt nach ROLLOUT_RUN_KILL_AFTER s KILL; der Starter endet erst dann`, { skip: !hasSetsid && 'setsid fehlt' }, async () => {
+    const m = mywhooshHome('standard');
+    fs.writeFileSync(path.join(m.home, 'upstream.sh'), TREE_UPSTREAM, { mode: 0o755 });
+    const child = start(sh, m.home, ['mywhoosh'], { RUN_MODE: 'stubborn', ROLLOUT_RUN_KILL_AFTER: '1', ...m.extra });
+    assert.ok(await until(() => fs.existsSync(path.join(m.home, 'started'))));
+    const grandchild = Number(fs.readFileSync(path.join(m.home, 'child.pid'), 'utf8'));
+    const t0 = Date.now();
+    child.kill('SIGTERM');
+    const code = await exited(child);
+    assert.ok(code === 137 || code === 143 || code === 'SIGKILL' || code > 128, `Exit ${code}`);
+    assert.ok(Date.now() - t0 >= 900, 'erst nach der Frist');
+    assert.ok(await until(() => !alivePid(grandchild), 3000), 'Enkel ist weg');
+    assert.equal(pidFile(m.home), null);
+  });
+}
+
+// --- Gamepad für MyWhoosh ausblenden (R34) ---------------------------------------------------------------------------------------
+test('R34 MyWhoosh: Das Steam-Gamepad wird für Wine ausgeblendet, aber nur mit xdotool, nie mit ROLLOUT_MYWHOOSH_PAD=off, eine eigene Vorgabe gilt; Zwift und Einrichtung bleiben unberührt', () => {
+  const probe = (home, extra) => {
+    fs.writeFileSync(path.join(home, 'upstream.sh'), '#!/bin/sh\necho "sdl=${SDL_GAMECONTROLLER_IGNORE_DEVICES-unset}" >> "$ROLLOUT_HOME/sdl.log"\n', { mode: 0o755 });
+    return extra;
+  };
+  const sdl = (home) => fs.readFileSync(path.join(home, 'sdl.log'), 'utf8').trim().split('\n');
+  const withXdotool = (home) => { fs.writeFileSync(path.join(home, 'fakebin/xdotool'), '#!/bin/sh\nexit 0\n', { mode: 0o755 }); };
+  const m = mywhooshHome('standard');
+  withXdotool(m.home);
+  probe(m.home);
+  assert.equal(run('bash', m.home, ['mywhoosh'], { ...m.extra, SDL_GAMECONTROLLER_IGNORE_DEVICES: undefined }).status, 0);
+  run('bash', m.home, ['mywhoosh'], { ...m.extra, ROLLOUT_MYWHOOSH_PAD: 'off' });
+  run('bash', m.home, ['mywhoosh'], { ...m.extra, SDL_GAMECONTROLLER_IGNORE_DEVICES: '0x1/0x2' });
+  run('bash', m.home, ['--mywhoosh', 'update'], m.extra);
+  assert.deepEqual(sdl(m.home), ['sdl=0x045e/0x028e', 'sdl=unset', 'sdl=0x1/0x2', 'sdl=unset']);
+  // Ohne xdotool bliebe das Spiel ganz ohne Eingabe: dann nichts ausblenden. PATH nur mit den nötigsten Werkzeugen.
+  const bare = mywhooshHome('standard');
+  probe(bare.home);
+  const tools = path.join(bare.home, 'tools');
+  fs.mkdirSync(tools);
+  for (const t of ['sed', 'dirname', 'mkdir', 'cat', 'rm', 'mv', 'ls', 'head', 'sleep', 'echo', 'bash', 'sh', 'env', 'kill', 'setsid', 'id']) {
+    const found = spawnSync('sh', ['-c', `command -v ${t}`], { encoding: 'utf8' }).stdout.trim();
+    if (found) fs.symlinkSync(found, path.join(tools, t));
+  }
+  run('bash', bare.home, ['mywhoosh'], { ...bare.extra, PATH: tools });
+  assert.deepEqual(sdl(bare.home), ['sdl=unset']);
+});
+
+// --- Zwift geordnet beenden (R35): erst höflich, dann hart, dann stop; so kopiert netbrains Skript die Anmeldung ins Volume ----------
+for (const sh of shells) {
+  test(`R35 Beenden von Zwift (${sh}): taskkill höflich, bei Bedarf hart, danach immer podman stop; kurze Fristen im Test`, async () => {
+    const cases = [
+      // [Umgebung, erwartete Aufrufe vor stop]
+      [{ FAKE_POLITE_KILLS: '1' }, ['exec --user user zwift-fahrer wine taskkill /im ZwiftApp.exe']],
+      [{}, ['exec --user user zwift-fahrer wine taskkill /im ZwiftApp.exe', 'exec --user user zwift-fahrer wine taskkill /f /im ZwiftApp.exe']],
+      [{ FAKE_FORCE_IGNORED: '1' }, ['exec --user user zwift-fahrer wine taskkill /im ZwiftApp.exe', 'exec --user user zwift-fahrer wine taskkill /f /im ZwiftApp.exe']]
+    ];
+    for (const [extra, expected] of cases) {
+      const home = makeHome();
+      zwiftScript(home);
+      fs.writeFileSync(path.join(home, 'running'), '');
+      const child = start(sh, home, ['zwift'], { RUN_MODE: 'wait', USER: 'fahrer', ROLLOUT_ZWIFT_QUIT_WAIT: '1', ROLLOUT_ZWIFT_KILL_WAIT: '1', ...extra });
+      assert.ok(await until(() => fs.existsSync(path.join(home, 'started'))));
+      child.kill('SIGTERM');
+      await exited(child);
+      const log = containers(home).map((l) => l.replace(/^(podman|docker) /, '')).filter((l) => /^(exec|stop) /.test(l));
+      assert.deepEqual(log, [...expected, 'stop -t 10 zwift-fahrer'], JSON.stringify(extra));
+      assert.equal(pidFile(home), null);
+    }
   });
 }

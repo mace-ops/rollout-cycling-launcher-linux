@@ -39,9 +39,19 @@ const ctl = (args: string[]): string => {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Wie `ctl`, aber ohne den Hauptprozess zu blockieren: Der Zustand wird bei jedem Öffnen des App-Menüs und vor jedem Start abgefragt. */
+const ctlAsync = (args: string[]): Promise<string> => new Promise((resolve) => {
+  let out = '';
+  const child = spawn('bluetoothctl', args, { stdio: ['ignore', 'pipe', 'ignore'] });
+  const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+  child.stdout.on('data', (d: Buffer) => { out += d.toString(); });
+  child.on('error', () => { clearTimeout(timer); resolve(''); });
+  child.on('close', (code) => { clearTimeout(timer); resolve(code === 0 ? out : ''); });
+});
+
 export const realBluetooth: BluetoothService = {
   async adapter() {
-    return /Powered:\s*yes/.test(strip(ctl(['show']))) ? 'ready' : 'problem';
+    return /Powered:\s*yes/.test(strip(await ctlAsync(['show']))) ? 'ready' : 'problem';
   },
 
   async scan(onFound, seconds) {

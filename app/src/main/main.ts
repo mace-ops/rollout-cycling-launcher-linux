@@ -11,6 +11,7 @@ import { FakeFeed, FakeSelfUpdate } from './selfupdate-fake';
 import { UPDATE_KEYS } from './selfupdate-keys';
 import { realFeed } from './selfupdate-net';
 import upstreams from '../../upstreams.json';
+import { RealMywhoosh, chooseMywhooshMode, type MywhooshService } from './mywhoosh';
 import { FakeZwift, RealZwift, chooseZwiftMode, type ZwiftService } from './zwift';
 import { zoomFor } from './zoom';
 import * as steam from './steam';
@@ -89,6 +90,27 @@ if (!app.requestSingleInstanceLock()) {
       try { fs.appendFileSync(path.join(home, 'state/zwift-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* Protokoll ist Zugabe */ }
     } } });
     return null;
+  };
+
+  /**
+   * MyWhoosh echt (`real`: vendor/mywhoosh.sh über bin/rollout-run, Zustand aus dem Spielordner) oder simuliert (`sim`). Ohne die Variable
+   * ROLLOUT_MYWHOOSH gilt `real`, sobald bin/rollout-run und die mitgelieferte mywhoosh.sh da sind. Die Datei liegt neben dist/ der laufenden Version.
+   */
+  const mywhooshService = (): MywhooshService | null => {
+    const home = steam.rolloutHome();
+    const mode = chooseMywhooshMode({
+      mode: process.env.ROLLOUT_MYWHOOSH,
+      runnerExists: fs.existsSync(path.join(home, 'bin/rollout-run')),
+      scriptExists: fs.existsSync(path.join(__dirname, '../../vendor/mywhoosh.sh'))
+    });
+    if (mode !== 'real') return null;
+    // Fensterüberwachung und Controller im Spielmodus (wie bei Zwift): ROLLOUT_MYWHOOSH_WINDOWS=off schaltet beides ab, ROLLOUT_MYWHOOSH_PAD=off nur den Controller.
+    // Protokoll: <Rollout-Ordner>/state/mywhoosh-window.log
+    const windows = process.env.ROLLOUT_MYWHOOSH_WINDOWS === 'off' ? undefined : {
+      display: process.env.ROLLOUT_MYWHOOSH_DISPLAY || process.env.DISPLAY || ':0',
+      onNote: (text: string) => { try { fs.appendFileSync(path.join(home, 'state/mywhoosh-window.log'), `${new Date().toISOString()} ${text}\n`); } catch { /* Protokoll ist Zugabe */ } }
+    };
+    return new RealMywhoosh({ home, windows, cursorDir: path.join(home, 'state/cursors') });
   };
 
   const handlers: Record<Command, (...args: unknown[]) => unknown> = {
@@ -185,7 +207,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     // Das Backend entsteht erst danach und fragt den Dienst schon im Konstruktor: bis dahin gilt „nichts belegt“.
     const updates = selfUpdateService(() => (backend ? backend.settings() : { autoUpdate: true, channel: 'stable' }), () => (backend ? backend.busy() : false));
-    backend = new SimBackend((snapshot: Snapshot) => win?.webContents.send('rollout-snapshot', snapshot), app.getLocale(), steamService(), fileStore, process.env.ROLLOUT_BT === 'fake' ? new FakeBluetooth(process.env.ROLLOUT_SIM_BT === 'problem') : realBluetooth, updates, process.env, zwiftService());
+    backend = new SimBackend((snapshot: Snapshot) => win?.webContents.send('rollout-snapshot', snapshot), app.getLocale(), steamService(), fileStore, process.env.ROLLOUT_BT === 'fake' ? new FakeBluetooth(process.env.ROLLOUT_SIM_BT === 'problem') : realBluetooth, updates, process.env, zwiftService(), mywhooshService());
     updates.onChange(() => backend.refresh());
     updates.start();
     win = new BrowserWindow({

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Legt Rollout an den festen Pfad ~/.local/share/rollout (oder $ROLLOUT_HOME), Aufbau nach Konzept 4.3:
-# bin/rollout (Wächter), bin/rollout-run (Spielstart), versions/<version>/, current, electron/<version>/, state/.
+# bin/rollout (Wächter), bin/rollout-run (Spielstart), versions/<version>/ (dist, vendor, bootstrap), current, electron/<version>/, state/.
 # Der Pfad bin/rollout ändert sich nie, deshalb bleiben Steam-Eintrag, Artwork und Spielzeit bei Updates erhalten.
 # Ein alter Aufbau (app/dist, app/electron) zieht beim nächsten Lauf um und behält sein Electron.
 # Aufruf nach `npm run build`: scripts/install.sh [Electron-Ordner]. Rollout dabei beenden.
@@ -53,6 +53,7 @@ new="$home/versions/.new-$$"
 rm -rf "$new"
 mkdir -p "$new/bootstrap"
 cp -r "$here/dist" "$new/dist"
+cp -r "$here/vendor" "$new/vendor"
 cp "$here/package.json" "$new/package.json"
 cp "$here/scripts/bin-rollout.sh" "$new/bootstrap/rollout"
 cp "$here/scripts/bin-rollout-run.sh" "$new/bootstrap/rollout-run"

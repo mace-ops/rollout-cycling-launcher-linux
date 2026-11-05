@@ -55,14 +55,15 @@ export interface XWindow { id: number; hex: string; width: number; height: numbe
 const WINDOW_LINE = /^(\s+)(0x[0-9a-f]+)\s+(?:"[^"]*"|\(has no name\)):\s+\("([^"]*)" "([^"]*)"\)\s+(\d+)x(\d+)[+-]/;
 
 /** Spielfenster aus `xwininfo -root -tree`: oberste Ebene, WM_CLASS `zwiftapp.exe`, nicht winzig; bei mehreren das größte. */
-export function findZwiftWindow(tree: string): XWindow | null {
+export function findZwiftWindow(tree: string, windowClass: string | RegExp = WINDOW_CLASS): XWindow | null {
   const lines = tree.split('\n').map((l) => WINDOW_LINE.exec(l)).filter((m): m is RegExpExecArray => m !== null);
   if (!lines.length) return null;
   const top = Math.min(...lines.map((m) => m[1].length));
   let best: XWindow | null = null;
   for (const m of lines) {
     if (m[1].length !== top) continue;
-    if (m[3].toLowerCase() !== WINDOW_CLASS && m[4].toLowerCase() !== WINDOW_CLASS) continue;
+    const matches = (name: string): boolean => (typeof windowClass === 'string' ? name.toLowerCase() === windowClass : windowClass.test(name));
+    if (!matches(m[3]) && !matches(m[4])) continue;
     const width = Number(m[5]);
     const height = Number(m[6]);
     if (width < MIN_SIDE || height < MIN_SIDE) continue;
@@ -88,6 +89,10 @@ export interface WindowWatcherOptions {
   /** Hinweise für das Protokoll (z. B. gesetzte AppID, Werkzeugfehler) */
   onNote?: (text: string) => void;
   intervalMs?: number;
+  /** WM_CLASS des Spielfensters (Vorgabe `zwiftapp.exe`); ein RegExp trifft Instanz oder Klasse */
+  windowClass?: string | RegExp;
+  /** `STEAM_GAME` an das Fenster setzen (Vorgabe ja). MyWhoosh startet unter Steam und trägt es schon; dann ohne AppID nur beobachten. */
+  tag?: boolean;
 }
 
 export interface WindowWatcher {
@@ -104,6 +109,7 @@ export interface WindowWatcher {
  */
 export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
   const { exec, appId } = opts;
+  const tag = opts.tag !== false;
   const focusExec = opts.focusExec ?? exec;
   let stopped = false;
   let visible = false;
@@ -114,9 +120,9 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
   const setVisible = (value: boolean): void => { if (value !== visible && !stopped) { visible = value; opts.onVisible(value); } };
 
   const tick = async (): Promise<void> => {
-    const win = findZwiftWindow(await exec('xwininfo', ['-root', '-tree']));
-    if (!win) { tagged = 0; note('kein Zwift-Fenster gefunden'); setVisible(false); return; }
-    if (tagged !== win.id) {
+    const win = findZwiftWindow(await exec('xwininfo', ['-root', '-tree']), opts.windowClass);
+    if (!win) { tagged = 0; note('kein Spielfenster gefunden'); setVisible(false); return; }
+    if (tag && tagged !== win.id) {
       await exec('xprop', ['-id', win.hex, '-f', 'STEAM_GAME', '32c', '-set', 'STEAM_GAME', appId as string]);
       tagged = win.id;
       note(`STEAM_GAME=${appId} an Fenster ${win.hex} gesetzt`);
@@ -129,7 +135,7 @@ export function watchZwiftWindow(opts: WindowWatcherOptions): WindowWatcher {
     if (!stopped) timer = setTimeout(() => { void loop(); }, opts.intervalMs ?? 1000);
   };
 
-  if (appId) void loop();
+  if (appId || !tag) void loop();
   else note('Rollout läuft nicht unter Steam (keine AppID im Prozessbaum): Zwift-Fenster bleibt ohne STEAM_GAME');
   return {
     stop: () => { stopped = true; if (timer) clearTimeout(timer); },

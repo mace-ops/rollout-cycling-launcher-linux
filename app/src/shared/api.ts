@@ -13,6 +13,8 @@ export type AppProblem = '' | 'net' | 'verify' | 'disk' | 'runtime' | 'tag' | 'p
 
 export interface AppInfo {
   installed: boolean;
+  /** Version des installierten Spiels, wenn bekannt (echtes MyWhoosh: aus dem Spielordner), sonst leer */
+  version: string;
   steam: boolean;
   updateAvailable: boolean;
   problem: AppProblem;

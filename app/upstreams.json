@@ -6,5 +6,13 @@
     "sha256": "30d5f18941ec44860e623e9874159f12739594e1fda5fdeb3518122a2e59435f",
     "image": "docker.io/netbrain/zwift",
     "tag": "1.124.0"
+  },
+  "mywhoosh": {
+    "repo": "Parapeth962/mywhoosh-linux-installer",
+    "commit": "1d0b2ddfbc36175ee741a3e38dddb53d6108b345",
+    "files": {
+      "mywhoosh.sh": "b12a163765ed97f9abc55054016d400ebc9aea25e89b87297c25606372db549c",
+      "ble-bridge.py": "71691972a9034841cfee9be134e3c2589535986bb7561dda783298d6fe0fed8b"
+    }
   }
 }

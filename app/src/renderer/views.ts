@@ -262,7 +262,8 @@ function appMenu(ui: Ui, snap: Snapshot): string {
   const stopping = snap.launch?.app === id;
   return `<div class="page slim">
     ${backBtn('library')}
-    <h1 class="mb-32">${APP_NAMES[id]}</h1>
+    <h1 class="${info.version ? '' : 'mb-32'}">${APP_NAMES[id]}</h1>
+    ${info.version ? `<p class="muted mb-32">${esc(info.version)}</p>` : ''}
     <div class="panel stack">
       <div class="row"><span>${t('settings.steamRow', { app: APP_NAMES[id] })}</span>${sw(info.steam, 'steam', t('settings.steamRow', { app: APP_NAMES[id] }), id)}</div>
       ${id === 'mywhoosh' ? `<button class="btn row-btn" data-act="go" data-arg="bluetooth"><span class="rowtext"><span>${t('bt.title')}</span><span class="muted small">${btProblem ? t('home.btCheck') : t('home.btReady')} <span class="live ${btProblem ? 'warn' : ''}"></span></span></span>${ICON.next}</button>` : ''}

@@ -44,6 +44,8 @@ export async function session(name, env, steps, opts = {}) {
     // Zwift ist ohne ausdrückliche Wahl simuliert: Mit einem Wegwerf-ROLLOUT_HOME ohne bin/rollout-run wäre es das ohnehin, die
     // Festlegung schützt auch Läufe mit eigenem home vor dem echten Container. `real` braucht Attrappen (siehe unten).
     ROLLOUT_ZWIFT: env.ROLLOUT_ZWIFT || 'sim',
+    // Ebenso MyWhoosh: ohne ausdrückliche Wahl simuliert. `real` nur mit Attrappe als Upstream und Spielordner im Wegwerf-Ordner (unten geprüft).
+    ROLLOUT_MYWHOOSH: env.ROLLOUT_MYWHOOSH || 'sim',
     ROLLOUT_SIM_STEAM: 'fake', ROLLOUT_BT: env.ROLLOUT_BT === 'real' ? 'real' : 'fake', ROLLOUT_SELFUPDATE: 'fake',
     ROLLOUT_HOME: home, ROLLOUT_CONFIG_HOME: opts.configHome ?? path.join(os.tmpdir(), `rollout-smoke-cfg-${stamp}`),
     ROLLOUT_SELFUPDATE_DIR: feedDir, ROLLOUT_SELFUPDATE_KEY: opts.key ?? testKey().publicB64
@@ -65,6 +67,8 @@ export async function session(name, env, steps, opts = {}) {
     const marked = ['podman', 'docker'].every((tool) => { try { return fs.readFileSync(path.join(first, tool), 'utf8').includes('# rollout-test-attrappe'); } catch { return false; } });
     if (!first.startsWith(tmp) || !marked || !childEnv.ROLLOUT_RUN_UPSTREAM) throw new Error('Container-Attrappen nicht erzwungen, Test abgebrochen');
   }
+  if (childEnv.ROLLOUT_MYWHOOSH === 'real'
+    && (!childEnv.ROLLOUT_RUN_UPSTREAM || !(childEnv.MYWHOOSH_ROOT ?? '').startsWith(tmp) || !(childEnv.HOME ?? '').startsWith(tmp))) throw new Error('MyWhoosh-Attrappe nicht erzwungen, Test abgebrochen');
   const userData = opts.userData ?? path.join(os.tmpdir(), `rollout-smoke-${stamp}`);
   const debug = `--remote-debugging-port=${port}`;
   const [cmd, args] = opts.launcher

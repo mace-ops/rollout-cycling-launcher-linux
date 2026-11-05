@@ -31,11 +31,12 @@ export function bumpVersion(version) {
   return `${m[1]}${m[2]}-${parts.join('.')}`;
 }
 
-/** App-Archiv: package.json (nur name, version, main), dist/ und bootstrap/rollout und bootstrap/rollout-run. `mutate(stageDir)` ändert den Inhalt vor dem Packen (Tests). */
+/** App-Archiv: package.json (nur name, version, main), dist/, vendor/ (mywhoosh.sh samt Helfer und Lizenz) und bootstrap/rollout und bootstrap/rollout-run. `mutate(stageDir)` ändert den Inhalt vor dem Packen (Tests). */
 export function packApp({ distDir, bootstrap, version, outFile, mutate }) {
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-pack-'));
   try {
     fs.cpSync(distDir, path.join(stage, 'dist'), { recursive: true });
+    fs.cpSync(path.join(path.dirname(bootstrap), '../vendor'), path.join(stage, 'vendor'), { recursive: true });
     fs.mkdirSync(path.join(stage, 'bootstrap'));
     fs.copyFileSync(bootstrap, path.join(stage, 'bootstrap/rollout'));
     fs.copyFileSync(path.join(path.dirname(bootstrap), 'bin-rollout-run.sh'), path.join(stage, 'bootstrap/rollout-run'));

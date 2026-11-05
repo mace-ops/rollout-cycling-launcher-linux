@@ -81,6 +81,11 @@ export interface NavHooks {
   scope(): ParentNode;
   modalOpen(): boolean;
   back(): void;
+  /**
+   * Nimmt Rollout Gamepad-Eingaben an? Läuft ein Spiel im Vordergrund, bekommen Spiel und Rollout dasselbe virtuelle Gamepad von Steam
+   * Input: Ein A im Spiel drückte sonst auch in Rollout den Knopf „Spiel beenden“ unter dem Fenster. Ohne Angabe: ja.
+   */
+  padEnabled?(): boolean;
 }
 
 const KEY_DIR: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
@@ -139,10 +144,19 @@ export function initNav(hooks: NavHooks): void {
   };
 
   const poll = (now: number): void => {
+    // Zuerst den nächsten Takt anmelden: Ein Fehler in einem Durchlauf darf die Abfrage nie beenden (so fiel der Controller einmal ganz aus).
+    requestAnimationFrame(poll);
     scrollAxis = 0;
+    const enabled = hooks.padEnabled?.() ?? true;
     for (const pad of navigator.getGamepads()) {
       if (!pad) continue;
       const button = (i: number): boolean => !!pad.buttons[i]?.pressed;
+      if (!enabled) {
+        // Tasten, die beim Wiedereinschalten noch gedrückt sind, lösen nichts aus.
+        for (const i of [0, 1]) pressedBefore.set(pad.index * 100 + i, button(i));
+        held.clear();
+        continue;
+      }
       const axisX = pad.axes[0] ?? 0;
       const axisY = pad.axes[1] ?? 0;
       fire('up', now, button(12) || axisY < -STICK_ON, () => move(hooks.scope(), 'up', padUsed()));
@@ -166,7 +180,6 @@ export function initNav(hooks: NavHooks): void {
       if (Math.abs(y) > STICK_OFF) scrollAxis = y;
     }
     if (scrollAxis) window.scrollBy(0, scrollAxis * SCROLL_SPEED);
-    requestAnimationFrame(poll);
   };
   requestAnimationFrame(poll);
 }

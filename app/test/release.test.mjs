@@ -41,12 +41,14 @@ test('pack: Archive, Manifest und Signatur stimmen mit dem Client überein', { s
   const appFile = path.join(out, `rollout-${pkg.version}-app.tar.gz`);
   assert.equal(manifest.app.size, fs.statSync(appFile).size);
   const listing = execFileSync('tar', ['-tzf', appFile], { encoding: 'utf8' }).split('\n');
-  for (const name of ['./package.json', './dist/main/main.js', './dist/preload/preload.js', './dist/renderer/index.html', './bootstrap/rollout', './bootstrap/rollout-run']) assert.ok(listing.includes(name), name);
+  for (const name of ['./package.json', './dist/main/main.js', './dist/preload/preload.js', './dist/renderer/index.html', './bootstrap/rollout', './bootstrap/rollout-run', './vendor/mywhoosh.sh', './vendor/ble-bridge.py', './vendor/LICENSE-mywhoosh-linux-installer']) assert.ok(listing.includes(name), name);
   const stage = fs.mkdtempSync(path.join(work, 'x-'));
   execFileSync('tar', ['-xzf', appFile, '-C', stage]);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(stage, 'package.json'), 'utf8')), { name: 'rollout', version: pkg.version, main: 'dist/main/main.js' });
   assert.deepEqual(fs.readFileSync(path.join(stage, 'bootstrap/rollout')), fs.readFileSync('scripts/bin-rollout.sh'));
   assert.deepEqual(fs.readFileSync(path.join(stage, 'bootstrap/rollout-run')), fs.readFileSync('scripts/bin-rollout-run.sh'));
+  assert.deepEqual(fs.readFileSync(path.join(stage, 'vendor/mywhoosh.sh')), fs.readFileSync('vendor/mywhoosh.sh'));
+  assert.ok(fs.statSync(path.join(stage, 'vendor/mywhoosh.sh')).mode & 0o100, 'mywhoosh.sh bleibt ausführbar');
   assert.equal(execFileSync('tar', ['-tzf', path.join(out, 'rollout-runtime-electron-45.0.0-linux-x64.tar.gz')], { encoding: 'utf8' }).includes('./LICENSE'), true, 'Lizenz im Electron-Archiv');
   assert.equal(manifest.runtime.electron, '45.0.0');
 
