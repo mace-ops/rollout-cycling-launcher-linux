@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/media/logo.svg">
-    <img src="docs/media/logo-currentcolor.svg" alt="Rollout logo" width="96">
+    <source media="(prefers-color-scheme: dark)" srcset="media/logo.svg">
+    <img src="media/logo-currentcolor.svg" alt="Rollout logo" width="96">
   </picture>
 </p>
 
@@ -23,11 +23,11 @@
   <a href="#install"><b>Install</b></a> ·
   <a href="#features"><b>Features</b></a> ·
   <a href="#faq"><b>FAQ</b></a> ·
-  <a href="docs/README.de.md">Deutsch</a>
+  <a href="README.de.md">Deutsch</a>
 </p>
 
 <p align="center">
-  <img src="docs/media/hero-carousel.gif" alt="Rollout in action: home screen, install, progress, Bluetooth check and settings" width="860">
+  <img src="media/hero-carousel.gif" alt="Rollout in action: home screen, install, progress, Bluetooth check and settings" width="860">
 </p>
 
 Rollout is a launcher that **installs, updates and starts indoor cycling apps on Linux**. It is made for
@@ -62,16 +62,16 @@ Rollout is a launcher that **installs, updates and starts indoor cycling apps on
 
 <table>
   <tr>
-    <td><img src="docs/media/screens/en/installing.jpg" alt="Installing Zwift at 46 percent with the phases listed"></td>
-    <td><img src="docs/media/screens/en/bluetooth.jpg" alt="Bluetooth check listing a trainer and a heart-rate strap"></td>
+    <td><img src="media/screens/en/installing.jpg" alt="Installing Zwift at 46 percent with the phases listed"></td>
+    <td><img src="media/screens/en/bluetooth.jpg" alt="Bluetooth check listing a trainer and a heart-rate strap"></td>
   </tr>
   <tr>
     <td align="center"><b>Install</b> – clear phases, honest time estimate</td>
     <td align="center"><b>Bluetooth</b> – find your sensors before the ride</td>
   </tr>
   <tr>
-    <td><img src="docs/media/screens/en/settings.jpg" alt="Settings: language, interface size, appearance, updates and Steam"></td>
-    <td><img src="docs/media/screens/en/advanced.jpg" alt="Advanced settings for MyWhoosh with recommended values"></td>
+    <td><img src="media/screens/en/settings.jpg" alt="Settings: language, interface size, appearance, updates and Steam"></td>
+    <td><img src="media/screens/en/advanced.jpg" alt="Advanced settings for MyWhoosh with recommended values"></td>
   </tr>
   <tr>
     <td align="center"><b>Settings</b> – language, updates, Steam</td>

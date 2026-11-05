@@ -1,4 +1,4 @@
-// Rohaufnahmen (site/shots-raw/en/s<n>-<name>.png, 1600 × 1000, englische Oberfläche) → Website (site/static/screens/en) und README (docs/media).
+// Rohaufnahmen (site/shots-raw/en/s<n>-<name>.png, 1600 × 1000, englische Oberfläche) → Website (site/static/screens/en) und README (media).
 // Aufruf: node scripts/process-shots.mjs [Rohordner]. Aufnahme siehe site/README.md (app/test/shots.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,7 +42,7 @@ for (const lang of LANGS) {
     fs.writeFileSync(path.join(web, `${name}-640.webp`), await sharp(full).resize(640, 400).webp({ quality: 78, effort: 5 }).toBuffer());
     fs.writeFileSync(path.join(web, `${name}.jpg`), await jpgUnder(full, 400 * 1024));
     if (README_LANGS.includes(lang)) {
-      const out = path.join(REPO, 'docs', 'media', 'screens', lang);
+      const out = path.join(REPO, 'media', 'screens', lang);
       mkdir(out);
       fs.writeFileSync(path.join(out, `${name}.jpg`), await jpgUnder(full, README_MAX));
     }
@@ -56,7 +56,7 @@ const GIF = ['home', 'before-install', 'installing', 'bluetooth', 'settings'];
 const w = 960, h = 600;
 const pages = await Promise.all(GIF.map((n) => sharp(frames[n]).resize(w, h).png().toBuffer()));
 const gif = await sharp(pages, { join: { animated: true } }).gif({ delay: GIF.map(() => 2200), loop: 0, effort: 7, colours: 128, dither: 0.6 }).toBuffer();
-const gifOut = path.join(REPO, 'docs', 'media', 'hero-carousel.gif');
+const gifOut = path.join(REPO, 'media', 'hero-carousel.gif');
 mkdir(path.dirname(gifOut));
 fs.writeFileSync(gifOut, gif);
 console.log('hero-carousel.gif', (gif.length / 1024 / 1024).toFixed(2), 'MB');

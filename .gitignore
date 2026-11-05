@@ -2,3 +2,5 @@ node_modules/
 spikes/g5-desktop/rollout-test.desktop
 app/dist/
 app/release-out/
+docs/
+spikes/

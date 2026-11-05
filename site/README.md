@@ -17,7 +17,7 @@ static/            Schriften (Archivo, Figtree samt OFL), Favicon, Screenshots j
 build.mjs          baut nach dist/ (Node ohne Framework, sharp für Bilder)
 check.mjs          Prüfskript (npm test)
 deploy.sh          baut, prüft, veröffentlicht auf den Branch gh-pages
-scripts/process-shots.mjs   Rohaufnahmen → static/screens und docs/media
+scripts/process-shots.mjs   Rohaufnahmen → static/screens und media
 ```
 
 `npm test` baut und prüft. Der Build bricht ab, wenn in einer Sprache ein Schlüssel fehlt oder übrig ist, ein Platzhalter von en abweicht oder ein Schlüssel aus en.json nirgends benutzt wird.
@@ -55,7 +55,7 @@ cd ../site && node scripts/process-shots.mjs
 ```
 
 Am Ally `DISPLAY=:0` und `TMPDIR` auf btrfs setzen (siehe `app/README.md`). `process-shots.mjs` schreibt `static/screens/en/<name>.{webp,jpg}` und `<name>-640.webp` (1280 × 800 und 640 × 400)
-sowie für die READMEs `docs/media/screens/en/<name>.jpg` (je unter 300 KB) und `docs/media/hero-carousel.gif` (960 px, 5 Ansichten). Namen: home, pick, before-install, installing, done,
+sowie für die READMEs `media/screens/en/<name>.jpg` (je unter 300 KB) und `media/hero-carousel.gif` (960 px, 5 Ansichten). Namen: home, pick, before-install, installing, done,
 bluetooth, starting, error, settings, advanced, light, steam. `shots-raw/` ist nicht im Repo.
 
 ## Veröffentlichen
