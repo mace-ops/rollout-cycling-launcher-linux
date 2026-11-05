@@ -35,7 +35,7 @@ const screenForPhase = (phase: LaunchPhase): Screen =>
 function structKey(): string {
   const { progress: _progress, ...selfUpdate } = snap.selfUpdate;
   return JSON.stringify([
-    ui.screen, ui.steamModal, ui.steamRollout, ui.picker, ui.confirmRemove, ui.confirmQuit, ui.confirmRestart, ui.confirmPrevious, ui.confirmImage, snap.zwiftTag, snap.updateChannel, selfUpdate, snap.apps, snap.job && [snap.job.app, snap.job.kind],
+    ui.screen, ui.menuApp, ui.steamModal, ui.steamRollout, ui.picker, ui.confirmRemove, ui.confirmQuit, ui.confirmRestart, ui.confirmPrevious, ui.confirmImage, snap.zwiftTag, snap.updateChannel, selfUpdate, snap.apps, snap.job && [snap.job.app, snap.job.kind],
     snap.launch && [screenForPhase(snap.launch.phase), snap.launch.problem, snap.launch.phase === 'stopping'], snap.bluetooth, snap.autoUpdate, snap.rolloutSteam, snap.overrides, snap.language, snap.theme, snap.scale
   ]);
 }
@@ -43,6 +43,7 @@ function structKey(): string {
 // Die Bühne liegt außerhalb von #view und läuft bei jedem Neuaufbau ungestört weiter.
 function updateStage(): void {
   const app = ui.screen === 'setup' || ui.screen === 'progress' || ui.screen === 'done' ? ui.setupApp
+    : ui.screen === 'appmenu' ? ui.menuApp
     : LAUNCH_SCREENS.includes(ui.screen) ? ui.launchApp : null;
   const key = ui.screen === 'library' ? 'none' : app ?? 'neutral';
   const clear = ui.screen === 'launching' || ui.screen === 'running';
@@ -151,6 +152,7 @@ function onSnapshot(next: Snapshot): void {
   } else if (LAUNCH_SCREENS.includes(ui.screen)) {
     ui.screen = 'library';
   }
+  if (ui.screen === 'appmenu' && !snap.apps[ui.menuApp].installed) ui.screen = 'library';
   if (!snap.job && ui.screen === 'progress') {
     // Eine gescheiterte Installation zeigt ihren Grund dort, wo man es noch einmal versuchen kann.
     const info = snap.apps[ui.setupApp];
@@ -181,6 +183,8 @@ const ACTIONS: Record<string, Action> = {
     else if (info.installed) startLaunch(id);
     else Object.assign(ui, { screen: 'setup', setupApp: id, hd: false, setupSteam: true });
   },
+  appMenu(arg) { ui.menuApp = arg as AppId; ui.screen = 'appmenu'; },
+  appAdvanced(arg) { ui.advTab = arg as AppId; ACTIONS.advanced(''); },
   hd() { ui.hd = !ui.hd; },
   project() { void api.openZwiftProject(); },
   install() {
@@ -233,7 +237,7 @@ const ACTIONS: Record<string, Action> = {
   },
   report() { void api.createReport(); ui.reportDone = true; },
   remove(arg) { ui.confirmRemove = arg as AppId; },
-  removeConfirm(arg) { void api.remove(arg as AppId); ui.confirmRemove = null; },
+  removeConfirm(arg) { void api.remove(arg as AppId); ui.confirmRemove = null; if (ui.screen === 'appmenu') ui.screen = 'library'; },
   advanced() { ui.screen = ui.gatePassed ? 'advanced' : 'gate'; },
   passGate() { ui.screen = 'advanced'; ui.gatePassed = true; },
   tab(arg) { ui.advTab = arg as AdvTab; },

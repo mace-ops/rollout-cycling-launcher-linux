@@ -23,6 +23,7 @@ export const es: Messages = {
   'pill.custom': 'Ajustes propios',
   'btn.progress': 'Ver progreso',
   'btn.update': 'Actualizar',
+  'card.options': 'Opciones de {app}',
   'btn.ride': 'A rodar',
   'btn.install': 'Instalar',
   'btn.skipUpdate': 'Iniciar sin actualizar',

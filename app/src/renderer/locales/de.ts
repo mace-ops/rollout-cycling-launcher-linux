@@ -25,6 +25,7 @@ export const de: Messages = {
   'pill.custom': 'Eigene Einstellungen',
   'btn.progress': 'Fortschritt ansehen',
   'btn.update': 'Aktualisieren',
+  'card.options': 'Einstellungen für {app}',
   'btn.ride': 'Losfahren',
   'btn.install': 'Installieren',
   'btn.skipUpdate': 'Ohne Update starten',

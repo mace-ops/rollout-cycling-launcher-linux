@@ -43,7 +43,6 @@ const updateHint = (snap: Snapshot): 'restart' | 'settings' | null => {
 };
 
 function library(snap: Snapshot): string {
-  const btProblem = snap.bluetooth.state === 'problem';
   const hint = updateHint(snap);
   const cards = APP_IDS.map((id) => {
     const info = snap.apps[id];
@@ -67,6 +66,7 @@ function library(snap: Snapshot): string {
         <div class="cardacts">
           <button class="btn primary" data-act="card" data-arg="${id}" ${blocked ? 'disabled' : ''}>${label}${arrow}</button>
           ${hasUpdate ? `<button class="linkbtn" data-act="launch" data-arg="${id}">${t('btn.skipUpdate')}</button>` : ''}
+          ${info.installed && !busy ? `<button class="btn icon-only" data-act="appMenu" data-arg="${id}" aria-label="${t('card.options', { app: APP_NAMES[id] })}" title="${t('card.options', { app: APP_NAMES[id] })}">${ICON.gear}</button>` : ''}
         </div>
       </div>
     </article>`;
@@ -76,7 +76,6 @@ function library(snap: Snapshot): string {
       <p class="brand">${ICON.logo}Rollout</p>
       <div class="topactions">
         ${hint ? `<button class="btn su-hint" data-act="${hint === 'restart' ? 'suAsk' : 'go'}" ${hint === 'settings' ? 'data-arg="settings"' : ''} aria-label="${t('su.hint')}" title="${t('su.hint')}"><span class="hintdot"></span>${ICON.update}<span class="su-text">${t('su.hint')}</span></button>` : ''}
-        <button class="btn" data-act="go" data-arg="bluetooth"><span class="live ${btProblem ? 'warn' : ''}"></span>${btProblem ? t('home.btCheck') : t('home.btReady')}</button>
         <button class="btn" data-act="go" data-arg="settings">${ICON.gear}${t('home.settings')}</button>
         <button class="btn icon-only" data-act="quit" aria-label="${t('quit.label')}" title="${t('quit.label')}">${ICON.power}</button>
       </div>
@@ -236,7 +235,7 @@ export function scanHtml(snap: Snapshot): string {
 function bluetooth(ui: Ui, snap: Snapshot): string {
   const problem = snap.bluetooth.state === 'problem';
   return `<div class="page">
-    ${backBtn('library')}
+    ${backBtn('appmenu')}
     <div class="split">
       <div>
         <h1 class="title">${t('bt.title')}</h1>
@@ -250,6 +249,29 @@ function bluetooth(ui: Ui, snap: Snapshot): string {
           <button class="linkbtn" data-act="btHelp">${t('bt.noBt')}</button>
         </div>
         ${ui.btHelp ? `<div class="panel mt-16"><p>${t('bt.phone')}</p></div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** Menü einer App (Zahnrad auf der Karte): Steam, Bluetooth (nur MyWhoosh), erweiterte Einstellungen, Deinstallieren. */
+function appMenu(ui: Ui, snap: Snapshot): string {
+  const id = ui.menuApp;
+  const info = snap.apps[id];
+  const btProblem = snap.bluetooth.state === 'problem';
+  const stopping = snap.launch?.app === id;
+  return `<div class="page slim">
+    ${backBtn('library')}
+    <h1 class="mb-32">${APP_NAMES[id]}</h1>
+    <div class="panel stack">
+      <div class="row"><span>${t('settings.steamRow', { app: APP_NAMES[id] })}</span>${sw(info.steam, 'steam', t('settings.steamRow', { app: APP_NAMES[id] }), id)}</div>
+      ${id === 'mywhoosh' ? `<button class="btn row-btn" data-act="go" data-arg="bluetooth"><span class="rowtext"><span>${t('bt.title')}</span><span class="muted small"><span class="live ${btProblem ? 'warn' : ''}"></span> ${btProblem ? t('home.btCheck') : t('home.btReady')}</span></span>${ICON.next}</button>` : ''}
+      ${id === 'zwift' ? zwiftNote(snap.zwiftRuntime) : ''}
+      <button class="btn row-btn" data-act="appAdvanced" data-arg="${id}">${t('settings.advanced')}${ICON.next}</button>
+      <hr class="divider">
+      <div class="row">
+        <span class="rowtext"><strong>${t('remove.button')}</strong><span class="muted small">${t('remove.uses', { gb: space(id, false) })}</span>${info.problem ? `<span class="warntext small" role="alert">${t('remove.failed')}</span>` : ''}</span>
+        <button class="btn danger" data-act="remove" data-arg="${id}" ${stopping || !!snap.job ? 'disabled' : ''}>${t('remove.button')}</button>
       </div>
     </div>
   </div>`;
@@ -417,6 +439,7 @@ export function view(ui: Ui, snap: Snapshot): string {
     case 'crash': return crash(ui);
     case 'failed': return failed(ui, snap);
     case 'bluetooth': return bluetooth(ui, snap);
+    case 'appmenu': return appMenu(ui, snap);
     case 'settings': return settings(snap);
     case 'help': return help(ui);
     case 'remove': return remove(snap);

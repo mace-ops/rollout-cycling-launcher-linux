@@ -23,6 +23,7 @@ export const nl: Messages = {
   'pill.custom': 'Eigen instellingen',
   'btn.progress': 'Voortgang bekijken',
   'btn.update': 'Bijwerken',
+  'card.options': 'Opties voor {app}',
   'btn.ride': 'Gaan fietsen',
   'btn.install': 'Installeren',
   'btn.skipUpdate': 'Starten zonder update',

@@ -2,7 +2,7 @@ import type { AppId, Overrides, Snapshot } from '../shared/api';
 
 export type Screen =
   | 'library' | 'setup' | 'progress' | 'done' | 'launching' | 'running' | 'bterror' | 'crash' | 'failed'
-  | 'bluetooth' | 'settings' | 'help' | 'remove' | 'gate' | 'advanced';
+  | 'bluetooth' | 'appmenu' | 'settings' | 'help' | 'remove' | 'gate' | 'advanced';
 
 export type AdvTab = AppId | 'bluetooth' | 'launcher';
 
@@ -14,6 +14,8 @@ export interface Ui {
   hd: boolean;
   updateDone: boolean;
   launchApp: AppId;
+  /** App, deren Menü (Zahnrad auf der Karte) offen ist */
+  menuApp: AppId;
   btHelp: boolean;
   reportDone: boolean;
   steamModal: boolean;
@@ -35,7 +37,7 @@ export interface Ui {
 
 export const freshUi = (): Ui => ({
   screen: 'library', setupApp: 'mywhoosh', setupSteam: true, hd: false, updateDone: false,
-  launchApp: 'mywhoosh', btHelp: false, reportDone: false, steamModal: false, steamRollout: null, picker: null, confirmRemove: null, confirmQuit: false, confirmRestart: false, confirmPrevious: false, confirmImage: false,
+  launchApp: 'mywhoosh', menuApp: 'mywhoosh', btHelp: false, reportDone: false, steamModal: false, steamRollout: null, picker: null, confirmRemove: null, confirmQuit: false, confirmRestart: false, confirmPrevious: false, confirmImage: false,
   gatePassed: false, advTab: 'mywhoosh'
 });
 
@@ -43,7 +45,7 @@ export const LAUNCH_SCREENS: readonly Screen[] = ['launching', 'running', 'bterr
 
 /** Wohin „Zurück“ führt, auch für Esc und die B-Taste. `null`: kein Zurück. */
 export const BACK: Partial<Record<Screen, Screen>> = {
-  setup: 'library', progress: 'library', done: 'library', bluetooth: 'library', settings: 'library',
+  setup: 'library', progress: 'library', done: 'library', bluetooth: 'appmenu', appmenu: 'library', settings: 'library',
   help: 'settings', remove: 'settings', gate: 'settings', advanced: 'settings'
 };
 

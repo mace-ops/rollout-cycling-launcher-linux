@@ -210,10 +210,12 @@ await session('einstellungen', {}, async (t) => {
 });
 
 await session('bluetooth', { ROLLOUT_SIM_BT: 'problem' }, async (t) => {
-  await t.expect(t.has('Check Bluetooth'), 'Bluetooth-Problem auf der Startseite');
+  await t.expect(t.clickSel('button[data-act=appMenu][data-arg=mywhoosh]'), 'Zahnrad auf der MyWhoosh-Karte');
+  await t.expect(t.waitFor('Check Bluetooth'), 'Bluetooth-Problem im MyWhoosh-Menü');
   await t.click('Check Bluetooth');
   await t.expect(t.waitFor('Nothing found yet', 15000), 'Suche ohne Fund');
   await t.shot('1-bluetooth-problem');
+  await t.click('Back');
   await t.click('Back');
   await t.click('Ride');
   await t.expect(t.waitFor('Your trainer was not found', 15000), 'Fehleransicht Trainer');
@@ -223,6 +225,7 @@ await session('bluetooth', { ROLLOUT_SIM_BT: 'problem' }, async (t) => {
 });
 
 await session('bluetooth-ok', {}, async (t) => {
+  await t.clickSel('button[data-act=appMenu][data-arg=mywhoosh]');
   await t.click('Bluetooth ready');
   await t.expect(t.waitFor('All there.', 15000), 'Trainer und Gurt gefunden');
   await t.shot('1-bluetooth');
@@ -707,6 +710,7 @@ await session('hell-start', { ROLLOUT_SIM_THEME: 'light' }, async (t) => {
 // Nur von Hand mit ROLLOUT_REAL_BT=1: sucht mit dem echten Adapter und zeigt, was in der Nähe sendet.
 if (process.env.ROLLOUT_REAL_BT === '1') {
   await session('bluetooth-echt', { ROLLOUT_BT: 'real' }, async (t) => {
+    await t.clickSel('button[data-act=appMenu][data-arg=mywhoosh]');
     await t.click('Bluetooth');
     await t.waitFor('Sensors nearby');
     await sleep(Number(process.env.ROLLOUT_REAL_BT_WAIT || 20000));

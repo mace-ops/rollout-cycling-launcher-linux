@@ -25,6 +25,7 @@ export const en = {
   'pill.custom': 'Custom settings',
   'btn.progress': 'View progress',
   'btn.update': 'Update',
+  'card.options': '{app} options',
   'btn.ride': 'Ride',
   'btn.install': 'Install',
   'btn.skipUpdate': 'Start without update',
