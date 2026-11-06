@@ -1,5 +1,5 @@
 #!/bin/sh
-# rollout-bootstrap: 8
+# rollout-bootstrap: 9
 # Starts a game (concept 5.2), called the same way by the launcher and by Steam: rollout-run <mywhoosh|zwift> [arguments].
 # Further calls: rollout-run --container-check (names the usable container runtime, otherwise message and exit 10),
 # rollout-run --zwift-pull (pulls the configured Zwift image and remembers the consent, only after confirmation by the user) and
@@ -132,6 +132,16 @@ zwift_prepare() {
   # Host network: the Zwift Companion app finds the game by broadcast on the Wi-Fi and cannot get into the bridge network (confirmed on the Ally: with host
   # Zwift connects to the phone, with bridge it does not). Anyone who wants something else sets NETWORKING themselves.
   export NETWORKING=${NETWORKING:-host}
+  # Zwift's data directory: Zwift 1.124.0 writes settings and logs to Documents/Zwift (its log: "Using user data path: C:\users\user\DOCU~OWL",
+  # netbrain's script: "Zwift is using Documents/Zwift instead of AppData/Local/Zwift"), but run_zwift.sh only syncs ZWIFT_DATA_DIR (in the image:
+  # AppData/Local/Zwift) with the volume zwift-<rider>. Everything was lost after every run (confirmed on the Ally: the volume held only .logrecord).
+  # Rollout therefore points ZWIFT_DATA_DIR at Documents/Zwift (a real directory filled by rsync, not a link: netbrain issue 366 does not apply).
+  # ROLLOUT_ZWIFT_DATA=appdata keeps netbrain's default (for an image whose Zwift uses AppData again). A user CONTAINER_EXTRA_ARGS string is kept;
+  # one set only in netbrain's own config replaces ours (known limitation). netbrain warns about the string form; that is expected.
+  if [ "${ROLLOUT_ZWIFT_DATA:-documents}" != appdata ]; then
+    CONTAINER_EXTRA_ARGS="-e ZWIFT_DATA_DIR=/home/user/.wine/drive_c/users/user/Documents/Zwift${CONTAINER_EXTRA_ARGS:+ $CONTAINER_EXTRA_ARGS}"
+    export CONTAINER_EXTRA_ARGS
+  fi
   # zwift.sh aborts with "USER: unbound variable" if USER is missing (noticed on the Ally during a trial run with an empty environment).
   [ -n "${USER:-}" ] || { USER=$(id -un 2>/dev/null) || USER=; export USER; }
   # Container name as in zwift.sh (--name zwift-${ZWIFT_RIDER:-$USER}); on quit the starter stops it by that name (see forward).
@@ -177,6 +187,7 @@ if [ "$app" = mywhoosh ] && [ "${ROLLOUT_MYWHOOSH_PAD:-}" != off ] && [ -z "${SD
 fi
 
 mkdir -p "$state"
+fifo=
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
 reaper=
 if [ -n "$mw_setup" ]; then
@@ -196,7 +207,7 @@ else
     fi
     echo $$ > "$state/run.pid.tmp" && mv -f "$state/run.pid.tmp" "$state/run.pid"
   fi
-  trap '[ "$(sed -n "1p" "$state/run.pid" 2>/dev/null)" = "$$" ] && rm -f "$state/run.pid"; [ -n "$reaper" ] && kill "$reaper" 2>/dev/null' EXIT
+  trap '[ "$(sed -n "1p" "$state/run.pid" 2>/dev/null)" = "$$" ] && rm -f "$state/run.pid"; [ -n "$reaper" ] && kill "$reaper" 2>/dev/null; [ -n "$fifo" ] && rm -f "$fifo"' EXIT
 fi
 
 # INT and HUP are passed on as TERM so the game can quit. For Zwift that is not enough: the container is not part of
@@ -219,10 +230,24 @@ zw_quit() {
   limited "$rt" exec --user user "$zw_name" wine taskkill /f /im ZwiftApp.exe >/dev/null 2>&1 </dev/null
   zw_wait_gone "${ROLLOUT_ZWIFT_KILL_WAIT:-15}"
 }
+# zw_sync_loop: copy Zwift's data into the volume while it runs. netbrain's script does that only once ZwiftApp.exe has exited; "Exit game" in
+# Steam sends TERM to every process below Rollout, also to "podman run", which passes it on to the container: it ends at once and the copy never
+# happens (seen on the Ally: container kill and died in the same second, volume unchanged). Every ROLLOUT_ZWIFT_SYNC_EVERY s (30, 0 = off) the same
+# rsync as netbrain's (-au, ZWIFT_DATA_DIR to ZWIFT_VOLUME, both from the container's environment) runs inside the container as its user.
+# At most that many seconds of changes are lost on a hard end. Output to /dev/null: the loop must not hold the launcher's pipe open.
+zw_sync_loop() {
+  while sleep "$zw_every"; do
+    kill -0 "$pid" 2>/dev/null || break
+    zw_gone && continue
+    limited "$rt" exec --user user "$zw_name" sh -c 'd=${ZWIFT_DATA_DIR:-} v=${ZWIFT_VOLUME:-}; [ -n "$d" ] && [ -n "$v" ] && [ "$d" != "$v" ] && [ -d "$d" ] || exit 0; rsync -qau "$d/" "$v/"' </dev/null
+  done
+}
+syncer=
 sig=0
 pid=
 forward() {
   sig=1
+  [ -n "$syncer" ] && kill "$syncer" 2>/dev/null
   if [ -n "$pid" ]; then
     if [ -n "$grp" ]; then kill -s TERM -- "-$pid" 2>/dev/null; else kill -TERM "$pid" 2>/dev/null; fi
   fi
@@ -238,6 +263,26 @@ forward() {
 }
 trap forward TERM INT HUP
 
+# Output log for Zwift: the container runs with --rm, so whatever zwift.sh and the container print (stdout and stderr together) is otherwise
+# lost after a crash. A copy goes to state/zwift-run.log; the two runs before stay as zwift-run.log.1 and .2. ROLLOUT_ZWIFT_LOG=off switches it off.
+# The copy runs through a FIFO and tee. tee ignores INT, TERM and HUP (a Ctrl+C in the terminal must not end it, the game would then die of
+# SIGPIPE on its next line) and XFSZ: ulimit -f caps the file (20 to 40 MB, the unit differs between shells), beyond that only the file stops growing.
+log=
+tee_pid=
+if [ "$app" = zwift ] && [ "${ROLLOUT_ZWIFT_LOG:-}" != off ]; then
+  log=$state/zwift-run.log
+  fifo=$state/zwift-run.fifo
+  [ -f "$log.1" ] && mv -f "$log.1" "$log.2"
+  [ -f "$log" ] && mv -f "$log" "$log.1"
+  rm -f "$fifo"
+  if mkfifo "$fifo" 2>/dev/null && { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) rollout-run zwift $* (runtime $rt, image $zw_want)" > "$log"; } 2>/dev/null; then
+    ( trap '' INT TERM HUP XFSZ; ulimit -f 40000 2>/dev/null; exec tee -a "$log" 2>/dev/null ) < "$fifo" &
+    tee_pid=$!
+  else
+    rm -f "$fifo"; fifo=; log=
+  fi
+fi
+
 # Keep the screen awake where systemd-inhibit exists and is allowed (in an SSH session polkit refuses it): try it first,
 # so a failure of the inhibitor never prevents the game.
 why="$app is running"
@@ -248,8 +293,12 @@ if [ -z "${ROLLOUT_RUN_NO_INHIBIT:-}" ] && command -v systemd-inhibit >/dev/null
 else
   set -- "$up" "$@"
 fi
-if [ -n "$grp" ]; then setsid "$@" & else "$@" & fi
+if [ -n "$fifo" ]; then "$@" > "$fifo" 2>&1 & elif [ -n "$grp" ]; then setsid "$@" & else "$@" & fi
 pid=$!
+if [ "$app" = zwift ]; then
+  zw_every=${ROLLOUT_ZWIFT_SYNC_EVERY:-30}
+  case $zw_every in ''|*[!0-9]*|0) ;; *) zw_sync_loop >/dev/null 2>&1 </dev/null & syncer=$! ;; esac
+fi
 while :; do
   wait "$pid"; code=$?
   if ! kill -0 "$pid" 2>/dev/null; then
@@ -260,4 +309,13 @@ while :; do
   fi
 done
 [ "$sig" = 1 ] && [ "$code" = 0 ] && code=143
+[ -n "$syncer" ] && kill "$syncer" 2>/dev/null
+if [ -n "$tee_pid" ]; then
+  # tee ends once the game's last writer closes the FIFO. A leftover process that still holds it open must not keep the starter alive: KILL after 5 s.
+  ( sleep 5; kill -s KILL "$tee_pid" ) >/dev/null 2>&1 </dev/null &
+  dog=$!
+  wait "$tee_pid" 2>/dev/null
+  kill "$dog" 2>/dev/null
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) rollout-run: exit code $code" >> "$log" 2>/dev/null
+fi
 exit "$code"

@@ -1,4 +1,4 @@
-// Checks the game starter scripts/bin-rollout-run.sh (R1 to R19) in throwaway directories, with bash, `bash --posix` and, if present, dash.
+// Checks the game starter scripts/bin-rollout-run.sh (R1 to R39) in throwaway directories, with bash, `bash --posix` and, if present, dash.
 // The upstream is a shell script (ROLLOUT_RUN_UPSTREAM) that reads its behaviour from RUN_MODE and logs to calls.log.
 // Podman and Docker are fakes on PATH (fakebin/) that write their calls to containers.log: a real container is never started.
 import assert from 'node:assert/strict';
@@ -22,10 +22,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const UPSTREAM = `#!/bin/sh
 echo "\${USER-}" > "$ROLLOUT_HOME/user.log"
 echo "tool=$CONTAINER_TOOL image=$IMAGE version=$VERSION fg=\${ZWIFT_FG-} noupdate=\${DONT_UPDATE-}" > "$ROLLOUT_HOME/env.log"
+echo "extra=\${CONTAINER_EXTRA_ARGS-unset}" > "$ROLLOUT_HOME/extra.log"
 echo "start args=$* preload=\${LD_PRELOAD+set} libpath=\${LD_LIBRARY_PATH+set} pidfile=$(cat "$ROLLOUT_HOME/state/run.pid" 2>/dev/null) parent=$PPID" >> "$ROLLOUT_HOME/calls.log"
 case $RUN_MODE in
   exit*) exit "\${RUN_MODE#exit }" ;;
   wait) : > "$ROLLOUT_HOME/started"; sleep 20 >/dev/null 2>&1 & s=$!; wait $s ;;
+  talk) echo "out line"; echo "err line" >&2; exit 3 ;;
+  termtalk) echo "before term"; sleep 20 >/dev/null 2>&1 & s=$!; trap 'kill $s; echo "after term"; exit 42' TERM; : > "$ROLLOUT_HOME/started"; wait $s ;;
   term42) sleep 20 >/dev/null 2>&1 & s=$!; trap 'kill $s; echo term >> "$ROLLOUT_HOME/calls.log"; exit 42' TERM; : > "$ROLLOUT_HOME/started"; wait $s ;;
 esac
 `;
@@ -66,7 +69,7 @@ function makeHome() {
 
 // Fixed environment of the runs: fakes at the front of PATH, own config directory (never the real config.toml), Zwift tag set.
 // An environment of the test machine (ROLLOUT_ZWIFT_*, CONTAINER_TOOL, FAKE_*) never leaks in.
-const clean = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ROLLOUT_(ZWIFT|CONTAINER)|FAKE_|CONTAINER_TOOL$|IMAGE$|VERSION$|DONT_UPDATE$|ZWIFT_FG$)/.test(k)));
+const clean = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ROLLOUT_(ZWIFT|CONTAINER)|FAKE_|CONTAINER_TOOL$|CONTAINER_EXTRA_ARGS$|IMAGE$|VERSION$|DONT_UPDATE$|ZWIFT_FG$)/.test(k)));
 const env = (home, extra = {}) => ({
   ...clean(), ROLLOUT_HOME: home, ROLLOUT_CONFIG_HOME: path.join(home, 'cfg'), ROLLOUT_ZWIFT_TAG: '1.2.3',
   ROLLOUT_RUN_UPSTREAM: path.join(home, 'upstream.sh'), ROLLOUT_RUN_NO_INHIBIT: '1',
@@ -151,7 +154,7 @@ for (const sh of shells) {
     const home = makeHome();
     const r = run(sh, home, ['--bootstrap-selftest'], { RUN_MODE: 'exit 0' });
     assert.equal(r.status, 0);
-    assert.equal(r.stdout.trim(), 'rollout-bootstrap 8 run');
+    assert.equal(r.stdout.trim(), 'rollout-bootstrap 9 run');
     assert.equal(calls(home).length, 0);
     assert.equal(pidFile(home), null);
   });
@@ -608,5 +611,115 @@ for (const sh of shells) {
       assert.deepEqual(log, [...expected, 'stop -t 10 zwift-fahrer'], JSON.stringify(extra));
       assert.equal(pidFile(home), null);
     }
+  });
+}
+
+// --- Output log for Zwift (R36, R37): the container runs with --rm, a copy of its output goes to state/zwift-run.log --------------------------
+const runLog = (home, suffix = '') => { try { return fs.readFileSync(path.join(home, `state/zwift-run.log${suffix}`), 'utf8'); } catch { return null; } };
+for (const sh of shells) {
+  test(`R36 Zwift output log (${sh}): stdout and stderr in the file and still on stdout, exit code kept, two older runs kept, off switch, MyWhoosh untouched`, () => {
+    const home = makeHome();
+    zwiftScript(home);
+    for (let i = 1; i <= 4; i += 1) {
+      const r = run(sh, home, ['zwift', `--run${i}`], { RUN_MODE: 'talk', USER: 'fahrer' });
+      assert.equal(r.status, 3);
+      assert.match(r.stdout, /out line/);
+      assert.match(r.stdout, /err line/);
+    }
+    const now = runLog(home);
+    assert.match(now, /^\S+Z rollout-run zwift --run4 \(runtime podman, image docker\.io\/netbrain\/zwift:1\.2\.3\)\n/);
+    assert.match(now, /^out line$/m);
+    assert.match(now, /^err line$/m);
+    assert.match(now, /rollout-run: exit code 3\n$/);
+    assert.match(runLog(home, '.1'), /--run3 /);
+    assert.match(runLog(home, '.2'), /--run2 /);
+    assert.equal(runLog(home, '.3'), null, 'at most three runs');
+    assert.equal(fs.existsSync(path.join(home, 'state/zwift-run.fifo')), false, 'no FIFO left behind');
+    const off = makeHome();
+    zwiftScript(off);
+    const r = run(sh, off, ['zwift'], { RUN_MODE: 'talk', USER: 'fahrer', ROLLOUT_ZWIFT_LOG: 'off' });
+    assert.equal(r.status, 3);
+    assert.match(r.stdout, /out line/);
+    assert.match(r.stderr, /err line/, 'without the log stderr stays stderr');
+    assert.equal(runLog(off), null);
+    const mw = makeHome();
+    assert.equal(run(sh, mw, ['mywhoosh'], { RUN_MODE: 'talk' }).status, 3);
+    assert.equal(runLog(mw), null);
+  });
+
+  test(`R37 Zwift output log on quit (${sh}): TERM and INT do not end the copy, output after the signal still arrives, exit code of the game`, async () => {
+    for (const signal of ['SIGTERM', 'SIGINT']) {
+      const home = makeHome();
+      zwiftScript(home);
+      const child = spawn(...argv(sh, path.join(home, 'bin/rollout-run'), 'zwift'), { env: env(home, { RUN_MODE: 'termtalk', USER: 'fahrer', ROLLOUT_ZWIFT_QUIT_WAIT: '1', ROLLOUT_ZWIFT_KILL_WAIT: '1' }), stdio: 'ignore', detached: true });
+      assert.ok(await until(() => fs.existsSync(path.join(home, 'started'))));
+      assert.ok(await until(() => /before term/.test(runLog(home) ?? '')), 'output arrives while the game runs');
+      // Like Ctrl+C in a terminal: the signal hits the whole process group, also tee. The starter turns INT into TERM for the game.
+      process.kill(-child.pid, signal);
+      assert.equal(await exited(child), 42, signal);
+      const text = runLog(home);
+      assert.match(text, /^after term$/m, signal);
+      assert.match(text, /rollout-run: exit code 42\n$/, signal);
+      assert.equal(pidFile(home), null);
+    }
+  });
+}
+
+// --- Zwift's data directory (R38): Zwift 1.124.0 writes to Documents/Zwift, netbrain syncs only ZWIFT_DATA_DIR with the volume ------------------------
+for (const sh of shells) {
+  test(`R38 Zwift data directory (${sh}): ZWIFT_DATA_DIR points at Documents/Zwift via CONTAINER_EXTRA_ARGS, a user string is kept, appdata leaves it alone, MyWhoosh untouched`, () => {
+    const docs = '-e ZWIFT_DATA_DIR=/home/user/.wine/drive_c/users/user/Documents/Zwift';
+    const extra = (home) => fs.readFileSync(path.join(home, 'extra.log'), 'utf8').trim();
+    const cases = [[{}, `extra=${docs}`], [{ CONTAINER_EXTRA_ARGS: '--cpus 2' }, `extra=${docs} --cpus 2`], [{ ROLLOUT_ZWIFT_DATA: 'appdata' }, 'extra=unset'],
+      [{ ROLLOUT_ZWIFT_DATA: 'appdata', CONTAINER_EXTRA_ARGS: '--cpus 2' }, 'extra=--cpus 2']];
+    for (const [more, expected] of cases) {
+      const home = makeHome();
+      zwiftScript(home);
+      assert.equal(run(sh, home, ['zwift'], { RUN_MODE: 'exit 0', USER: 'fahrer', ...more }).status, 0);
+      assert.equal(extra(home), expected, JSON.stringify(more));
+    }
+    const mw = makeHome();
+    assert.equal(run(sh, mw, ['mywhoosh'], { RUN_MODE: 'exit 0' }).status, 0);
+    assert.equal(extra(mw), 'extra=unset');
+  });
+}
+
+// --- Zwift data into the volume while it runs (R39): "Exit game" in Steam ends the container at once, netbrain's copy at the end never happens ---------
+for (const sh of shells) {
+  test(`R39 Zwift periodic copy (${sh}): rsync in the container every ROLLOUT_ZWIFT_SYNC_EVERY s while it runs, never after the end, 0 switches it off, not for MyWhoosh`, async () => {
+    const syncs = (home) => containers(home).filter((l) => /exec --user user zwift-fahrer sh -c .*rsync -qau/.test(l));
+    const home = makeHome();
+    zwiftScript(home);
+    fs.writeFileSync(path.join(home, 'running'), '');
+    const child = start(sh, home, ['zwift'], { RUN_MODE: 'wait', USER: 'fahrer', ROLLOUT_ZWIFT_SYNC_EVERY: '1', ROLLOUT_ZWIFT_QUIT_WAIT: '1', ROLLOUT_ZWIFT_KILL_WAIT: '1', FAKE_POLITE_KILLS: '1' });
+    assert.ok(await until(() => syncs(home).length >= 2, 6000), 'copies while running');
+    // Container gone (e.g. between start and ready): no copy, but the loop keeps waiting.
+    fs.rmSync(path.join(home, 'running'));
+    const before = syncs(home).length;
+    await sleep(2300);
+    assert.equal(syncs(home).length, before, 'no copy without a running container');
+    child.kill('SIGTERM');
+    await exited(child);
+    const after = syncs(home).length;
+    await sleep(1500);
+    assert.equal(syncs(home).length, after, 'no copy after the end');
+    // Off, and a game that ends by itself: the starter does not wait for the loop (spawnSync would hang if it held stdout).
+    for (const every of ['0', '']) {
+      const off = makeHome();
+      zwiftScript(off);
+      fs.writeFileSync(path.join(off, 'running'), '');
+      const r = run(sh, off, ['zwift'], { RUN_MODE: 'exit 0', USER: 'fahrer', ROLLOUT_ZWIFT_SYNC_EVERY: every });
+      assert.equal(r.status, 0);
+      if (every === '0') assert.equal(syncs(off).length, 0);
+    }
+    const quick = makeHome();
+    zwiftScript(quick);
+    const t0 = Date.now();
+    assert.equal(run(sh, quick, ['zwift'], { RUN_MODE: 'exit 0', USER: 'fahrer' }).status, 0);
+    assert.ok(Date.now() - t0 < 5000, 'the default 30 s loop does not delay the end');
+    const mw = makeHome();
+    fs.writeFileSync(path.join(mw, 'running'), '');
+    assert.equal(run(sh, mw, ['mywhoosh'], { RUN_MODE: 'exit 0', USER: 'fahrer', ROLLOUT_ZWIFT_SYNC_EVERY: '1' }).status, 0);
+    assert.equal(syncs(mw).length, 0);
   });
 }
