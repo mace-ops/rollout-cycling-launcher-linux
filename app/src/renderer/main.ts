@@ -1,6 +1,6 @@
 import type { AppId, LaunchPhase, RolloutApi, Snapshot } from '../shared/api';
 import { resolveLanguage, setLanguage } from './i18n';
-import { focusInitial, initNav } from './nav';
+import { focusInitial, initNav, padAllowed } from './nav';
 import { BACK, LAUNCH_SCREENS, freshUi, type AdvTab, type Screen, type Ui } from './ui';
 import { cardStatus, launchText, modal, noticeVisible, phasesHtml, scanHtml, selfUpdateNote, view } from './views';
 
@@ -351,9 +351,8 @@ initNav({
   scope: () => viewEl.querySelector('.modalbg') ?? viewEl,
   modalOpen: () => !!viewEl.querySelector('.modalbg'),
   back,
-  // MyWhoosh has no window signal like Zwift: from "Starting" the game is in front and belongs to the controller; it is quit through Steam.
-  // `snap` is still empty on the first tick (the first snapshot arrives asynchronously).
-  padEnabled: () => { const launch = (snap as Snapshot | undefined)?.launch; return !(launch?.app === 'mywhoosh' && (launch.phase === 'starting' || launch.phase === 'running')); }
+  // While a game is in front the gamepad belongs to the game (padAllowed). `snap` is still empty on the first tick (the first snapshot arrives asynchronously).
+  padEnabled: () => padAllowed((snap as Snapshot | undefined)?.launch)
 });
 
 void api.getSnapshot().then((first) => {

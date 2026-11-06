@@ -1,7 +1,22 @@
 // Operation by keyboard and controller: arrows, d-pad and left stick move between
 // all controls, A or Enter activates, B or Esc goes back, right stick scrolls.
 
+import type { Launch } from '../shared/api';
+
 export type Dir = 'up' | 'down' | 'left' | 'right';
+
+/**
+ * May Rollout's own UI take gamepad input during this start? In Gaming Mode the game and Rollout get the same virtual gamepad from Steam Input.
+ * As long as the game is in front, an A meant for the game would also press "Quit game", the only button of the running view (with Zwift
+ * this ended the game on the login form: arrow down focused the button, A for "log in with existing account" pressed it).
+ * MyWhoosh has no window signal: from "Starting" the game is in front and is quit through Steam. Zwift reports `visible` (its window is the one
+ * gamescope focuses, zwift-window.ts): while it is in front the gamepad belongs to Zwift; once Rollout is in front again, to Rollout.
+ */
+export function padAllowed(launch: Pick<Launch, 'app' | 'phase' | 'visible'> | null | undefined): boolean {
+  if (!launch) return true;
+  if (launch.app === 'mywhoosh') return launch.phase !== 'starting' && launch.phase !== 'running';
+  return !launch.visible;
+}
 
 const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])';
 const STICK_ON = 0.6;
