@@ -1,6 +1,6 @@
 {
   "name": "rollout",
-  "version": "0.9.0-beta.2",
+  "version": "0.9.0-beta.3",
   "license": "MIT",
   "private": true,
   "description": "Rollout: launcher for MyWhoosh and Zwift on Linux",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "start": "npm run build && electron .",
     "test": "npm run typecheck && npm run test:unit && npm run build && ELECTRON_RUN_AS_NODE=1 electron test/smoke.mjs",
-    "test:unit": "node --test test/steam.test.mjs test/config.test.mjs test/bluetooth.test.mjs test/zoom.test.mjs test/selfupdate.test.mjs test/bootstrap.test.mjs test/run.test.mjs test/zwift.test.mjs test/mywhoosh.test.mjs test/gamepad.test.mjs test/release.test.mjs"
+    "test:unit": "node --test test/steam.test.mjs test/config.test.mjs test/bluetooth.test.mjs test/zoom.test.mjs test/selfupdate.test.mjs test/bootstrap.test.mjs test/run.test.mjs test/zwift.test.mjs test/mywhoosh.test.mjs test/gamepad.test.mjs test/nav.test.mjs test/release.test.mjs"
   },
   "devDependencies": {
     "@types/node": "20.17.6",
